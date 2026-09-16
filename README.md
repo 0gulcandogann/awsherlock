@@ -38,7 +38,7 @@ Open `awsherlock-report.html` locally. No server, account signup, or internet co
 
 ## Installation
 
-Requires **Python 3.11 or newer**. Use pipx to install `awsherlock` as a terminal
+Requires **Python 3.11 or newer** and **Git**. Use pipx to install `awsherlock` as a terminal
 command, available from any directory without activating a virtual environment.
 
 ### Windows PowerShell
@@ -46,7 +46,7 @@ command, available from any directory without activating a virtual environment.
 ```powershell
 py -m pip install --user pipx
 py -m pipx ensurepath
-py -m pipx install "https://github.com/0gulcandogann/awsherlock/archive/refs/heads/main.zip"
+py -m pipx install "git+https://github.com/0gulcandogann/awsherlock.git"
 ```
 
 Close and reopen your terminal, then run:
@@ -67,13 +67,15 @@ Install pipx with your operating system's package manager (for example,
 
 ```bash
 pipx ensurepath
-pipx install "https://github.com/0gulcandogann/awsherlock/archive/refs/heads/main.zip"
+pipx install "git+https://github.com/0gulcandogann/awsherlock.git"
 ```
 
 Reopen your terminal and run `awsherlock --version`. See the
 [pipx installation guide](https://pipx.pypa.io/latest/how-to/install-pipx.html)
-for other systems. The archive URL installs the current `main` branch without Git.
-To pin a release, use `https://github.com/0gulcandogann/awsherlock/archive/refs/tags/v0.1.0.zip`
+for other systems. The Git URL installs the default branch using your existing Git
+authentication. If the repository is private, your GitHub account must have access;
+anonymous archive downloads may return 404. To pin a release, use
+`git+https://github.com/0gulcandogann/awsherlock.git@v0.1.0`
 instead; the original v0.1.0 release requires `awsherlock --help` for help.
 
 ### Update, remove, or troubleshoot
@@ -87,7 +89,7 @@ If the command is not found, run `pipx ensurepath` and restart the terminal
 application, including an IDE's terminal host if necessary. On Windows you can use
 `py -m pipx ensurepath` even when `pipx` itself is not on PATH. Verify discovery with
 `Get-Command awsherlock` in PowerShell or `command -v awsherlock` on macOS/Linux.
-An archive installation does not create a source checkout; clone the repository
+A pipx installation does not create a working source checkout; clone the repository
 below if you want the demo files locally.
 
 ### From a checkout
