@@ -2,6 +2,8 @@
 
 from typing import Annotated
 from pathlib import Path
+import importlib.util
+import shutil
 import subprocess
 import sys
 
@@ -36,11 +38,20 @@ def show_version(value: bool) -> None:
 def update_installation() -> None:
     """Upgrade the current isolated installation from the public main branch."""
     typer.echo("Updating AWSherlock from GitHub...")
+    if importlib.util.find_spec("pip") is not None:
+        command = [sys.executable, "-m", "pip", "install", "--upgrade", REPOSITORY_URL]
+    else:
+        pipx = shutil.which("pipx")
+        if pipx:
+            command = [pipx, "upgrade", "awsherlock"]
+        else:
+            launcher = shutil.which("py") or shutil.which("python3") or shutil.which("python")
+            if not launcher:
+                typer.echo("Update failed: pipx or a Python launcher was not found.", err=True)
+                raise typer.Exit(code=1)
+            command = [launcher, "-m", "pipx", "upgrade", "awsherlock"]
     try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", REPOSITORY_URL],
-            check=True,
-        )
+        subprocess.run(command, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
         typer.echo(f"Update failed: {error}", err=True)
         raise typer.Exit(code=1) from None
