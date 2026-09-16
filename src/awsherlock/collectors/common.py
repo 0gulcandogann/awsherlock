@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections.abc import Callable
 
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import (BotoCoreError, ClientError, ConnectTimeoutError,
+                                ReadTimeoutError, EndpointConnectionError)
 
 from awsherlock.models import JSONValue, Resource
 
@@ -29,7 +30,17 @@ class InvalidResponse(ValueError):
 def error_message(error: Exception) -> str:
     if isinstance(error, ClientError):
         code = error.response.get("Error", {}).get("Code")
-        return "AccessDenied" if code in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"} else "AWS request failed"
+        if code in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}:
+            return "AccessDenied"
+        if code in {"Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded"}:
+            return "AWS request throttled"
+        if code in {"ExpiredToken", "ExpiredTokenException", "InvalidClientTokenId", "SignatureDoesNotMatch"}:
+            return "AWS credentials expired or invalid"
+        return "AWS request failed"
+    if isinstance(error, (ConnectTimeoutError, ReadTimeoutError)):
+        return "AWS request timed out"
+    if isinstance(error, EndpointConnectionError):
+        return "AWS endpoint connection failed"
     return "Invalid AWS response" if isinstance(error, InvalidResponse) else "AWS SDK request failed"
 
 

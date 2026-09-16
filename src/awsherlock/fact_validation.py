@@ -16,6 +16,7 @@ SCHEMAS = {
     ("secretsmanager", "rotation"): bool, ("secretsmanager", "policy"): [RESOURCE_STATEMENT],
     ("secretsmanager", "encryption"): {"manager": str, "state": str},
     ("cloudtrail", "usable_trail"): bool,
+    ("cloudtrail", "management_events"): bool,
     ("cloudtrail", "trail_settings"): {"IsMultiRegionTrail": bool, "IncludeGlobalServiceEvents": bool, "LogFileValidationEnabled": bool, "IsOrganizationTrail": bool},
     ("cloudtrail", "trail_status"): {"logging": bool, "destination": str, "delivery_error": bool},
     ("kms", "policy"): [RESOURCE_STATEMENT],

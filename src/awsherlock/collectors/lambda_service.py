@@ -14,6 +14,7 @@ def collect_lambda(context: ScanContext, *, today: date | None = None) -> Collec
         result.issues.append(CollectionIssue(None, "Region", "Configure an AWS region for Lambda"))
         return result
     roles = {}
+    iam = None
     today = today or date.today()
     try:
         client = context.client("lambda", region_name=context.region)
@@ -48,10 +49,12 @@ def collect_lambda(context: ScanContext, *, today: date | None = None) -> Collec
                         return auth
                     collect_fact(result, resource, "urls", "ListFunctionUrlConfigs", urls)
                     def role_policies():
+                        nonlocal iam
                         role = text_field(function.get("Role"))
                         if role not in roles:
                             role_name = role.rsplit("/", 1)[-1]
-                            iam = context.client("iam")
+                            if iam is None:
+                                iam = context.client("iam")
                             policies = []
                             for policy_page in iam.get_paginator("list_attached_role_policies").paginate(RoleName=role_name):
                                 for policy in items(policy_page, "AttachedPolicies"):

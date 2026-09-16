@@ -22,6 +22,8 @@ class AuditRule:
             prefix = "CT"
             if self.number == 1:
                 matches = {"usable": False} if value is False else []
+            elif self.number == 4:
+                matches = {"management_events": False} if value is False else []
             elif self.number == 2:
                 matches = value if not value["IsMultiRegionTrail"] or not value["IncludeGlobalServiceEvents"] else []
             else:
@@ -47,6 +49,7 @@ CLOUDTRAIL_RULES = (
     AuditRule("cloudtrail", 1, "usable_trail", "No usable CloudTrail trail visible in scanned region", "Review logging state, S3 destination and delivery errors; configure an appropriate trail."),
     AuditRule("cloudtrail", 2, "trail_settings", "CloudTrail multi-region or global event logging is incomplete", "Review regional coverage and global service event logging."),
     AuditRule("cloudtrail", 3, "trail_settings", "CloudTrail log file validation is disabled", "Enable log file validation and validate delivered log integrity."),
+    AuditRule("cloudtrail", 4, "management_events", "CloudTrail management-event logging is excluded", "Review basic or advanced event selectors and include the intended management events; read/write filters may still limit coverage."),
 )
 KMS_RULES = (
     AuditRule("kms", 1, "rotation", "Eligible KMS key automatic rotation is disabled", "Review your rotation policy and enable automatic rotation when appropriate."),

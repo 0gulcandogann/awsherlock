@@ -9,6 +9,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from awsherlock.aws.context import ScanContext
 from awsherlock.models import JSONValue, Resource
 from awsherlock.s3_facts import PUBLIC_ACCESS_FLAGS, validate_fact
+from awsherlock.collectors.common import error_message
 
 
 @dataclass(frozen=True)
@@ -29,13 +30,9 @@ class InvalidResponse(ValueError):
 
 
 def _message(error: Exception) -> str:
-    if isinstance(error, ClientError):
-        if error.response.get("Error", {}).get("Code") in {"AccessDenied", "AccessDeniedException"}:
-            return "AccessDenied"
-        return "AWS request failed"
     if isinstance(error, InvalidResponse):
         return "Invalid AWS response"
-    return "AWS SDK request failed"
+    return error_message(error)
 
 
 def _normalize(name: str, response: object) -> JSONValue:

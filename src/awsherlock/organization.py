@@ -1,6 +1,7 @@
 """Read-only organization discovery and sequential account orchestration."""
 
 import re
+from dataclasses import replace
 from collections.abc import Callable
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -19,13 +20,19 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                       external_id: str | None = None, role_session_name: str | None = None,
                       progress: Callable[[str, int, int], None] | None = None,
                       regions: list[str] | None = None,
-                      snapshot_sink: SnapshotSink | None = None) -> Report:
+                      snapshot_sink: SnapshotSink | None = None,
+                      selected_checks: list[str] | None = None,
+                      selected_accounts: list[str] | None = None) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
                      "account_id": source.account_id, "region": source.region, "version": __version__,
                      "mode": "organization", "accounts": []}, [], [])
     accounts = report.metadata["accounts"]
+    if selected_checks is not None:
+        report.metadata["selected_checks"] = list(selected_checks)
+    if selected_accounts is not None:
+        report.metadata["selected_accounts"] = list(selected_accounts)
     if regions is not None:
         report.metadata.update(region=None, regions=regions)
     def account_failures(account_id: str, operation: str, message: str,
@@ -60,6 +67,12 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
         account_id = account["account_id"]
         if progress is not None:
             progress(f"Scanning account {account_id}", index + 1, len(accounts) + 2)
+        if selected_accounts is not None and account_id not in selected_accounts:
+            account["scan_status"] = "NOT_SCANNED"
+            account_failures(account_id, "AccountSelection", "Account excluded by --accounts", "NOT_SCANNED")
+            if progress is not None:
+                progress(f"Account {account_id} excluded", index + 2, len(accounts) + 2)
+            continue
         if account["state"] != "ACTIVE":
             account["scan_status"] = "NOT_SCANNED"
             account_failures(account_id, "AccountState", "Account is not ACTIVE", "NOT_SCANNED")
@@ -71,13 +84,16 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                                           role=f"arn:{source.partition}:iam::{account_id}:role/{role_name}",
                                           external_id=external_id, role_session_name=role_session_name,
                                           **({"client_config": source.client_config} if source.client_config is not None else {}))
+            if source.measurements is not None:
+                context = replace(context, measurements=source.measurements)
             if regions is not None:
-                result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink)
+                result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
+                                      **({"selected_checks": selected_checks} if selected_checks is not None else {}))
             else:
                 snapshot = capture_snapshot(context, services)
                 if snapshot_sink is not None:
                     snapshot_sink(snapshot, context.region or "global")
-                result = evaluate_snapshot(snapshot)
+                result = evaluate_snapshot(snapshot, **({"selected_checks": selected_checks} if selected_checks is not None else {}))
         except (SessionError, SnapshotError) as error:
             account["scan_status"] = coverage_status([{"message": str(error)}], 0, 0)
             operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"
@@ -92,6 +108,10 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             progress(f"Account {account_id} finished", index + 2, len(accounts) + 2)
     if progress is not None:
         progress("Finalizing results", len(accounts) + 1, len(accounts) + 2)
+    if selected_accounts is not None:
+        for account_id in selected_accounts:
+            if account_id not in seen:
+                account_failures(account_id, "AccountSelection", "Selected account was not discovered", "NOT_SCANNED")
     return report
 
 

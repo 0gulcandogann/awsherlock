@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from boto3.session import Session
 from botocore.config import Config
 from botocore.client import BaseClient
+from awsherlock.measurement import ScanMeasurements
 
 
 @dataclass(frozen=True)
@@ -18,9 +19,17 @@ class ScanContext:
     region: str | None
     session: Session = field(repr=False, compare=False)
     client_config: Config | None = field(default=None, repr=False, compare=False)
+    measurements: ScanMeasurements | None = field(default=None, repr=False, compare=False)
+    trail_status_cache: dict[tuple[str, str, str, str], dict[str, bool]] | None = field(
+        default=None, repr=False, compare=False)
+    trail_selector_cache: dict[tuple[str, str, str, str], bool] | None = field(
+        default=None, repr=False, compare=False)
 
     def client(self, service_name: str, **options: object) -> BaseClient:
         """Use the authenticated session with scan-specific request configuration."""
         if self.client_config is not None:
             options.setdefault("config", self.client_config)
-        return self.session.client(service_name, **options)
+        client = self.session.client(service_name, **options)
+        if self.measurements is not None:
+            self.measurements.instrument(client, self.account_id, self.caller_arn)
+        return client

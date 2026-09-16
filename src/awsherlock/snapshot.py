@@ -2,6 +2,7 @@
 
 import json
 import re
+from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -25,7 +26,7 @@ FACTS = {
     ("ec2", "security-group"): {"ingress"}, ("ec2", "instance"): {"metadata", "addresses"}, ("ec2", "volume"): {"encrypted"},
     ("lambda", "function"): {"urls", "runtime", "role_policies"},
     ("secretsmanager", "secret"): {"rotation", "policy", "encryption"},
-    ("cloudtrail", "trail"): {"trail_settings", "trail_status"},
+    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events"},
     ("cloudtrail", "regional_summary"): {"usable_trail"},
     ("kms", "key"): {"rotation", "policy"},
 }
@@ -73,7 +74,11 @@ def capture_snapshot(context: ScanContext, services: list[str],
         if progress is not None:
             progress(f"Scanning {service.upper()}", index, len(services))
         collector, _ = service_components(service)
-        result = collector(context)
+        timer = (context.measurements.collection(context.account_id, context.caller_arn,
+                                                 context.region, service)
+                 if context.measurements is not None else nullcontext())
+        with timer:
+            result = collector(context)
         results[service] = CollectionResult(result.resources, result.issues)
         if progress is not None:
             progress(f"Collected {service.upper()}", index + 1, len(services))

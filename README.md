@@ -4,11 +4,11 @@
 
 [![Release v0.1.5](https://img.shields.io/badge/release-v0.1.5-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.5)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-[![28 security checks](https://img.shields.io/badge/security_checks-28-7C3AED?style=flat-square)](#checks)
+[![29 security checks](https://img.shields.io/badge/security_checks-29-7C3AED?style=flat-square)](#checks)
 [![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](LICENSE)
 
-AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 28 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
+AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 29 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
 
 > [!NOTE]
 > **Read-only scanning.** The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
@@ -237,7 +237,7 @@ awsherlock snapshot --help
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
-| `--list-checks` | Off | List all 28 registered check IDs and titles; no AWS calls. |
+| `--list-checks` | Off | List all 29 registered check IDs and titles; no AWS calls. |
 | `--list-services` | Off | List supported services and their check counts; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
@@ -259,6 +259,8 @@ member accounts, or pass a normalized JSON file for offline evaluation.
 | `--role-session-name NAME` | `AWSherlock` | Name the assumed-role session; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
 | `--external-id ID` | Not supplied | External ID for the assumed role; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
 | `--services LIST` | All seven services | Comma-separated supported service names. Offline selection must exist in the snapshot. |
+| `--checks LIST` | All checks | Evaluate comma-separated registered IDs, such as `AWSH-S3-001,AWSH-S3-003`. Collection is unchanged; IDs must belong to the selected services/snapshot. Excluded checks remain visible in coverage. |
+| `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
 | `--output FORMAT` | `console` | `console`, `json` or `html`. JSON goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
 | `--report-file PATH` | Not supplied | Write a new JSON/HTML report; requires `--output json` or `--output html`. Existing files are not overwritten. |
 | `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
@@ -293,6 +295,13 @@ awsherlock scan scan-facts/123456789012-eu-west-1.json --summary-only --no-progr
 ```
 
 Replace the account ID, profile and role trust values with your actual configuration.
+Explicit exclusions make coverage incomplete and retain exit code 1. These selectors
+do not suppress findings after scanning. Resource/tag and OU selection are not implemented.
+
+```bash
+awsherlock scan facts.json --checks AWSH-S3-001,AWSH-S3-003 --output json
+awsherlock scan organization --accounts 123456789012,999999999999 --services iam,s3
+```
 Saved directories contain individually replayable files; pass a file, not the
 directory, to offline `scan`. Coverage and error exit codes remain visible in all modes.
 
@@ -577,10 +586,21 @@ Required reads: `lambda:ListFunctions`, `lambda:ListFunctionUrlConfigs`,
 
 Use `--services cloudtrail,kms`. CloudTrail includes organization and shadow trails,
 reads status in the home region, and checks for a usable trail visible in the
-configured region, multi-region/global-event settings, and log file validation.
-Stopped logging, a missing destination, or reported delivery errors trigger review; this does not inspect event selectors,
-CloudTrail Lake, log contents, or every region. Permission failures leave availability
-unknown. Requires `cloudtrail:DescribeTrails` and `cloudtrail:GetTrailStatus`.
+configured region, multi-region/global-event settings, log file validation and
+management-event selectors (`AWSH-CT-004`). Usability requires applicable regional
+coverage and management events in addition to logging and no reported delivery error.
+Basic selectors and advanced eventCategory/readOnly selectors are supported;
+restrictive advanced management-event filters remain unknown/partial. Read/write
+or event-source exclusions may still limit coverage; a positive indicator does not
+prove all API events are logged. Selector facts are normalized to a boolean.
+Old snapshots remain readable; absent selector facts count as NOT_SCANNED.
+CloudTrail Lake, log contents, actual delivery and every region are not inspected.
+Requires `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus` and
+[`cloudtrail:GetEventSelectors`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_GetEventSelectors.html).
+Without the new read permission, coverage remains partial.
+
+Within one multi-region scan, successful status/selector reads for the same trail
+are reused at its home region. Failures are not cached, and later scans read again.
 
 KMS checks automatic rotation of enabled customer-managed symmetric encryption
 keys with AWS_KMS origin, plus broad Allow principals in customer key policies.
@@ -732,6 +752,13 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Unreleased local work adds explicit `--checks`/organization `--accounts` selectors,
+scan-local collection measurements, successful CloudTrail status/selector reuse,
+one IAM client per Lambda collection, clearer collection failure categories and
+management-event check `AWSH-CT-004`. Measurements count SDK invocations separately
+from HTTP retries; `--stats` remains elapsed time and result counts. Synthetic
+benchmarks do not establish live AWS performance. No new tag has been published.
 
 Version 0.1.5, dated 2026-09-16, adds explicit single/multiple-region selection,
 per-region coverage in all reports, expected-account verification, per-request

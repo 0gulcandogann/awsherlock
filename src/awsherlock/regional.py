@@ -11,6 +11,7 @@ from awsherlock.aws.context import ScanContext
 from awsherlock.aws.session import validate_region
 from awsherlock.evaluation import Report, evaluate_snapshot
 from awsherlock.snapshot import Snapshot, SnapshotError, capture_snapshot
+from awsherlock.catalog import check_catalog
 
 GLOBAL_SERVICES = {"iam", "s3"}
 SnapshotSink = Callable[[Snapshot, str], None]
@@ -34,8 +35,11 @@ def collection_scopes(services: list[str], regions: list[str]) -> list[tuple[str
 
 def scan_regions(context: ScanContext, services: list[str], regions: list[str], *,
                  progress: Callable[[str, int, int], None] | None = None,
-                 snapshot_sink: SnapshotSink | None = None) -> Report:
+                 snapshot_sink: SnapshotSink | None = None,
+                 selected_checks: list[str] | None = None) -> Report:
     """Collect global services once and label every regional coverage entry."""
+    # One cache per orchestration, never retained on the caller's context.
+    context = replace(context, trail_status_cache={}, trail_selector_cache={})
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
                      "account_id": context.account_id, "region": None, "regions": regions,
                      "version": __version__, "mode": "multi-region"}, [], [])
@@ -43,6 +47,8 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
     total = sum(len(selected) for _, selected in scopes) + 1
     finished = 0
     seen_findings: set[str] = set()
+    if selected_checks is not None:
+        report.metadata["selected_checks"] = list(selected_checks)
     for region, selected in scopes:
         label = region or "global-bucket"
         target = replace(context, region=region) if region is not None else context
@@ -55,7 +61,11 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
             snapshot = capture_snapshot(target, selected, progress=service_progress)
             if snapshot_sink is not None:
                 snapshot_sink(snapshot, label)
-            result = evaluate_snapshot(snapshot)
+            # A global/regional scope can contain only some requested check services.
+            scope_ids = {identifier for identifier, service, _ in check_catalog() if service in selected}
+            scope_checks = ([identifier for identifier in selected_checks if identifier in scope_ids]
+                            if selected_checks is not None else None)
+            result = evaluate_snapshot(snapshot, **({"selected_checks": scope_checks} if scope_checks is not None else {}))
             entries = result.coverage
             for entry in entries:
                 entry["findings"] = 0

@@ -25,6 +25,7 @@ from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.diagnostics import runtime_diagnostics
 from awsherlock.terminal import CYAN, GREEN, ORANGE, RED, YELLOW, configure_typer_styles, color_option, field, message
 from awsherlock.regional import collection_scopes, parse_regions, scan_regions
+from awsherlock.selection import parse_check_selection, parse_account_selection
 
 configure_typer_styles()
 
@@ -174,11 +175,14 @@ def main(
     "[#5bfcfc]awsherlock scan --save-snapshot facts.json --stats[/]\n\n"
     "[#5bfcfc]awsherlock scan organization --role-name audit/Reader[/]\n\n"
     "[#5bfcfc]awsherlock scan facts.json --output json[/]\n\n"
+    "[#5bfcfc]awsherlock scan facts.json --checks AWSH-S3-001[/]\n\n"
     "[#ffd369]Default: all seven services, console output, SDK-configured region. "
     "Use --region OR --regions. --summary-only requires console output. "
     "--report-file requires JSON/HTML. --timeout sets both request limits; "
     "do not combine with separate timeout flags. Offline scans reject AWS "
     "authentication, regions, request timeouts and --save-snapshot. "
+    "--accounts is organization-only. --checks selects evaluation, not collection. "
+    "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
     "Incomplete coverage exits 1; findings alone do not change exit 0.[/]"
 ))
 def scan(
@@ -214,6 +218,8 @@ def scan(
     timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts; not an overall scan deadline.")] = None,
     color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
     stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.")] = False,
+    checks: Annotated[str | None, typer.Option("--checks", help="Evaluate comma-separated check IDs; collection is unchanged and exclusions remain visible.")] = None,
+    accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.")] = None,
 ) -> None:
     """Identify the AWS account, scan selected services, or evaluate an offline snapshot."""
     if output not in {None, "console", "json", "html"}:
@@ -223,6 +229,14 @@ def scan(
     if summary_only and output in {"json", "html"}:
         raise typer.BadParameter("--summary-only requires console output.")
     organization = snapshot_path == Path("organization")
+    if accounts is not None and not organization:
+        raise typer.BadParameter("--accounts requires scan organization.")
+    try:
+        selected_checks = parse_check_selection(checks)
+        selected_accounts = parse_account_selection(accounts)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from None
+    selection_options = ({"selected_checks": selected_checks} if selected_checks is not None else {})
     if region is not None and regions is not None:
         raise typer.BadParameter("Choose either --region or --regions.")
     selected_regions = None
@@ -258,6 +272,10 @@ def scan(
     except ValueError:
         raise typer.BadParameter("Unsupported service selection.", param_hint="--services") from None
     started = perf_counter()
+    if selected_checks is not None:
+        services_by_check = {identifier: owner for identifier, owner, _ in check_catalog()}
+        if any(services_by_check[identifier] not in selected for identifier in selected_checks):
+            raise typer.BadParameter("Selected checks must belong to the --services selection.")
     work_total = (sum(len(names) for _, names in collection_scopes(selected, selected_regions))
                   if selected_regions is not None else len(selected)) + 2
     try:
@@ -270,6 +288,8 @@ def scan(
                 report = scan_organization(
                     context, selected, role_name or "AWSherlockAuditRole", external_id,
                     role_session_name, progress=account_progress,
+                    **selection_options,
+                    **({"selected_accounts": selected_accounts} if selected_accounts is not None else {}),
                     **({"regions": selected_regions} if selected_regions is not None else {}),
                     **({"snapshot_sink": sink} if sink is not None else {}),
                 )
@@ -282,6 +302,8 @@ def scan(
                         raise SnapshotError("Selected service is absent from the snapshot")
                     snapshot.services = {service: snapshot.services[service] for service in selected}
                 activity("Evaluating security checks", 1, 2)
+                if selected_checks is not None and any(services_by_check[identifier] not in snapshot.services for identifier in selected_checks):
+                    raise SnapshotError("Selected checks are absent from the snapshot")
             else:
                 activity("Connecting to AWS", 0, work_total)
                 context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id, **region_options, **extra_options)
@@ -292,14 +314,14 @@ def scan(
                     def regional_progress(stage: str, completed: int, total: int) -> None:
                         activity(stage, completed + 1, total + 1)
                     report = scan_regions(context, selected, selected_regions,
-                                          progress=regional_progress, snapshot_sink=sink)
+                                          progress=regional_progress, snapshot_sink=sink, **selection_options)
                 else:
                     snapshot = capture_snapshot(context, selected, progress=service_progress)
                     if sink is not None:
                         sink(snapshot, context.region or "global")
                     activity("Evaluating security checks", len(selected) + 1, len(selected) + 2)
             if not organization and selected_regions is None:
-                report = evaluate_snapshot(snapshot)
+                report = evaluate_snapshot(snapshot, **selection_options)
             activity("Scan finished - incomplete coverage" if report.incomplete else "Scan finished", 1, 1)
         if output == "html":
             destination = report_file or Path("awsherlock-report.html")

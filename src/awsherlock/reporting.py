@@ -114,9 +114,11 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
         console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
-        errors.print("Collection issues", style=f"bold {RED}")
+        has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection"} for _, issue in issues)
+        errors.print("Scan issues and exclusions" if has_exclusions else "Collection issues", style=f"bold {RED}")
         for entry, issue in issues:
-            message = Text(f"ERROR {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
+            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection"} else "ERROR"
+            message = Text(f"{label} {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
                            f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style=RED)
             if multi_region:
                 message.append(f"Region / scope: {terminal_text(entry.get('region') or entry.get('scope') or 'global')}\n", style=CYAN)
