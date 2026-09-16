@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Organized terminal results into a summary, severity counts, coverage table,
+  severity-ordered finding cards and separate collection issues.
+- Added a light HTML report theme with purple-bordered cards, orange offset
+  shadows and a compact top navigation. Existing offline filters are preserved.
+- Removed bundled examples from the repository tree and source distribution.
+  Rewrote installation, scanning and report documentation for new users.
+
 - Running `awsherlock` without arguments now displays help and exits successfully,
   without creating an AWS session.
 - Added `awsherlock --update` to refresh an existing installation from GitHub.

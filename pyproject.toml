@@ -29,12 +29,6 @@ dependencies = [
   "jinja2>=3.1,<4"
 ]
 
-[project.optional-dependencies]
-dev = [
-  "pytest>=8,<9",
-  "pytest-cov>=5,<7"
-]
-
 [project.scripts]
 awsherlock = "awsherlock.cli:app"
 
@@ -49,8 +43,4 @@ path = "src/awsherlock/__init__.py"
 packages = ["src/awsherlock"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/docs", "/examples", "/README.md", "/LICENSE", "/CHANGELOG.md", "/CONTRIBUTING.md", "/SECURITY.md", "/Dockerfile", "/.dockerignore", "/install.sh", "/pyproject.toml"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q"
+include = ["/src", "/docs", "/README.md", "/LICENSE", "/CHANGELOG.md", "/CONTRIBUTING.md", "/SECURITY.md", "/Dockerfile", "/.dockerignore", "/install.sh", "/pyproject.toml"]

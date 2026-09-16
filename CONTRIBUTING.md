@@ -1,37 +1,30 @@
 # Contributing
 
-Use issues for bug reports and focused proposals. Include the version, command,
-check ID, expected behavior and a sanitized reproduction. Use Python 3.11 or newer.
+Open an issue for a bug or a focused proposal. Include the AWSherlock version,
+command, affected check ID, expected result, and a sanitized reproduction.
+Never attach AWS credentials or an unsanitized snapshot or report.
+
+For code changes, use Python 3.11 or newer in a virtual environment:
 
 ```bash
 python -m venv .venv
-# Activate your environment, then:
-python -m pip install -e .
-awsherlock --help
-awsherlock scan examples/demo-snapshot.json --output json
 ```
 
-The demo deliberately exits with code 1 for incomplete coverage. The maintainer's
-local regression suite is not included in this public distribution. Include a
-minimal synthetic reproduction with your proposal and describe its validation.
-Cover secure/insecure configurations, pagination and AccessDenied where relevant.
-Preserve independent facts when collection partially fails; missing permissions
-must never become a PASS.
-
-Keep sessions in the authentication layer, facts in collectors, evaluation in
-rules and formatting in reporters. HTML must work offline without a framework.
-Do not add AWS write calls, credential storage or secret-value retrieval.
-
-Before a pull request, validate the affected behavior, inspect the diff for
-secrets and unrelated changes, and explain the resulting behavior and validation.
-Use synthetic account IDs and credentials in tests. Never attach a real snapshot
-without sanitizing account/resource names and sensitive metadata.
-
-Packaging verification:
+Activate it with `source .venv/bin/activate` on Linux/macOS or
+`.\.venv\Scripts\Activate.ps1` in PowerShell, then install:
 
 ```bash
-python -m pip install build
-python -m build
-docker build -t awsherlock:local .
-docker run --rm --network none awsherlock:local --version
+python -m pip install -e .
+awsherlock --help
 ```
+
+Keep AWS sessions in the authentication layer, collection in collectors,
+evaluation in rules, and rendering in reporters. Reports must work offline.
+Do not add AWS write calls, custom credential storage, or secret-value retrieval.
+
+Describe how you verified the change. For a security check, cover both secure and
+insecure configurations and include missing-permission behavior. For collectors,
+check pagination and partial failures. Use synthetic data when reproducing issues.
+
+Keep pull requests focused. Explain the user-visible change and its limits, and
+check that your diff contains no credentials, local reports, or unrelated files.

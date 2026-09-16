@@ -1,47 +1,24 @@
-<div align="center">
-
 # AWSherlock
 
-**Inspect AWS configuration. Understand the risk. Know what was actually scanned.**
+AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 28 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
 
-Read-only AWS security scanning with offline snapshots and standalone HTML reports.
-
-**7 services · 28 checks · Multi-account scanning · Python 3.11+ · MIT**
-
-[Get started](#installation) · [Try the demo](#try-it-without-an-aws-account) · [Security checks](docs/checks.md) · [Report an issue](https://github.com/0gulcandogann/awsherlock/issues)
-
-</div>
-
----
-
-AWSherlock is a CLI for reviewing AWS security configuration. Scan an account or an organization, inspect the evidence behind each finding, and share a report that opens directly in a browser.
-
-Missing permissions stay visible. An empty findings list never hides a failed scan.
+The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
 
 ```bash
-awsherlock scan --profile production --services iam,s3 --output html
+awsherlock scan --profile production
 ```
 
-Open `awsherlock-report.html` locally. No server, account signup, or internet connection is needed to view the report.
+**Python 3.11+ · IAM, S3, EC2, Lambda, Secrets Manager, CloudTrail, KMS · MIT**
 
-## What you get
-
-| Capability | Details |
-| --- | --- |
-| Configuration checks | 28 checks across IAM, S3, EC2, Lambda, Secrets Manager, CloudTrail and KMS |
-| Existing AWS authentication | SDK credential chain, named profiles, SSO sessions and STS AssumeRole |
-| Organization scanning | Account discovery, configurable audit roles and visible per-account failures |
-| Offline analysis | Capture facts once, then evaluate or regenerate reports without AWS access |
-| Three output formats | Terminal findings, structured JSON and a single standalone HTML file |
-| Interactive reports | Search, severity/service/account filters, sorting, evidence and remediation |
-| Explicit coverage | Per-account and per-service visibility into successful, partial and failed collection |
+[Installation](#installation) · [First scan](#first-scan) · [Reports](#reports) · [Checks and permissions](docs/checks.md) · [Troubleshooting](#troubleshooting)
 
 ## Installation
 
-Requires **Python 3.11 or newer** and **Git**. The supported installation flow
-starts with a clone so the CLI, offline demo and installer are available locally.
+Install Python 3.11 or newer and Git before starting. AWSherlock installs into an isolated environment so it can run from any directory without activating a virtual environment. There is no PyPI installation step; install from this repository.
 
-### Windows PowerShell
+### Windows
+
+Open PowerShell:
 
 ```powershell
 git clone https://github.com/0gulcandogann/awsherlock.git
@@ -51,260 +28,284 @@ py -m pipx ensurepath
 py -m pipx install .
 ```
 
-Close and reopen your terminal, then run:
+Close and reopen your terminal, then check the installed command:
 
 ```powershell
-awsherlock
 awsherlock --version
-awsherlock scan --help
+awsherlock --help
 ```
 
-The bare `awsherlock` command shows help without contacting AWS. Installation is
-per user; administrator access and manual virtual-environment activation are not required.
-Use `awsherlock --update` later to refresh the installed command from the latest
-GitHub `main` branch.
+Installation is per user and does not need administrator access. Running `awsherlock` without arguments also displays help and does not contact AWS.
 
-### macOS / Linux
-
-From the cloned checkout, the included installer creates an isolated user install
-under `~/.local/share/awsherlock` and exposes `awsherlock` through `~/.local/bin`.
-It does not require sudo and does not modify system Python:
+### Linux and macOS
 
 ```bash
 git clone https://github.com/0gulcandogann/awsherlock.git
 cd awsherlock
 ./install.sh
-```
-
-If `~/.local/bin` is not already on PATH, the script prints the exact export
-command to add. Open a new terminal after adding it, then run `awsherlock --version`.
-To choose another user-owned location, set `AWSHERLOCK_INSTALL_ROOT` or
-`AWSHERLOCK_BIN_DIR` before running the script.
-
-If you prefer pipx after cloning, install pipx with your
-operating system's package manager (for example, `brew install pipx` on macOS
-or `sudo apt install pipx` on Ubuntu), then:
-
-```bash
-pipx ensurepath
-pipx install .
-```
-
-Reopen your terminal and run `awsherlock --version`. See the
-[pipx installation guide](https://pipx.pypa.io/latest/how-to/install-pipx.html)
-for other systems. The package is installed from the local clone, so no separate
-download or source archive is needed.
-
-### Update, remove, or troubleshoot
-
-```bash
-awsherlock --update
-pipx upgrade awsherlock
-pipx uninstall awsherlock
-```
-
-If the command is not found, run `pipx ensurepath` and restart the terminal
-application, including an IDE's terminal host if necessary. On Windows you can use
-`py -m pipx ensurepath` even when `pipx` itself is not on PATH. Verify discovery with
-`Get-Command awsherlock` in PowerShell or `command -v awsherlock` on macOS/Linux.
-Both routes start from the same local clone, so the offline demo and documentation
-remain available beside the installed command.
-
-### From a checkout
-
-For development only, use an activated virtual environment:
-
-```bash
-git clone https://github.com/0gulcandogann/awsherlock.git
-cd awsherlock
-python -m venv .venv
-```
-
-Activate your environment:
-
-```bash
-# macOS / Linux
-source .venv/bin/activate
-```
-
-```powershell
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-```
-
-Then install and verify:
-
-```bash
-python -m pip install .
 awsherlock --version
-awsherlock scan --help
 ```
 
-Alternatively, run `pipx install .` from the checkout for an isolated CLI installation. You can also use `python -m awsherlock` in place of `awsherlock`.
+The installer creates a Python environment in `~/.local/share/awsherlock/venv` and links the command into `~/.local/bin`. It does not need sudo or change your system Python.
 
-## Try it without an AWS account
-
-The repository includes a completely synthetic example with four findings and an intentional permission failure:
+If the command is not found, add the bin directory to PATH:
 
 ```bash
-awsherlock scan examples/demo-snapshot.json
-awsherlock scan examples/demo-snapshot.json --output json
-awsherlock scan examples/demo-snapshot.json --output html --report-file demo.html
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Open `demo.html` to explore search, filters, evidence and coverage. These commands return **exit code 1** because the example deliberately contains incomplete coverage; the report is still generated.
+Add that line to your shell configuration, such as `~/.bashrc` or `~/.zshrc`, to keep it for future terminals. The installer prints the PATH command for your chosen location. Set `PYTHON` to select a Python executable, or `AWSHERLOCK_INSTALL_ROOT` and `AWSHERLOCK_BIN_DIR` to choose other user-owned directories.
 
-Explore the [snapshot](examples/demo-snapshot.json) and [JSON report](examples/demo-report.json), or download [the HTML report](https://raw.githubusercontent.com/0gulcandogann/awsherlock/main/examples/demo-report.html) and open it locally. All example identifiers are invented.
+On systems that package Python's virtual-environment support separately, install it before running the script. For example, Debian and Ubuntu provide `python3-venv`.
 
-## Scan your AWS environment
+## First scan
 
-Configure credentials and a region with your existing AWS CLI/SDK setup. For SSO, sign in first using your normal AWS CLI login. AWSherlock uses the SDK credential chain and does not implement credential storage.
+AWSherlock uses the standard AWS SDK credential chain. Existing AWS CLI profiles, environment credentials, instance or container roles, and authenticated IAM Identity Center sessions can supply credentials. The AWS CLI is useful for setting up profiles and SSO; it is not required for every scan.
+
+If you use IAM Identity Center, sign in with your configured profile first:
 
 ```bash
-# All seven services using the default credential chain
+aws sso login --profile production
+awsherlock scan --profile production
+```
+
+To use the default credential chain:
+
+```bash
 awsherlock scan
+```
 
-# A named profile and selected services
+Set the region in your profile or through `AWS_DEFAULT_REGION`. Regional services use that one configured region. IAM is global, and S3 buckets are inspected in their own regions. There is no `--region` flag or automatic scan of every AWS region.
+
+Your identity needs permission to read the configuration being inspected. See [checks and required permissions](docs/checks.md) before assigning access to an audit role. AWSherlock does not create roles or attach policies for you.
+
+### Choose services
+
+A plain scan selects all seven supported services. To limit the scan, pass a comma-separated list:
+
+```bash
 awsherlock scan --profile production --services iam,s3
-
-# Assume a role in a target account
-awsherlock scan --profile production --role arn:aws:iam::123456789012:role/AWSherlockAuditRole
+awsherlock scan --profile production --services ec2,lambda,kms
 ```
 
-Regional services use the SDK-configured region (`AWS_DEFAULT_REGION` or your profile region). IAM is global; S3 buckets are inspected in their own regions.
+Accepted names are `iam`, `s3`, `ec2`, `lambda`, `secretsmanager`, `cloudtrail`, and `kms`.
 
-### AssumeRole options
+## Reading the results
 
-```bash
-awsherlock scan --profile production --role arn:aws:iam::123456789012:role/AWSherlockAuditRole --role-session-name audit-session --external-id example-external-id
-```
+Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource, explains the configuration issue, and gives a remediation suggestion. Collection errors appear in a separate section.
 
-The source principal needs `sts:AssumeRole`, and the target role must trust it. Temporary credentials remain in memory. Explicit assumed-role sessions do not automatically refresh; rerun the scan after credentials expire. Interactive MFA parameters are not supported; use an already authenticated source session.
+Severity describes the reported configuration risk. Coverage tells you whether the scanner had enough information to evaluate the selected checks. Read both before drawing a conclusion from the results.
 
-### Scan an organization
+| Coverage | Meaning |
+| --- | --- |
+| `COMPLETE` | Applicable checks on known resources were evaluated. This is not a statement that the account is secure. |
+| `PARTIAL` | Some checks ran, but other checks lacked facts or permissions. |
+| `ACCESS_DENIED` | Permission denial prevented evaluation for this entry. |
+| `ERROR` | Collection or evaluation failed. |
+| `NOT_SCANNED` | Required facts were unavailable, or an organization account was not active. |
 
-```bash
-awsherlock scan organization --profile management --services iam,s3 --output html
-awsherlock scan organization --profile management --role-name audit/Reader --output json
-```
+A failed resource listing can hide resources the scanner never learned about. The count of checks not scanned covers known resources only.
 
-The management or delegated administrator account needs `organizations:ListAccounts`. AWSherlock discovers accounts, reads their `State`, and sequentially assumes `AWSherlockAuditRole` in each active account. Override the target role name or path with `--role-name`.
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Evaluation completed. Findings may still exist. |
+| `1` | Coverage was incomplete, or an operational error occurred. |
+| `2` | The command or its arguments were invalid. |
 
-Each target role needs the relevant service read permissions and a trust policy allowing the source. Inaccessible accounts are reported; remaining accounts continue. Non-active accounts are marked `NOT_SCANNED`.
+Exit code `0` does not mean there are no security findings. If a scan is partial, AWSherlock still writes the available report before returning `1`.
 
-For organization scans, `--external-id` and `--role-session-name` apply to target roles. `--role` optionally assumes a source discovery role first.
-
-## Reports and snapshots
+## Reports
 
 ### HTML
 
 ```bash
-awsherlock scan --services iam,s3 --output html --report-file report.html
+awsherlock scan --profile production --output html
 ```
 
-Reports include scan metadata, severity counts, evidence, risk, remediation and collection issues. Search includes finding IDs, resources and evidence. Combine severity, service and account filters, or sort by severity, service, resource or finding ID. With JavaScript disabled, all findings remain readable.
+Open `awsherlock-report.html` in your browser. To choose a file name:
 
-CSS and JavaScript are embedded. No CDN, server or external asset is required.
+```bash
+awsherlock scan --profile production --output html --report-file production.html
+```
+
+The report uses a light theme with bordered cards. It includes scan metadata, severity counts, findings, evidence, remediation, and coverage details. Use the search field and severity, service, and account filters to narrow the findings. Sorting is available by severity, service, resource, or check ID.
+
+HTML reports are single files with embedded styles and JavaScript. They need no server or internet connection. All findings remain readable with JavaScript disabled.
 
 ### JSON
 
-```bash
-# Structured JSON on stdout
-awsherlock scan --services iam,s3 --output json
+Write structured JSON to stdout:
 
-# Save a report
-awsherlock scan --services iam,s3 --output json --report-file findings.json
+```bash
+awsherlock scan --profile production --output json
 ```
 
-JSON preserves metadata, normalized findings, coverage, collection issues and summary counts. Existing report and snapshot files are never overwritten.
+Or save it directly:
 
-### Capture now, analyze offline
+```bash
+awsherlock scan --profile production --output json --report-file findings.json
+```
+
+JSON includes metadata, summary counts, normalized findings, coverage, and collection issues. `--report-file` is supported for JSON and HTML output. Existing report files are never overwritten; choose a new name or move the earlier report.
+
+## Scan another account
+
+Use a source profile to assume an audit role in the target account:
+
+```bash
+awsherlock scan --profile production --role arn:aws:iam::123456789012:role/AWSherlockAuditRole
+```
+
+Replace the account ID and role name with your target role. The source identity needs `sts:AssumeRole`, the target role must trust that source, and the role needs the service read permissions listed in [docs/checks.md](docs/checks.md).
+
+If the trust policy requires an external ID, or you want a specific session name:
+
+```bash
+awsherlock scan --profile production --role arn:aws:iam::123456789012:role/AWSherlockAuditRole --external-id audit-external-id --role-session-name security-review
+```
+
+Temporary credentials stay in memory. Explicit assumed-role credentials do not automatically refresh during a scan. Interactive MFA arguments are not supported; use an already authenticated source session.
+
+## Scan an organization
+
+```bash
+awsherlock scan organization --profile management --output html --report-file organization.html
+```
+
+The source account needs access to `organizations:ListAccounts` and permission to assume the audit roles in member accounts. AWSherlock discovers accounts and scans active accounts sequentially using `AWSherlockAuditRole` by default.
+
+Choose another role name or path, and limit services if needed:
+
+```bash
+awsherlock scan organization --profile management --role-name audit/Reader --services iam,s3 --output html --report-file organization-s3-iam.html
+```
+
+Each member role must trust the source identity and allow the required reads. Accounts that cannot be accessed are recorded in the report while scanning continues for the remaining accounts. Non-active accounts are marked `NOT_SCANNED`.
+
+For organization scans, `--external-id` and `--role-session-name` apply to the member-account roles. Use `--role` to assume a source discovery role first. The HTML account filter lets you review findings from one account at a time.
+
+## Capture a snapshot for offline analysis
+
+Collect configuration facts without evaluating security rules:
 
 ```bash
 awsherlock snapshot --profile production --services iam,s3 --output snapshot.json
+```
+
+Evaluate that file later, or generate a report without contacting AWS:
+
+```bash
 awsherlock scan snapshot.json
 awsherlock scan snapshot.json --output html --report-file offline.html
 ```
 
-Capture collects facts without evaluating rules. Offline scans use the same rules as live scans and never create an AWS session. Authentication flags are rejected offline; `--services` can select services present in the snapshot.
+Offline scans use the same rules as live scans. Authentication arguments such as `--profile` and `--role` cannot be used with a snapshot. `--services` can select services already present in the file. Existing snapshot files are never overwritten.
 
-Snapshots reflect collection time. They contain resource names, account IDs and security metadata; sanitize them before sharing.
+Snapshots reflect the time of collection. They contain account IDs, resource names, policies, and security metadata. Treat snapshots and reports as internal audit data and sanitize them before sharing. Organization snapshot capture is not supported.
 
-## Supported checks
+## Checks
 
-| Service | Checks | What is inspected |
+| Service | Count | Configuration reviewed |
 | --- | ---: | --- |
-| IAM | 6 | AdministratorAccess, broad policy actions/resources, console MFA, old and unused active keys |
-| S3 | 5 | Public access safeguards, encryption configuration, versioning, access logging, public policy status |
-| EC2 | 6 | Internet-wide SSH/RDP/database ingress, IMDSv1, public addresses, EBS encryption |
+| IAM | 6 | AdministratorAccess, broad policy actions and resources, console MFA, old and unused active keys |
+| S3 | 5 | Public access safeguards, default encryption, versioning, access logging, public policy status |
+| EC2 | 6 | Internet-wide SSH, RDP and database ingress; IMDSv1; public addresses; EBS encryption |
 | Lambda | 3 | Public function URLs, broad managed execution-role policies, deprecated runtimes |
 | Secrets Manager | 3 | Rotation, broad resource-policy principals, custom encryption key state |
-| CloudTrail | 3 | Usable trail, multi-region/global logging, log validation |
-| KMS | 2 | Eligible key rotation and broad key-policy principals |
+| CloudTrail | 3 | Usable trail, multi-region and global logging, log validation |
+| KMS | 2 | Eligible key rotation, broad key-policy principals |
 
-See **[security checks and permissions](docs/checks.md)** for required AWS read permissions, detection details and service-specific limitations. AWSherlock does not create audit roles or modify policies.
+[Checks and permissions](docs/checks.md) lists the check IDs, finding triggers, required AWS actions, and service-specific limits.
 
-## Understand scan coverage
+AWSherlock evaluates configuration indicators. It does not prove effective access or simulate policy conditions, explicit denies, permissions boundaries, or SCPs. Unknown Lambda runtimes and container-image runtimes leave runtime coverage incomplete. OU analysis, automatic remediation, and compliance certification are not included.
 
-| Status | Meaning |
-| --- | --- |
-| `COMPLETE` | Applicable known checks were evaluated; this does not mean the account is secure |
-| `PARTIAL` | Some checks ran, but facts or permissions were missing |
-| `ACCESS_DENIED` | Permission denial prevented evaluation for this entry |
-| `ERROR` | Collection or evaluation failed |
-| `NOT_SCANNED` | Required facts were missing or an account was not active |
-
-Coverage appears in every report format. Missing-check counts cover known resources; a failed listing can hide an unknown number of resources.
-
-| Exit code | Meaning |
-| --- | --- |
-| `0` | Evaluation completed, including scans that found issues |
-| `1` | Incomplete coverage or an operational error |
-| `2` | Invalid command-line usage |
+The scanner does not retrieve secret values, Lambda code or environment values, EC2 user data, or KMS key material. Validation has used mocked AWS APIs and local browsers; live-account validation is not claimed.
 
 ## Docker
 
+Build the image from the cloned repository:
+
 ```bash
 docker build -t awsherlock:local .
-docker run --rm --network none awsherlock:local --help
+docker run --rm awsherlock:local --version
 ```
 
-Offline demo on macOS/Linux:
+For a live scan with a host AWS profile on Linux or macOS:
 
 ```bash
-docker run --rm --network none -v "$PWD/examples:/data:ro" awsherlock:local scan /data/demo-snapshot.json --output json
+docker run --rm -v "$HOME/.aws:/home/scanner/.aws:ro" -e AWS_DEFAULT_REGION=eu-central-1 awsherlock:local scan --profile production --output json
 ```
 
-Offline demo on PowerShell:
+On PowerShell:
 
 ```powershell
-docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path)/examples,target=/data,readonly" awsherlock:local scan /data/demo-snapshot.json --output json
+docker run --rm --mount "type=bind,source=$env:USERPROFILE/.aws,target=/home/scanner/.aws,readonly" -e AWS_DEFAULT_REGION=eu-central-1 awsherlock:local scan --profile production --output json
 ```
 
-Example live profile scan on PowerShell:
+To save an HTML report, mount an output directory at `/work`. On Linux or macOS:
+
+```bash
+mkdir -p reports
+docker run --rm -v "$HOME/.aws:/home/scanner/.aws:ro" -v "$PWD/reports:/work" --user "$(id -u):$(id -g)" -e HOME=/home/scanner -e AWS_DEFAULT_REGION=eu-central-1 awsherlock:local scan --profile production --output html --report-file /work/report.html
+```
+
+The image normally runs as UID `10001`. The output mount must be writable by the container user; the command above uses your host UID and GID. The credentials mount must also be readable. Supply authentication at runtime, never during the image build. SSO sessions must already be authenticated, and any external credential helper used by a profile must be available inside the container.
+
+You can also mount your own snapshot read-only and run offline with `--network none`.
+
+## Update or remove
+
+Run the update commands from the directory where you cloned AWSherlock.
+
+For Linux and macOS installs made with the script:
+
+```bash
+git pull --ff-only
+./install.sh
+```
+
+For Windows pipx installs:
 
 ```powershell
-docker run --rm --mount "type=bind,source=$env:USERPROFILE/.aws,target=/home/scanner/.aws,readonly" -e AWS_DEFAULT_REGION=eu-central-1 awsherlock:local scan --profile production --services iam,s3 --output json
+git pull --ff-only
+py -m pipx install --force .
 ```
 
-The image runs as UID `10001`. Mount a writable directory at `/work` to retain reports. On Linux, arrange mount permissions or use `--user` with your UID/GID. Supply credentials at runtime through SDK mechanisms. Host-only credential helpers must also be available inside the container; SSO login/refresh happens outside AWSherlock. No host credentials are copied into the image.
+Then run `awsherlock --version`. Reinstalling from the updated clone also picks up changes that keep the same version number. `awsherlock --update` is available as a convenience command; if it does not refresh a clone-based pipx install, use the commands above.
 
-## Security and limitations
+To remove a Windows pipx install:
 
-AWSherlock reads configuration and never changes AWS resources. It does not fetch secret values, Lambda code or environment values, EC2 user data, or KMS key material.
+```powershell
+py -m pipx uninstall awsherlock
+```
 
-- Findings are configuration risk indicators, not proof of effective access.
-- Policy checks do not simulate conditions, denies, boundaries or SCPs.
-- Regional services use one configured region; there is no all-region enumeration.
-- Unknown Lambda runtimes and container images produce incomplete runtime coverage.
-- Organization snapshot capture and OU/SCP analysis are not supported.
-- Validation has used mocked AWS APIs and local browsers; no live-account validation is claimed.
+For the default Linux/macOS script install, remove the `~/.local/bin/awsherlock` symlink and the `~/.local/share/awsherlock` directory. If you chose custom installation paths, remove those instead. Keep your cloned repository if you want to install again later.
 
-For vulnerability reports, see [SECURITY.md](SECURITY.md).
+## Troubleshooting
 
-## Contributing
+**`awsherlock` is not found.** On Windows, run `py -m pipx ensurepath` and restart the terminal application, including the IDE if you use its terminal. On Linux/macOS, check that your selected bin directory is on PATH. Use `Get-Command awsherlock` in PowerShell or `command -v awsherlock` in a Unix shell to check which command is being found.
 
-Bug reports and focused improvements are welcome. Include the command, version, check ID and sanitized reproduction where possible. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and architecture guidance, and [CHANGELOG.md](CHANGELOG.md) for release details.
+**Credentials are missing or expired.** Check your selected profile and sign in again if it uses SSO. AWSherlock does not perform an interactive login. To confirm the source account with the AWS CLI, run `aws sts get-caller-identity --profile production`.
+
+**The report says `AccessDenied`.** Review the specific operation in the collection issues, then compare your role permissions with [docs/checks.md](docs/checks.md). Other checks can still produce findings, but denied checks have not been evaluated.
+
+**A regional service could not be scanned.** Set a region in your profile or through `AWS_DEFAULT_REGION` and rerun. One scan covers one configured region for regional services.
+
+**A report file cannot be created.** Check the output directory and choose a file name that does not already exist. AWSherlock refuses to overwrite reports and snapshots.
+
+For the complete argument list:
+
+```bash
+awsherlock --help
+awsherlock scan --help
+awsherlock snapshot --help
+```
+
+## Issues and security reports
+
+For bugs, include the AWSherlock version, the command, the affected check ID, and a sanitized description of what happened. Do not attach credentials or unsanitized reports. See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+Release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -5,33 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AWSherlock · Security report</title>
 <style>
-:root{color-scheme:light;--ink:#182c37;--muted:#596b75;--paper:#eef3f5;--line:#d7e2e7;--accent:#087e8b;--teal:#28b7b1;--shadow:0 14px 34px rgba(18,43,56,.08)}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-header{background:linear-gradient(120deg,#0d2734,#174858 70%,#0f313b);color:#fff;padding:42px max(24px,calc((100vw - 1160px)/2));border-bottom:5px solid var(--teal);position:relative;overflow:hidden}header::after{content:"";position:absolute;right:-90px;top:-130px;width:330px;height:330px;border:1px solid rgba(118,221,209,.28);border-radius:50%;box-shadow:0 0 0 28px rgba(118,221,209,.04),0 0 0 58px rgba(118,221,209,.03)}
-.hero{position:relative;z-index:1;display:flex;justify-content:space-between;gap:32px;align-items:flex-end}.hero-copy{max-width:760px}.hero-stamp{min-width:150px;padding:14px 16px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);font-size:12px;color:#d6eeef}.hero-stamp strong{display:block;color:#fff;font-size:20px;margin-top:3px}
-.brand{font-size:15px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-h1{font-size:clamp(30px,4vw,46px);line-height:1.12;margin:18px 0 10px;letter-spacing:-.03em}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:20px 0 6px}p{margin:8px 0}
-header p{color:#c7dce4;font-size:16px}main{max-width:1208px;margin:auto;padding:30px 24px 64px}.panel{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:var(--shadow)}
-.metadata{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.metadata strong{display:block;overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}
-.stat{padding:21px 24px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 20px rgba(18,43,56,.05);position:relative;overflow:hidden}.stat::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--teal)}.stat b{display:block;font-size:34px;line-height:1.3}.muted{color:var(--muted)}
-.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.severity-grid b{display:block;font-size:24px}.severity-grid>div{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fbfdfd}.severity-track{height:5px;margin-top:10px;border-radius:9px;background:#e7eef0;overflow:hidden;display:block}.severity-track i{display:block;height:100%;width:var(--width);border-radius:9px}
-.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:.04em;background:#e9eef1;color:#374954}
-.CRITICAL{background:#ffe1e9;color:#9f1239}.HIGH{background:#ffead9;color:#a43d05}.MEDIUM{background:#fff1c5;color:#785800}.LOW{background:#dff2f4;color:#126572}.INFO{background:#e8ebf1;color:#475569}
-.warning{border-left:4px solid #d18b10;background:#fff7e5;padding:16px 20px;margin-bottom:24px}.finding{background:#fff;border:1px solid var(--line);border-radius:12px;margin:12px 0;overflow:hidden;box-shadow:0 7px 18px rgba(18,43,56,.045)}
-.finding summary{cursor:pointer;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}.finding summary::before{content:"+";font-weight:700;color:var(--accent)}.finding[open] summary::before{content:"−"}.finding-title{font-weight:650;display:block}.finding-id{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
-.finding-body{border-top:1px solid var(--line);padding:4px 24px 24px;overflow-wrap:anywhere}.resource-line{font-size:13px;color:var(--muted);overflow-wrap:anywhere}pre{padding:16px;border-radius:8px;background:#f1f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}
-footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:10px}
-.filters{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(115px,1fr));gap:12px;align-items:end}.filters label{display:block;font-weight:650;font-size:12px;color:var(--muted)}input,select,button{font:inherit;border:1px solid #bacbd3;border-radius:6px;padding:10px;background:#fff;color:var(--ink)}input,select{width:100%;margin-top:6px}button{cursor:pointer}button:hover{background:#e7f4f4}input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #16a6ab;outline-offset:3px}
-.filter-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px}.result-count{color:var(--muted);font-size:13px}[hidden]{display:none!important}
-.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}caption{text-align:left;color:var(--muted);padding-bottom:12px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td ul{padding-left:18px;margin:6px 0;overflow-wrap:anywhere}.COMPLETE{background:#ddf2e9;color:#176343}.PARTIAL,.NOT_SCANNED{background:#fff1c5;color:#785800}.ERROR{background:#ffe1e9;color:#9f1239}
-@media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search-label{grid-column:1/-1}}
-@media(max-width:640px){.hero{display:block}.hero-stamp{margin-top:24px;width:max-content}.stats{grid-template-columns:1fr}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,1fr)}.finding summary{flex-wrap:wrap}.panel{padding:18px}}
-@media print{body{background:#fff}header{color:#000;background:#fff;padding:16px;border-bottom:2px solid #333}header p{color:#333}.finding{break-inside:avoid}main{padding:16px}.finding-body{display:block}.filter-panel{display:none}}
+:root{color-scheme:light;--ink:#1e142e;--muted:#736481;--paper:#f7f1fb;--surface:#fff;--bar:#e8e0f4;--line:#dfd3e9;--accent:#0f8573;--amber:#a16a25;--orange:#e98c52;--purple:#7b0ad1;--mono:Consolas,"Liberation Mono","Courier New",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.7 var(--mono)}
+header{padding:0}
+.topbar{background:#fff;border-bottom:1px solid var(--line)}.topbar-inner{max-width:1080px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px}
+.brand{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;white-space:nowrap}.brand-name{color:var(--purple)}.prompt{color:var(--accent)}
+.report-nav{display:flex;gap:6px;flex-wrap:wrap}.report-nav a{color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:8px 12px;border-radius:6px}.report-nav a:hover,.report-nav a:focus-visible{background:var(--bar);color:var(--purple)}
+.hero{width:calc(100% - 40px);max-width:1040px;margin:30px auto 0;background:var(--surface);border:2px solid var(--purple);border-radius:8px;box-shadow:5px 5px 0 var(--orange);padding:26px 30px;display:flex;justify-content:space-between;gap:24px;align-items:center}.hero-copy{min-width:0}.hero-label{color:var(--muted);font-size:11px}
+
+h1{font-size:clamp(26px,4vw,34px);line-height:1.2;letter-spacing:-.045em;margin:8px 0 10px}
+h2{font-size:16px;letter-spacing:-.02em;margin:0 0 16px}h2::before{content:"// ";color:var(--purple)}h3{font-size:14px;margin:20px 0 6px}p{margin:6px 0}
+header p,.muted{color:var(--muted)}
+.hero-stamp{font-size:10px;color:var(--muted);text-align:right;padding:8px 0;flex-shrink:0}.hero-stamp strong{display:block;font-size:13px;color:var(--amber);margin:4px 0}
+main{max-width:1080px;margin:auto;padding:30px 20px 48px}
+.panel{background:var(--surface);border:2px solid var(--purple);border-radius:8px;padding:22px;margin-bottom:26px;box-shadow:5px 5px 0 var(--orange)}
+.metadata{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}.metadata strong{display:block;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.eyebrow{font-size:11px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:24px 0 28px}
+.stat{padding:16px 20px;background:var(--surface);border:2px solid var(--purple);border-radius:8px;box-shadow:4px 4px 0 var(--orange)}.stat b{display:block;font-size:30px;color:var(--accent);font-weight:650;letter-spacing:-.04em}
+.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px}.severity-grid b{display:block;font-size:22px;margin-top:6px;font-weight:600}
+.severity-track{height:3px;margin-top:10px;background:var(--bar);display:block;border-radius:3px;overflow:hidden}.severity-track i{display:block;height:100%;width:var(--width)}
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.03em;background:var(--bar);color:var(--muted)}
+.CRITICAL{background:#ffe2eb;color:#a21746}.HIGH{background:#ffeadb;color:#9d430f}.MEDIUM{background:#fff0ce;color:#855b13}.LOW{background:#def4ef;color:#126d61}.INFO{background:var(--bar);color:#66527d}.severity-track i.CRITICAL{background:#ff8fab}.severity-track i.HIGH{background:#ffab78}.severity-track i.MEDIUM{background:#ffc978}.severity-track i.LOW{background:#7df9ff}.severity-track i.INFO{background:#afa4bf}
+.COMPLETE{background:#def4ef;color:#126d61}.PARTIAL,.NOT_SCANNED{background:#fff0ce;color:#855b13}.ERROR,.ACCESS_DENIED{background:#ffe2eb;color:#a21746}
+.warning{border:1px solid #e6c38e;background:#fff8e9;color:#75511c;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px}
+.finding{background:var(--surface);border:2px solid var(--purple);border-radius:8px;margin:16px 0 22px;overflow:hidden;box-shadow:5px 5px 0 var(--orange);transition:border-color .15s ease,box-shadow .15s ease}
+.finding summary{cursor:pointer;padding:16px;display:flex;gap:12px;align-items:flex-start}.finding summary::before{content:"+";color:var(--muted);font-weight:600}.finding[open] summary::before{content:"-"}.finding summary>.badge{margin-top:2px;flex-shrink:0}.finding-title{font-weight:600;display:block}.finding-id{font:11px/1.6 var(--mono);color:var(--muted)}
+.finding-body{border-top:1px solid var(--line);padding:16px 20px 20px;overflow-wrap:anywhere}.resource-line{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+pre{padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:#5f3ab3;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 var(--mono)}
+.filters{display:grid;grid-template-columns:minmax(180px,2fr) repeat(4,minmax(110px,1fr));gap:10px;align-items:end}.filters label{font-size:11px;color:var(--muted)}
+input,select,button{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:9px 10px;background:var(--paper);color:var(--ink)}input,select{width:100%;margin-top:5px}button{cursor:pointer}button:hover{background:var(--bar);border-color:var(--accent)}.finding:hover,.finding[open]{border-color:var(--accent);box-shadow:5px 5px 0 var(--orange)}.finding[open] summary{background:#faf6fd}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.filter-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:12px}.result-count{color:var(--muted);font-size:12px}[hidden]{display:none!important}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}caption{text-align:left;color:var(--muted);padding-bottom:12px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;font-weight:600;color:var(--muted)}td ul{padding-left:18px;margin:6px 0;overflow-wrap:anywhere}
+.coverage-details>summary{cursor:pointer;font-weight:600}.coverage-details>.table-wrap{margin-top:16px}
+footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;text-align:center;background:var(--surface);border:1px dashed var(--line);border-radius:8px}
+@media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search-label{grid-column:1/-1}.metadata{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.topbar-inner{flex-direction:column;align-items:flex-start;gap:10px;padding:14px 20px}.report-nav{gap:4px}.report-nav a{padding:7px 10px}.hero{display:block;padding:20px;margin-top:24px}.hero-stamp{margin-top:18px;width:max-content;text-align:left}.stats{gap:8px}.stat{padding:12px}.stat b{font-size:25px}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.finding summary{flex-wrap:wrap}.finding summary>span:last-child{min-width:0;overflow-wrap:anywhere}.panel{padding:16px}}
+@media print{:root{color-scheme:light;--ink:#202b36;--muted:#536170;--paper:#fff;--surface:#fff;--bar:#f1f3f5;--line:#d3d8de;--accent:#126572;--amber:#854d0e}body{background:#fff}header{padding:0;background:#fff}.topbar{border:0}.topbar-inner{padding:10px 0}.hero{border:1px solid #aaa;box-shadow:none;margin:16px auto}.brand-name{background:none;color:#202b36}.hero-stamp{background:#fff}main{padding:16px}.finding{break-inside:avoid}.finding-body,.coverage-details>.table-wrap{display:block}.filter-panel,.report-nav{display:none}.panel,.finding,.stat{box-shadow:none;border:1px solid #aaa}pre{color:#202b36}.badge{background:#f1f3f5;color:#202b36;border:1px solid #d3d8de}.warning{background:#fff;color:#202b36;border-color:#aaa}.stat b{color:#126572}}
 </style>
 </head>
 <body>
-<header><div class="hero"><div class="hero-copy"><div class="brand">AWSherlock <span style="color:#76ddd1">/</span> Security assessment</div>
-<h1>AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></div><div class="hero-stamp">SCAN STATUS<strong>{% if report.summary.incomplete %}REVIEW{% else %}COMPLETE{% endif %}</strong>{{ report.metadata.version }}</div></div></header>
+<header>
+<div class="topbar"><div class="topbar-inner">
+<a class="brand" href="#report-title" aria-label="AWSherlock report"><span class="prompt" aria-hidden="true">&gt;_</span><span class="brand-name">AWSherlock</span></a>
+<nav class="report-nav" aria-label="Report sections"><a href="#metadata-title">Overview</a><a href="#findings-title">Findings</a><a href="#coverage-title">Coverage</a></nav>
+</div></div>
+<div class="hero"><div class="hero-copy"><div class="hero-label">SECURITY ASSESSMENT / {{ report.metadata.version }}</div>
+<h1 id="report-title">AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></div>
+<div class="hero-stamp">SCAN COVERAGE<strong>{% if report.summary.incomplete %}INCOMPLETE{% else %}COMPLETE{% endif %}</strong>Configuration review</div></div>
+</header>
 <main>
 <section class="panel" aria-labelledby="metadata-title"><h2 id="metadata-title">Scan overview</h2>
 <div class="metadata">
@@ -48,12 +72,6 @@ footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;tex
 <section class="panel"><h2>Severity distribution</h2><div class="severity-grid">
 {% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b><span class="severity-track"><i class="{{ severity }}" style="--width: {{ (count / report.summary.findings * 100) | round(0) if report.summary.findings else 0 }}%"></i></span></div>{% endfor %}
 </div></section>
-<section class="panel" aria-labelledby="coverage-title"><h2 id="coverage-title">Scan coverage</h2>
-<div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
-<thead><tr><th scope="col">Account / Service</th><th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
-<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th><td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
-<td>{% if entry.issues %}<details><summary>{{ entry.issues | length }} issue(s)</summary><ul>{% for issue in entry.issues %}<li><strong>{{ issue.resource_id or 'Account' }} · {{ issue.operation }}</strong>: {{ issue.message }}</li>{% endfor %}</ul></details>{% else %}<span class="muted">No collection errors</span>{% endif %}</td></tr>{% endfor %}</tbody>
-</table></div></section>
 <section aria-labelledby="findings-title"><h2 id="findings-title">Findings</h2>
 <div class="panel filter-panel" aria-label="Finding filters">
 <div class="filters">
@@ -78,6 +96,12 @@ footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;tex
 <div id="no-matches" class="empty" hidden>No findings match these filters. Change the search or reset the filters.</div>
 {% if not report.findings %}<div class="empty">No findings were produced by the evaluated checks. Review scan coverage before drawing conclusions.</div>{% endif %}
 </section>
+<section class="panel"><details class="coverage-details"{% if report.summary.incomplete %} open{% endif %}><summary id="coverage-title">Scan coverage &middot; {{ report.coverage | length }} account / service entries</summary>
+<div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
+<thead><tr><th scope="col">Account / Service</th><th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
+<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th><td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
+<td>{% if entry.issues %}<details><summary>{{ entry.issues | length }} issue(s)</summary><ul>{% for issue in entry.issues %}<li><strong>{{ issue.resource_id or 'Account' }} · {{ issue.operation }}</strong>: {{ issue.message }}</li>{% endfor %}</ul></details>{% else %}<span class="muted">No collection errors</span>{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div></details></section>
 <footer>AWSherlock {{ report.metadata.version }} · Standalone report · Configuration indicators do not prove effective access. Facts reflect collection time.</footer>
 </main>
 <script>
