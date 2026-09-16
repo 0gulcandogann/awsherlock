@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
 from awsherlock.evaluation import Report
+from awsherlock.branding import terminal_text
 from rich import box
 from rich.panel import Panel
 from rich.table import Table
@@ -39,8 +40,8 @@ def render_console(report: Report) -> None:
     summary = data["summary"]
     console.print()
     console.print("AWSherlock / Scan results", style="bold cyan", markup=False)
-    console.print(f"Account: {report.metadata['account_id']}", markup=False)
-    console.print(f"Region: {report.metadata.get('region') or 'Global / not configured'}", style="dim", markup=False)
+    console.print(f"Account: {terminal_text(report.metadata['account_id'])}", markup=False)
+    console.print(f"Region: {terminal_text(report.metadata.get('region') or 'Global / not configured')}", style="dim", markup=False)
     console.print()
     console.print(
         f"{summary['findings']} findings   /   {summary['resources']} resources   /   "
@@ -60,15 +61,15 @@ def render_console(report: Report) -> None:
         for label in ("Account", "Name", "State", "Scan status"):
             table.add_column(label)
         for account in accounts:
-            table.add_row(*(Text(str(account[key])) for key in ("account_id", "name", "state", "scan_status")))
+            table.add_row(*(Text(terminal_text(str(account[key]))) for key in ("account_id", "name", "state", "scan_status")))
         console.print(table)
     coverage = Table(title="Scan coverage", box=box.SIMPLE, expand=True)
     for label in ("Account / Service", "Status", "Resources", "Checks", "Not scanned", "Findings"):
         coverage.add_column(label, justify="right" if label in {"Resources", "Checks", "Not scanned", "Findings"} else "left")
     for entry in report.coverage:
         status_style = "green" if entry["status"] == "COMPLETE" else "yellow"
-        coverage.add_row(Text(f"{entry['account_id']} / {entry['service'].upper()}"),
-                         Text(entry["status"], style=status_style),
+        coverage.add_row(Text(f"{terminal_text(entry['account_id'])} / {terminal_text(entry['service'].upper())}"),
+                         Text(terminal_text(entry["status"]), style=status_style),
                          *(str(entry[key]) for key in ("resources", "evaluated", "not_scanned", "findings")))
     console.print(coverage)
     console.print("Findings", style="bold")
@@ -76,12 +77,12 @@ def render_console(report: Report) -> None:
     findings = sorted(report.findings, key=lambda finding: rank[finding.severity])
     for index, finding in enumerate(findings, 1):
         title = Text(f"{index:02d}  {finding.severity}", style=SEVERITY_STYLES[finding.severity])
-        body = Text(f"{finding.title}\n", style="bold")
-        body.append(f"{finding.id} / {finding.service.upper()} / {finding.account_id}\n", style="dim")
-        body.append(f"Resource: {finding.resource_id}\n")
-        body.append(f"{finding.description}\n\n")
+        body = Text(f"{terminal_text(finding.title)}\n", style="bold")
+        body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style="dim")
+        body.append(f"Resource: {terminal_text(finding.resource_id)}\n")
+        body.append(f"{terminal_text(finding.description, multiline=True)}\n\n")
         body.append("Remediation: ", style="bold")
-        body.append(finding.remediation)
+        body.append(terminal_text(finding.remediation, multiline=True))
         console.print(Panel(body, title=title, title_align="left", border_style="dim", padding=(1, 2)))
     if not findings:
         console.print("No findings were produced by the evaluated checks. Review scan coverage.", markup=False)
@@ -89,8 +90,8 @@ def render_console(report: Report) -> None:
     if issues:
         errors.print("Collection issues", style="bold yellow")
         for entry, issue in issues:
-            message = Text(f"ERROR {entry['account_id']} {entry['service'].upper()} / "
-                           f"{issue['resource_id'] or 'account'} / {issue['operation']}\n", style="yellow")
-            message.append(issue["message"], style="default")
+            message = Text(f"ERROR {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
+                           f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style="yellow")
+            message.append(terminal_text(issue["message"], multiline=True), style="default")
             errors.print(message)
     console.print("Scope: configuration risk indicators; effective access is not determined.", style="dim", markup=False)

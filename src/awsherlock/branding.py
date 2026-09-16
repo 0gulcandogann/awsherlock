@@ -1,6 +1,7 @@
 """Dependency-free terminal identity used by human-facing commands."""
 
 import sys
+import unicodedata
 
 BANNER = """⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⡖⠒⠲⠶⢤⣤⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⢀⣀⣀⣀⣀⢀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⢷⡀⠀⠀⠀⠀⠉⠙⢷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣀⣤⣄⠀
@@ -34,3 +35,12 @@ def terminal_banner() -> str:
     except (LookupError, UnicodeEncodeError):
         return "AWSherlock\nAWS security scanner\n"
     return BANNER
+
+
+def terminal_text(value: str, *, multiline: bool = False) -> str:
+    """Show untrusted terminal controls as visible escapes, never instructions."""
+    return "".join(
+        char if (multiline and char in "\n\t") or unicodedata.category(char) not in {"Cc", "Cf"}
+        else char.encode("unicode_escape").decode("ascii")
+        for char in value
+    )

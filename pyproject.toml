@@ -43,4 +43,4 @@ path = "src/awsherlock/__init__.py"
 packages = ["src/awsherlock"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/docs", "/README.md", "/LICENSE", "/CHANGELOG.md", "/CONTRIBUTING.md", "/SECURITY.md", "/Dockerfile", "/.dockerignore", "/install.sh", "/pyproject.toml"]
+include = ["/src", "/README.md", "/LICENSE", "/SECURITY.md", "/Dockerfile", "/.dockerignore", "/install.sh", "/pyproject.toml"]

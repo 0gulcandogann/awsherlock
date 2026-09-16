@@ -16,7 +16,7 @@ from awsherlock.scanner import parse_services
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report
-from awsherlock.branding import terminal_banner
+from awsherlock.branding import terminal_banner, terminal_text
 
 app = typer.Typer(
     name="awsherlock",
@@ -58,7 +58,7 @@ def update_installation() -> None:
             return
         except (OSError, subprocess.CalledProcessError) as error:
             last_error = error
-    typer.echo(f"Update failed: {last_error}", err=True)
+    typer.echo(f"Update failed: {terminal_text(str(last_error))}", err=True)
     raise typer.Exit(code=1)
 
 
@@ -145,12 +145,12 @@ def scan(
         if output == "html":
             destination = report_file or Path("awsherlock-report.html")
             write_report(render_html(report), destination)
-            typer.echo(f"HTML report saved: {destination}")
+            typer.echo(f"HTML report saved: {terminal_text(str(destination))}")
         elif output == "json":
             content = render_json(report)
             if report_file is not None:
                 write_report(content, report_file)
-                typer.echo(f"JSON report saved: {report_file}")
+                typer.echo(f"JSON report saved: {terminal_text(str(report_file))}")
             else:
                 typer.echo(content, nl=False)
         else:
@@ -158,7 +158,7 @@ def scan(
         if report.incomplete:
             raise typer.Exit(code=1)
     except (SessionError, SnapshotError) as error:
-        typer.echo(f"Error: {error}", err=True)
+        typer.echo(f"Error: {terminal_text(str(error))}", err=True)
         raise typer.Exit(code=1) from None
     except OSError:
         typer.echo("Error: Could not read or create the file. Check paths; existing reports are not overwritten.", err=True)
@@ -184,13 +184,13 @@ def snapshot_command(
         snapshot = capture_snapshot(context, selected)
         write_snapshot(snapshot, output)
     except (SessionError, SnapshotError) as error:
-        typer.echo(f"Error: {error}", err=True)
+        typer.echo(f"Error: {terminal_text(str(error))}", err=True)
         raise typer.Exit(code=1) from None
     except OSError:
         typer.echo("Error: Could not create snapshot file. Check the path; existing files are not overwritten.", err=True)
         raise typer.Exit(code=1) from None
     typer.echo(terminal_banner())
-    typer.echo(f"Snapshot saved: {output}")
+    typer.echo(f"Snapshot saved: {terminal_text(str(output))}")
     if any(result.issues for result in snapshot.services.values()):
         typer.echo("Snapshot has incomplete collection coverage; inspect its issues.", err=True)
         raise typer.Exit(code=1)
