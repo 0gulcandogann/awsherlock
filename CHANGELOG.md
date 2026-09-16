@@ -6,6 +6,8 @@
   without creating an AWS session.
 - Document user-wide pipx installation, PATH setup, upgrades and removal for
   Windows, macOS and Linux.
+- Added `install.sh` for a sudo-free, isolated Linux/macOS installation from a
+  local checkout.
 
 ## 0.1.0 — 2026-09-16
 

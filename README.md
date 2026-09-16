@@ -62,8 +62,24 @@ per user; administrator access and manual virtual-environment activation are not
 
 ### macOS / Linux
 
-Install pipx with your operating system's package manager (for example,
-`brew install pipx` on macOS or `sudo apt install pipx` on Ubuntu), then:
+From a cloned checkout, the included installer creates an isolated user install
+under `~/.local/share/awsherlock` and exposes `awsherlock` through `~/.local/bin`.
+It does not require sudo and does not modify system Python:
+
+```bash
+git clone https://github.com/0gulcandogann/awsherlock.git
+cd awsherlock
+./install.sh
+```
+
+If `~/.local/bin` is not already on PATH, the script prints the exact export
+command to add. Open a new terminal after adding it, then run `awsherlock --version`.
+To choose another user-owned location, set `AWSHERLOCK_INSTALL_ROOT` or
+`AWSHERLOCK_BIN_DIR` before running the script.
+
+The pipx route remains available when you prefer it. Install pipx with your
+operating system's package manager (for example, `brew install pipx` on macOS
+or `sudo apt install pipx` on Ubuntu), then:
 
 ```bash
 pipx ensurepath
