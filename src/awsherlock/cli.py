@@ -31,6 +31,18 @@ configure_typer_styles()
 app = typer.Typer(
     name="awsherlock",
     help="AWSherlock: an open-source AWS security scanner.",
+    epilog=(
+        "[bold #ff7e55]Quick start[/]\n\n"
+        "[#5bfcfc]awsherlock scan[/] - Scan with existing AWS credentials.\n\n"
+        "[#5bfcfc]awsherlock scan --profile production[/] - Use your AWS profile.\n\n"
+        "[#5bfcfc]awsherlock scan facts.json[/] - Evaluate saved facts offline.\n\n"
+        "[#5bfcfc]awsherlock --describe-check AWSH-CT-001[/] - Explain a check offline.\n\n"
+        "[bold #ff7e55]All scan options and examples:[/] [#9dff7a]awsherlock scan --help[/]\n\n"
+        "[bold #ff7e55]Snapshot options and examples:[/] [#9dff7a]awsherlock snapshot --help[/]\n\n"
+        "[#ffd369]Put scan options after scan; snapshot options after snapshot. "
+        "Help does not contact AWS. Replace example profiles and account IDs.[/]\n\n"
+        "Full reference: https://github.com/0gulcandogann/awsherlock#command-reference"
+    ),
     add_completion=False,
     invoke_without_command=True,
 )
@@ -155,7 +167,20 @@ def main(
         typer.echo(ctx.get_help())
 
 
-@app.command()
+@app.command(epilog=(
+    "[bold #ff7e55]Examples[/]\n\n"
+    "[#5bfcfc]awsherlock scan --services iam,s3 --summary-only[/]\n\n"
+    "[#5bfcfc]awsherlock scan --regions eu-central-1,eu-west-1[/]\n\n"
+    "[#5bfcfc]awsherlock scan --save-snapshot facts.json --stats[/]\n\n"
+    "[#5bfcfc]awsherlock scan organization --role-name audit/Reader[/]\n\n"
+    "[#5bfcfc]awsherlock scan facts.json --output json[/]\n\n"
+    "[#ffd369]Default: all seven services, console output, SDK-configured region. "
+    "Use --region OR --regions. --summary-only requires console output. "
+    "--report-file requires JSON/HTML. --timeout sets both request limits; "
+    "do not combine with separate timeout flags. Offline scans reject AWS "
+    "authentication, regions, request timeouts and --save-snapshot. "
+    "Incomplete coverage exits 1; findings alone do not change exit 0.[/]"
+))
 def scan(
     snapshot_path: Annotated[Path | None, typer.Argument(help="Offline snapshot JSON, or 'organization' for multi-account scanning.")] = None,
     profile: Annotated[
@@ -311,14 +336,25 @@ def scan(
         raise typer.Exit(code=1) from None
 
 
-@app.command("snapshot")
+@app.command("snapshot", epilog=(
+    "[bold #ff7e55]Examples[/]\n\n"
+    "[#5bfcfc]awsherlock snapshot --output facts.json[/]\n\n"
+    "[#5bfcfc]awsherlock snapshot --output facts.json --services iam,s3[/]\n\n"
+    "[#5bfcfc]awsherlock scan facts.json --summary-only[/]\n\n"
+    "[#ffd369]--output is a required new JSON file path, not a report format. "
+    "Existing files are not overwritten. Default: all seven services and SDK "
+    "authentication/region. No security rules run during capture. "
+    "--role-session-name and --external-id require --role. "
+    "--timeout cannot be combined with separate timeout flags. "
+    "For organization/multiple regions, use scan --save-snapshot instead.[/]"
+))
 def snapshot_command(
     output: Annotated[Path, typer.Option("--output", help="New snapshot JSON file.")],
-    services: Annotated[str | None, typer.Option("--services")] = None,
-    profile: Annotated[str | None, typer.Option("--profile")] = None,
-    role: Annotated[str | None, typer.Option("--role")] = None,
-    role_session_name: Annotated[str | None, typer.Option("--role-session-name")] = None,
-    external_id: Annotated[str | None, typer.Option("--external-id")] = None,
+    services: Annotated[str | None, typer.Option("--services", help="Comma-separated supported services (default: all seven). See --list-services.")] = None,
+    profile: Annotated[str | None, typer.Option("--profile", help="Use a named AWS SDK profile; otherwise use the standard credential chain.")] = None,
+    role: Annotated[str | None, typer.Option("--role", help="Assume this IAM role before collecting facts.")] = None,
+    role_session_name: Annotated[str | None, typer.Option("--role-session-name", help="Assumed-role session name (default: AWSherlock); requires --role.")] = None,
+    external_id: Annotated[str | None, typer.Option("--external-id", help="External ID required by the role trust policy; requires --role.")] = None,
     region: Annotated[str | None, typer.Option("--region", help="Override the SDK region.")] = None,
     expect_account: Annotated[str | None, typer.Option("--expect-account", help="Required 12-digit AWS account ID.")] = None,
     connect_timeout: Annotated[float | None, typer.Option("--connect-timeout", help="Socket connection timeout in seconds.")] = None,
