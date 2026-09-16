@@ -1,0 +1,11 @@
+# Allow only build inputs: no credentials, reports, VCS, tests or local environments.
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!README.md
+!LICENSE
+!src/
+!src/**
+src/**/__pycache__/
+src/**/*.pyc

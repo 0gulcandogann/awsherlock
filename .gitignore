@@ -232,6 +232,7 @@ dist/
 
 # Virtual environments
 .venv/
+.venv-release/
 venv/
 env/
 
@@ -257,4 +258,14 @@ awsherlock-report*.html
 awsherlock-snapshot*.json
 findings*.json
 reports/
+
+# Local development instructions, planning and verification (not published)
+/AGENTS.md
+/NOW.md
+/SPEC.md
+/Roadmap.md
+/Start_Here.md
+/IDEAS.md
+/RELEASE_NOTES.md
+/tests/
 

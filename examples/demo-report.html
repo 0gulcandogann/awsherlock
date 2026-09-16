@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWSherlock · Security report</title>
+<style>
+:root{color-scheme:light;--ink:#182c37;--muted:#596b75;--paper:#f3f6f7;--line:#d9e2e6;--accent:#087e8b}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:#122b38;color:#fff;padding:36px max(24px,calc((100vw - 1160px)/2));border-bottom:5px solid #28b7b1}
+.brand{font-size:15px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.2;margin:18px 0 10px}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:20px 0 6px}p{margin:8px 0}
+header p{color:#c7dce4}main{max-width:1208px;margin:auto;padding:28px 24px 64px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px}
+.metadata{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.metadata strong{display:block;overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}
+.stat{padding:20px 24px;background:#fff;border:1px solid var(--line);border-radius:12px}.stat b{display:block;font-size:32px;line-height:1.3}.muted{color:var(--muted)}
+.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.severity-grid b{display:block;font-size:24px}.severity-grid>div{border-top:3px solid var(--line);padding-top:10px}
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:.04em;background:#e9eef1;color:#374954}
+.CRITICAL{background:#ffe1e9;color:#9f1239}.HIGH{background:#ffead9;color:#a43d05}.MEDIUM{background:#fff1c5;color:#785800}.LOW{background:#dff2f4;color:#126572}.INFO{background:#e8ebf1;color:#475569}
+.warning{border-left:4px solid #d18b10;background:#fff7e5;padding:16px 20px;margin-bottom:24px}.finding{background:#fff;border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
+.finding summary{cursor:pointer;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}.finding summary::before{content:"+";font-weight:700;color:var(--accent)}.finding[open] summary::before{content:"−"}.finding-title{font-weight:650;display:block}.finding-id{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.finding-body{border-top:1px solid var(--line);padding:4px 24px 24px;overflow-wrap:anywhere}.resource-line{font-size:13px;color:var(--muted);overflow-wrap:anywhere}pre{padding:16px;border-radius:8px;background:#f1f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}
+footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:10px}
+.filters{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(115px,1fr));gap:12px;align-items:end}.filters label{display:block;font-weight:650;font-size:12px;color:var(--muted)}input,select,button{font:inherit;border:1px solid #bacbd3;border-radius:6px;padding:10px;background:#fff;color:var(--ink)}input,select{width:100%;margin-top:6px}button{cursor:pointer}button:hover{background:#e7f4f4}input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #16a6ab;outline-offset:3px}
+.filter-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px}.result-count{color:var(--muted);font-size:13px}[hidden]{display:none!important}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}caption{text-align:left;color:var(--muted);padding-bottom:12px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td ul{padding-left:18px;margin:6px 0;overflow-wrap:anywhere}.COMPLETE{background:#ddf2e9;color:#176343}.PARTIAL,.NOT_SCANNED{background:#fff1c5;color:#785800}.ERROR{background:#ffe1e9;color:#9f1239}
+@media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search-label{grid-column:1/-1}}
+@media(max-width:640px){.stats{grid-template-columns:1fr}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,1fr)}.finding summary{flex-wrap:wrap}.panel{padding:18px}}
+@media print{body{background:#fff}header{color:#000;background:#fff;padding:16px;border-bottom:2px solid #333}header p{color:#333}.finding{break-inside:avoid}main{padding:16px}.finding-body{display:block}.filter-panel{display:none}}
+</style>
+</head>
+<body>
+<header><div class="brand">AWSherlock <span style="color:#76ddd1">/</span> Security assessment</div>
+<h1>AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></header>
+<main>
+<section class="panel" aria-labelledby="metadata-title"><h2 id="metadata-title">Scan overview</h2>
+<div class="metadata">
+<div><span class="eyebrow">Account</span><strong>000000000000</strong></div>
+<div><span class="eyebrow">Collected at</span><strong>2026-09-16T00:00:00+00:00</strong></div>
+<div><span class="eyebrow">Configured region</span><strong>eu-central-1</strong></div>
+<div><span class="eyebrow">Scan ID</span><strong>synthetic-demo</strong></div>
+</div></section>
+
+<aside class="warning" role="note"><strong>Incomplete scan coverage.</strong> Some checks could not run. Zero findings do not mean the account is secure.</aside>
+<div class="stats"><div class="stat"><span class="eyebrow">Resources</span><b>2</b></div>
+<div class="stat"><span class="eyebrow">Checks evaluated</span><b>6</b></div>
+<div class="stat"><span class="eyebrow">Findings</span><b>4</b></div></div>
+<section class="panel"><h2>Severity distribution</h2><div class="severity-grid">
+<div><span class="badge CRITICAL">CRITICAL</span><b>0</b></div><div><span class="badge HIGH">HIGH</span><b>0</b></div><div><span class="badge MEDIUM">MEDIUM</span><b>4</b></div><div><span class="badge LOW">LOW</span><b>0</b></div><div><span class="badge INFO">INFO</span><b>0</b></div>
+</div></section>
+<section class="panel" aria-labelledby="coverage-title"><h2 id="coverage-title">Scan coverage</h2>
+<div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
+<thead><tr><th scope="col">Account / Service</th><th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
+<tbody><tr><th scope="row">000000000000 / iam</th><td><span class="badge COMPLETE">COMPLETE</span></td><td>0</td><td>0</td><td>0</td>
+<td><span class="muted">No collection errors</span></td></tr><tr><th scope="row">000000000000 / s3</th><td><span class="badge PARTIAL">PARTIAL</span></td><td>1</td><td>4</td><td>1</td>
+<td><details><summary>1 issue(s)</summary><ul><li><strong>example-demo-bucket · GetBucketLogging</strong>: AccessDenied</li></ul></details></td></tr><tr><th scope="row">000000000000 / ec2</th><td><span class="badge COMPLETE">COMPLETE</span></td><td>1</td><td>2</td><td>0</td>
+<td><span class="muted">No collection errors</span></td></tr></tbody>
+</table></div></section>
+<section aria-labelledby="findings-title"><h2 id="findings-title">Findings</h2>
+<div class="panel filter-panel" aria-label="Finding filters">
+<div class="filters">
+<label class="search-label" for="search">Search findings<input id="search" type="search" placeholder="Finding ID, resource, evidence…" autocomplete="off"></label>
+<label for="severity">Severity<select id="severity"><option value="all">All severities</option><option value="CRITICAL">CRITICAL</option><option value="HIGH">HIGH</option><option value="MEDIUM">MEDIUM</option><option value="LOW">LOW</option><option value="INFO">INFO</option></select></label>
+<label for="service">Service<select id="service"><option value="all">All services</option><option value="ec2">ec2</option><option value="iam">iam</option><option value="s3">s3</option></select></label>
+<label for="account">Account<select id="account"><option value="all">All accounts</option><option value="000000000000">000000000000</option></select></label>
+<label for="sort">Sort by<select id="sort"><option value="severity-desc">Severity: highest first</option><option value="severity-asc">Severity: lowest first</option><option value="service">Service</option><option value="resource">Resource</option><option value="id">Finding ID</option></select></label>
+</div><div class="filter-footer"><span id="result-count" class="result-count" role="status" aria-live="polite">4 findings</span><button id="reset" type="button">Reset filters</button></div>
+<noscript><p>JavaScript is disabled. All findings are shown; use your browser’s text search.</p></noscript></div>
+<div id="findings">
+
+<details class="finding" data-severity="MEDIUM" data-service="s3" data-account="000000000000" data-id="AWSH-S3-001" data-resource="example-demo-bucket" data-index="0">
+<summary><span class="badge MEDIUM">MEDIUM</span><span><span class="finding-title">S3 bucket public access safeguards are incomplete</span><span class="finding-id">AWSH-S3-001</span><span class="resource-line"> · s3 · example-demo-bucket</span></span></summary>
+<div class="finding-body"><p>Bucket-level Block Public Access is missing or not fully enabled. This is potential exposure, not confirmation of public access.</p>
+<p class="resource-line">Account 000000000000 · Region eu-central-1<br>arn:aws:s3:::example-demo-bucket</p>
+<h3>Evidence</h3><pre>{
+  "public_access_block": null,
+  "scope": "bucket"
+}</pre>
+<h3>Risk</h3><p>Public policies or ACLs may expose data. Account-level controls may still block access; effective access and account-level settings were not evaluated.</p><h3>Remediation</h3><p>Review intended access and enable all four bucket Block Public Access settings.</p>
+<h3>References</h3><ul><li>https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html</li></ul>
+</div></details>
+
+<details class="finding" data-severity="MEDIUM" data-service="s3" data-account="000000000000" data-id="AWSH-S3-003" data-resource="example-demo-bucket" data-index="1">
+<summary><span class="badge MEDIUM">MEDIUM</span><span><span class="finding-title">S3 bucket versioning is not enabled</span><span class="finding-id">AWSH-S3-003</span><span class="resource-line"> · s3 · example-demo-bucket</span></span></summary>
+<div class="finding-body"><p>Versioning is absent or suspended.</p>
+<p class="resource-line">Account 000000000000 · Region eu-central-1<br>arn:aws:s3:::example-demo-bucket</p>
+<h3>Evidence</h3><pre>{
+  "versioning": null
+}</pre>
+<h3>Risk</h3><p>Overwrites and deletions may make data recovery harder.</p><h3>Remediation</h3><p>Enable bucket versioning and review lifecycle retention requirements.</p>
+<h3>References</h3><ul><li>https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html</li></ul>
+</div></details>
+
+<details class="finding" data-severity="MEDIUM" data-service="ec2" data-account="000000000000" data-id="AWSH-EC2-004" data-resource="i-00000000000000000" data-index="2">
+<summary><span class="badge MEDIUM">MEDIUM</span><span><span class="finding-title">Instance permits IMDSv1</span><span class="finding-id">AWSH-EC2-004</span><span class="resource-line"> · ec2 · i-00000000000000000</span></span></summary>
+<div class="finding-body"><p>Instance permits IMDSv1. This is configuration evidence; network routes, NACLs, and application controls are not evaluated.</p>
+<p class="resource-line">Account 000000000000 · Region eu-central-1<br>i-00000000000000000</p>
+<h3>Evidence</h3><pre>{
+  "metadata": {
+    "endpoint": "enabled",
+    "tokens": "optional"
+  }
+}</pre>
+<h3>Risk</h3><p>The configuration may expose workloads or weaken protection of instance data.</p><h3>Remediation</h3><p>Restrict ingress and public addressing; require IMDSv2 and use encrypted EBS volumes as applicable.</p>
+<h3>References</h3><ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html</li></ul>
+</div></details>
+
+<details class="finding" data-severity="MEDIUM" data-service="ec2" data-account="000000000000" data-id="AWSH-EC2-005" data-resource="i-00000000000000000" data-index="3">
+<summary><span class="badge MEDIUM">MEDIUM</span><span><span class="finding-title">Instance has public IPv4 or IPv6 addressing</span><span class="finding-id">AWSH-EC2-005</span><span class="resource-line"> · ec2 · i-00000000000000000</span></span></summary>
+<div class="finding-body"><p>Instance has public IPv4 or IPv6 addressing. This is configuration evidence; network routes, NACLs, and application controls are not evaluated.</p>
+<p class="resource-line">Account 000000000000 · Region eu-central-1<br>i-00000000000000000</p>
+<h3>Evidence</h3><pre>{
+  "addresses": [
+    "203.0.113.10"
+  ]
+}</pre>
+<h3>Risk</h3><p>The configuration may expose workloads or weaken protection of instance data.</p><h3>Remediation</h3><p>Restrict ingress and public addressing; require IMDSv2 and use encrypted EBS volumes as applicable.</p>
+<h3>References</h3><ul><li>https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html</li></ul>
+</div></details>
+</div>
+<div id="no-matches" class="empty" hidden>No findings match these filters. Change the search or reset the filters.</div>
+
+</section>
+<footer>AWSherlock 0.1.0 · Standalone report · Configuration indicators do not prove effective access. Facts reflect collection time.</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const container = document.getElementById('findings');
+  const rows = Array.from(container.querySelectorAll('.finding'));
+  const controls = Object.fromEntries(['search','severity','service','account','sort'].map(id => [id, document.getElementById(id)]));
+  const rank = {CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1};
+  const searchText = new Map(rows.map(row => [row, row.textContent.toLowerCase()]));
+  const collator = new Intl.Collator('en', {numeric: true, sensitivity: 'base'});
+  function update() {
+    const query = controls.search.value.trim().toLowerCase();
+    const mode = controls.sort.value;
+    const sorted = rows.slice().sort((a,b) => {
+      let result;
+      if (mode.startsWith('severity-')) {
+        result = rank[b.dataset.severity] - rank[a.dataset.severity];
+        if (mode === 'severity-asc') result = -result;
+      } else {
+        result = collator.compare(a.dataset[mode], b.dataset[mode]);
+      }
+      return result || Number(a.dataset.index) - Number(b.dataset.index);
+    });
+    let visible = 0;
+    for (const row of sorted) {
+      const matches = (!query || searchText.get(row).includes(query)) &&
+        ['severity','service','account'].every(key => controls[key].value === 'all' || controls[key].value === row.dataset[key]);
+      row.hidden = !matches;
+      if (matches) visible++;
+      container.appendChild(row);
+    }
+    document.getElementById('result-count').textContent = `${visible} of ${rows.length} findings shown`;
+    document.getElementById('no-matches').hidden = visible !== 0 || rows.length === 0;
+  }
+  controls.search.addEventListener('input', update);
+  for (const key of ['severity','service','account','sort']) controls[key].addEventListener('change', update);
+  document.getElementById('reset').addEventListener('click', () => {
+    controls.search.value = '';
+    for (const key of ['severity','service','account']) controls[key].value = 'all';
+    controls.sort.value = 'severity-desc';
+    update();
+  });
+  update();
+})();
+</script>
+</body></html>

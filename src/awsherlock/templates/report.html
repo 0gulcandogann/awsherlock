@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWSherlock · Security report</title>
+<style>
+:root{color-scheme:light;--ink:#182c37;--muted:#596b75;--paper:#f3f6f7;--line:#d9e2e6;--accent:#087e8b}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:#122b38;color:#fff;padding:36px max(24px,calc((100vw - 1160px)/2));border-bottom:5px solid #28b7b1}
+.brand{font-size:15px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.2;margin:18px 0 10px}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:20px 0 6px}p{margin:8px 0}
+header p{color:#c7dce4}main{max-width:1208px;margin:auto;padding:28px 24px 64px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px}
+.metadata{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.metadata strong{display:block;overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}
+.stat{padding:20px 24px;background:#fff;border:1px solid var(--line);border-radius:12px}.stat b{display:block;font-size:32px;line-height:1.3}.muted{color:var(--muted)}
+.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.severity-grid b{display:block;font-size:24px}.severity-grid>div{border-top:3px solid var(--line);padding-top:10px}
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:.04em;background:#e9eef1;color:#374954}
+.CRITICAL{background:#ffe1e9;color:#9f1239}.HIGH{background:#ffead9;color:#a43d05}.MEDIUM{background:#fff1c5;color:#785800}.LOW{background:#dff2f4;color:#126572}.INFO{background:#e8ebf1;color:#475569}
+.warning{border-left:4px solid #d18b10;background:#fff7e5;padding:16px 20px;margin-bottom:24px}.finding{background:#fff;border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
+.finding summary{cursor:pointer;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}.finding summary::before{content:"+";font-weight:700;color:var(--accent)}.finding[open] summary::before{content:"−"}.finding-title{font-weight:650;display:block}.finding-id{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.finding-body{border-top:1px solid var(--line);padding:4px 24px 24px;overflow-wrap:anywhere}.resource-line{font-size:13px;color:var(--muted);overflow-wrap:anywhere}pre{padding:16px;border-radius:8px;background:#f1f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}
+footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:10px}
+.filters{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(115px,1fr));gap:12px;align-items:end}.filters label{display:block;font-weight:650;font-size:12px;color:var(--muted)}input,select,button{font:inherit;border:1px solid #bacbd3;border-radius:6px;padding:10px;background:#fff;color:var(--ink)}input,select{width:100%;margin-top:6px}button{cursor:pointer}button:hover{background:#e7f4f4}input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #16a6ab;outline-offset:3px}
+.filter-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px}.result-count{color:var(--muted);font-size:13px}[hidden]{display:none!important}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}caption{text-align:left;color:var(--muted);padding-bottom:12px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td ul{padding-left:18px;margin:6px 0;overflow-wrap:anywhere}.COMPLETE{background:#ddf2e9;color:#176343}.PARTIAL,.NOT_SCANNED{background:#fff1c5;color:#785800}.ERROR{background:#ffe1e9;color:#9f1239}
+@media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search-label{grid-column:1/-1}}
+@media(max-width:640px){.stats{grid-template-columns:1fr}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,1fr)}.finding summary{flex-wrap:wrap}.panel{padding:18px}}
+@media print{body{background:#fff}header{color:#000;background:#fff;padding:16px;border-bottom:2px solid #333}header p{color:#333}.finding{break-inside:avoid}main{padding:16px}.finding-body{display:block}.filter-panel{display:none}}
+</style>
+</head>
+<body>
+<header><div class="brand">AWSherlock <span style="color:#76ddd1">/</span> Security assessment</div>
+<h1>AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></header>
+<main>
+<section class="panel" aria-labelledby="metadata-title"><h2 id="metadata-title">Scan overview</h2>
+<div class="metadata">
+<div><span class="eyebrow">Account</span><strong>{{ report.metadata.account_id }}</strong></div>
+<div><span class="eyebrow">Collected at</span><strong>{{ report.metadata.started_at }}</strong></div>
+<div><span class="eyebrow">Configured region</span><strong>{{ report.metadata.region or 'Not configured / global services' }}</strong></div>
+<div><span class="eyebrow">Scan ID</span><strong>{{ report.metadata.scan_id }}</strong></div>
+</div></section>
+{% if report.metadata.accounts is defined %}<section class="panel"><h2>Organization accounts</h2><div class="table-wrap"><table><thead><tr><th>Account</th><th>Name</th><th>State</th><th>Scan status</th></tr></thead><tbody>{% for account in report.metadata.accounts %}<tr><td>{{ account.account_id }}</td><td>{{ account.name }}</td><td>{{ account.state }}</td><td>{{ account.scan_status }}</td></tr>{% else %}<tr><td colspan="4">No accounts discovered. Review discovery coverage.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% if report.summary.incomplete %}<aside class="warning" role="note"><strong>Incomplete scan coverage.</strong> Some checks could not run. Zero findings do not mean the account is secure.</aside>{% endif %}
+<div class="stats"><div class="stat"><span class="eyebrow">Resources</span><b>{{ report.summary.resources }}</b></div>
+<div class="stat"><span class="eyebrow">Checks evaluated</span><b>{{ report.summary.checks_evaluated }}</b></div>
+<div class="stat"><span class="eyebrow">Findings</span><b>{{ report.summary.findings }}</b></div></div>
+<section class="panel"><h2>Severity distribution</h2><div class="severity-grid">
+{% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b></div>{% endfor %}
+</div></section>
+<section class="panel" aria-labelledby="coverage-title"><h2 id="coverage-title">Scan coverage</h2>
+<div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
+<thead><tr><th scope="col">Account / Service</th><th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
+<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th><td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
+<td>{% if entry.issues %}<details><summary>{{ entry.issues | length }} issue(s)</summary><ul>{% for issue in entry.issues %}<li><strong>{{ issue.resource_id or 'Account' }} · {{ issue.operation }}</strong>: {{ issue.message }}</li>{% endfor %}</ul></details>{% else %}<span class="muted">No collection errors</span>{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div></section>
+<section aria-labelledby="findings-title"><h2 id="findings-title">Findings</h2>
+<div class="panel filter-panel" aria-label="Finding filters">
+<div class="filters">
+<label class="search-label" for="search">Search findings<input id="search" type="search" placeholder="Finding ID, resource, evidence…" autocomplete="off"></label>
+<label for="severity">Severity<select id="severity"><option value="all">All severities</option>{% for severity in report.summary.severity %}<option value="{{ severity }}">{{ severity }}</option>{% endfor %}</select></label>
+<label for="service">Service<select id="service"><option value="all">All services</option>{% for service in services %}<option value="{{ service }}">{{ service }}</option>{% endfor %}</select></label>
+<label for="account">Account<select id="account"><option value="all">All accounts</option>{% for account in accounts %}<option value="{{ account }}">{{ account }}</option>{% endfor %}</select></label>
+<label for="sort">Sort by<select id="sort"><option value="severity-desc">Severity: highest first</option><option value="severity-asc">Severity: lowest first</option><option value="service">Service</option><option value="resource">Resource</option><option value="id">Finding ID</option></select></label>
+</div><div class="filter-footer"><span id="result-count" class="result-count" role="status" aria-live="polite">{{ report.findings | length }} findings</span><button id="reset" type="button">Reset filters</button></div>
+<noscript><p>JavaScript is disabled. All findings are shown; use your browser’s text search.</p></noscript></div>
+<div id="findings">
+{% for finding in report.findings %}
+<details class="finding" data-severity="{{ finding.severity }}" data-service="{{ finding.service }}" data-account="{{ finding.account_id }}" data-id="{{ finding.id }}" data-resource="{{ finding.resource_id }}" data-index="{{ loop.index0 }}">
+<summary><span class="badge {{ finding.severity }}">{{ finding.severity }}</span><span><span class="finding-title">{{ finding.title }}</span><span class="finding-id">{{ finding.id }}</span><span class="resource-line"> · {{ finding.service }} · {{ finding.resource_id }}</span></span></summary>
+<div class="finding-body"><p>{{ finding.description }}</p>
+<p class="resource-line">Account {{ finding.account_id }} · Region {{ finding.region or 'Global' }}<br>{{ finding.resource_arn or finding.resource_id }}</p>
+<h3>Evidence</h3><pre>{{ finding.evidence | tojson(indent=2) }}</pre>
+<h3>Risk</h3><p>{{ finding.risk }}</p><h3>Remediation</h3><p>{{ finding.remediation }}</p>
+{% if finding.references %}<h3>References</h3><ul>{% for reference in finding.references %}<li>{{ reference }}</li>{% endfor %}</ul>{% endif %}
+</div></details>
+{% endfor %}</div>
+<div id="no-matches" class="empty" hidden>No findings match these filters. Change the search or reset the filters.</div>
+{% if not report.findings %}<div class="empty">No findings were produced by the evaluated checks. Review scan coverage before drawing conclusions.</div>{% endif %}
+</section>
+<footer>AWSherlock {{ report.metadata.version }} · Standalone report · Configuration indicators do not prove effective access. Facts reflect collection time.</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const container = document.getElementById('findings');
+  const rows = Array.from(container.querySelectorAll('.finding'));
+  const controls = Object.fromEntries(['search','severity','service','account','sort'].map(id => [id, document.getElementById(id)]));
+  const rank = {CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1};
+  const searchText = new Map(rows.map(row => [row, row.textContent.toLowerCase()]));
+  const collator = new Intl.Collator('en', {numeric: true, sensitivity: 'base'});
+  function update() {
+    const query = controls.search.value.trim().toLowerCase();
+    const mode = controls.sort.value;
+    const sorted = rows.slice().sort((a,b) => {
+      let result;
+      if (mode.startsWith('severity-')) {
+        result = rank[b.dataset.severity] - rank[a.dataset.severity];
+        if (mode === 'severity-asc') result = -result;
+      } else {
+        result = collator.compare(a.dataset[mode], b.dataset[mode]);
+      }
+      return result || Number(a.dataset.index) - Number(b.dataset.index);
+    });
+    let visible = 0;
+    for (const row of sorted) {
+      const matches = (!query || searchText.get(row).includes(query)) &&
+        ['severity','service','account'].every(key => controls[key].value === 'all' || controls[key].value === row.dataset[key]);
+      row.hidden = !matches;
+      if (matches) visible++;
+      container.appendChild(row);
+    }
+    document.getElementById('result-count').textContent = `${visible} of ${rows.length} findings shown`;
+    document.getElementById('no-matches').hidden = visible !== 0 || rows.length === 0;
+  }
+  controls.search.addEventListener('input', update);
+  for (const key of ['severity','service','account','sort']) controls[key].addEventListener('change', update);
+  document.getElementById('reset').addEventListener('click', () => {
+    controls.search.value = '';
+    for (const key of ['severity','service','account']) controls[key].value = 'all';
+    controls.sort.value = 'severity-desc';
+    update();
+  });
+  update();
+})();
+</script>
+</body></html>
