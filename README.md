@@ -1,3 +1,5 @@
+![AWSherlock](awsherlock.png)
+
 # AWSherlock
 
 AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 28 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
