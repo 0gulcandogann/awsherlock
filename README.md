@@ -61,6 +61,8 @@ awsherlock scan --help
 
 The bare `awsherlock` command shows help without contacting AWS. Installation is
 per user; administrator access and manual virtual-environment activation are not required.
+Use `awsherlock --update` later to refresh the installed command from the latest
+GitHub `main` branch.
 
 ### macOS / Linux
 
@@ -96,6 +98,7 @@ download or source archive is needed.
 ### Update, remove, or troubleshoot
 
 ```bash
+awsherlock --update
 pipx upgrade awsherlock
 pipx uninstall awsherlock
 ```

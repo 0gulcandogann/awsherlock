@@ -2,6 +2,8 @@
 
 from typing import Annotated
 from pathlib import Path
+import subprocess
+import sys
 
 import typer
 
@@ -21,12 +23,28 @@ app = typer.Typer(
     invoke_without_command=True,
 )
 
+REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
+
 
 def show_version(value: bool) -> None:
     """Print the version before processing commands."""
     if value:
         typer.echo(f"AWSherlock {__version__}")
         raise typer.Exit()
+
+
+def update_installation() -> None:
+    """Upgrade the current isolated installation from the public main branch."""
+    typer.echo("Updating AWSherlock from GitHub...")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", REPOSITORY_URL],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        typer.echo(f"Update failed: {error}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo("AWSherlock updated successfully. Run `awsherlock --version` to verify.")
 
 
 @app.callback()
@@ -41,8 +59,18 @@ def main(
             help="Show the version and exit.",
         ),
     ] = False,
+    update: Annotated[
+        bool,
+        typer.Option(
+            "--update",
+            help="Update this installation from the latest GitHub main branch.",
+        ),
+    ] = False,
 ) -> None:
     """Provide top-level CLI options."""
+    if update:
+        update_installation()
+        raise typer.Exit()
     if ctx.invoked_subcommand is None:
         typer.echo(terminal_banner())
         typer.echo(ctx.get_help())

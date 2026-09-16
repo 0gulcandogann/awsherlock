@@ -4,6 +4,7 @@
 
 - Running `awsherlock` without arguments now displays help and exits successfully,
   without creating an AWS session.
+- Added `awsherlock --update` to refresh an existing installation from GitHub.
 - Document user-wide pipx installation, PATH setup, upgrades and removal for
   Windows, macOS and Linux.
 - Added `install.sh` for a sudo-free, isolated Linux/macOS installation from a
