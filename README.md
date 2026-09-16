@@ -18,7 +18,7 @@ AWSherlock is a command-line scanner for AWS security configuration. It reads yo
 awsherlock scan --profile production
 ```
 
-[Installation](#installation) · [First scan](#first-scan) · [Reports](#reports) · [Checks and permissions](#checks-and-permissions) · [Troubleshooting](#troubleshooting)
+[Installation](#installation) · [First scan](#first-scan) · [All CLI options](#command-reference) · [Reports](#reports) · [Checks and permissions](#checks-and-permissions) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -216,6 +216,117 @@ information. Use it when the command appears to run an older installation.
 `--list-checks` lists the registered check IDs and titles; `--list-services` shows
 each supported service and its check count. Use one action at a time, without a
 `scan` or `snapshot` command.
+
+## Command reference
+
+Every supported option is listed below, including `--help`. Options belong to the
+command shown in each table; for example, use `awsherlock --doctor` and
+`awsherlock scan --stats`. `--color` is available in all three locations.
+
+```bash
+awsherlock --help
+awsherlock scan --help
+awsherlock snapshot --help
+```
+
+### Top-level options: `awsherlock [OPTIONS]`
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--help` | Off | Show command help and exit without AWS calls. |
+| `--version` | Off | Print the installed version and exit without AWS calls. |
+| `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
+| `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
+| `--list-checks` | Off | List all 28 registered check IDs and titles; no AWS calls. |
+| `--list-services` | Off | List supported services and their check counts; no AWS calls. |
+| `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
+| `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
+
+Choose one of `--update`, `--doctor`, `--list-checks`, `--list-services` or
+`--describe-check`; these actions cannot be combined with each other or with a
+`scan`/`snapshot` command. `--version` exits eagerly rather than running other actions.
+
+### Scan options: `awsherlock scan [OPTIONS] [snapshot_path]`
+
+Omit `snapshot_path` for a live account scan, use `organization` for discovered
+member accounts, or pass a normalized JSON file for offline evaluation.
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--help` | Off | Show scan help without contacting AWS. |
+| `--profile NAME` | SDK credential chain | Use a named AWS profile for live authentication. |
+| `--role ARN` | No assumed role | Assume an IAM role for a single-account scan, or for organization discovery/source authentication. |
+| `--role-session-name NAME` | `AWSherlock` | Name the assumed-role session; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
+| `--external-id ID` | Not supplied | External ID for the assumed role; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
+| `--services LIST` | All seven services | Comma-separated supported service names. Offline selection must exist in the snapshot. |
+| `--output FORMAT` | `console` | `console`, `json` or `html`. JSON goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
+| `--report-file PATH` | Not supplied | Write a new JSON/HTML report; requires `--output json` or `--output html`. Existing files are not overwritten. |
+| `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
+| `--no-progress` | Off | Hide the banner and progress bar; explicit `--verbose` messages still appear. |
+| `--no-banner` | Off | Hide the banner while retaining interactive progress. |
+| `--verbose` | Off | Write sanitized scan stages and work units to stderr; does not enable raw SDK debug logging. |
+| `--summary-only` | Off | Console totals, coverage and issues without individual finding cards; requires console output. |
+| `--region REGION` | SDK-configured region | Select one live region for regional services. Mutually exclusive with `--regions`. |
+| `--regions LIST` | Not selected | Explicit comma-separated live regions, deduplicated in order; IAM/S3 run once per account. Mutually exclusive with `--region`. |
+| `--expect-account ID` | Not supplied | Require the resolved 12-digit target account ID. Organization mode checks the discovery/source account; offline mode checks snapshot metadata. |
+| `--save-snapshot PATH` | Off | Live scans only. Write a new file for a single-account scan, or a new directory for organization/`--regions` scans. Destination must differ from the report path. |
+| `--connect-timeout SECONDS` | SDK default | Finite positive socket connection timeout, at most 3600 seconds. |
+| `--read-timeout SECONDS` | SDK default | Finite positive socket read timeout, at most 3600 seconds. |
+| `--timeout SECONDS` | SDK defaults | Set both request timeouts; cannot be combined with either separate timeout flag. Not an overall scan deadline. |
+| `--color MODE` | `auto` / inherited top-level preference | Override terminal colors with `auto`, `always` or `never`. JSON payloads remain unstyled. |
+| `--stats` | Off | Write measured elapsed time and resource/check/finding counts to stderr; no API-call count claims. |
+
+Offline scans reject authentication options (`--profile`, `--role`,
+`--role-session-name`, `--external-id`), regional selection, request timeouts and
+`--save-snapshot`. They support service selection, account verification, report
+formats and display/statistics options. `--role-name` is organization-only.
+
+```bash
+# Live: verify account, select regions, retain facts and write an HTML report
+awsherlock scan --profile production --expect-account 123456789012 --regions eu-central-1,eu-west-1 --save-snapshot scan-facts --output html --report-file audit.html --timeout 30 --stats
+
+# Organization: assume a configurable member-account role
+awsherlock scan organization --profile audit --role-name audit/Reader --role-session-name audit-session --external-id configured-trust-id --regions eu-central-1,eu-west-1
+
+# Offline: show only a compact console summary from one saved scope
+awsherlock scan scan-facts/123456789012-eu-west-1.json --summary-only --no-progress --color never
+```
+
+Replace the account ID, profile and role trust values with your actual configuration.
+Saved directories contain individually replayable files; pass a file, not the
+directory, to offline `scan`. Coverage and error exit codes remain visible in all modes.
+
+### Snapshot options: `awsherlock snapshot [OPTIONS]`
+
+This command collects one live account's normalized facts without evaluating
+security rules. `--output` is required and always names a JSON snapshot file;
+it is different from scan's `--output FORMAT`.
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--help` | Off | Show snapshot help without contacting AWS. |
+| `--output PATH` | Required | Write a new normalized JSON snapshot file; existing files are not overwritten. |
+| `--services LIST` | All seven services | Select supported services using a comma-separated list. |
+| `--profile NAME` | SDK credential chain | Authenticate with a named AWS profile. |
+| `--role ARN` | No assumed role | Assume this IAM role before collecting facts. |
+| `--role-session-name NAME` | `AWSherlock` | Set the role session name; requires `--role`. |
+| `--external-id ID` | Not supplied | External ID required by the role trust policy; requires `--role`. |
+| `--region REGION` | SDK-configured region | Override the region for regional services. IAM remains global; S3 uses bucket locations. |
+| `--expect-account ID` | Not supplied | Stop before collection if the resolved account differs from this 12-digit ID. |
+| `--connect-timeout SECONDS` | SDK default | Finite positive socket connection timeout, at most 3600 seconds. |
+| `--read-timeout SECONDS` | SDK default | Finite positive socket read timeout, at most 3600 seconds. |
+| `--timeout SECONDS` | SDK defaults | Set both request timeouts; cannot be combined with either separate timeout flag. |
+| `--color MODE` | `auto` / inherited top-level preference | `auto`, `always` or `never`; honors `NO_COLOR`. |
+
+```bash
+awsherlock snapshot --output facts.json --profile production --services iam,s3,ec2 --region eu-central-1 --expect-account 123456789012 --timeout 30
+awsherlock scan facts.json --output html --report-file offline-audit.html
+```
+
+Snapshot does not accept scan-only `--regions`, `--save-snapshot`, `--role-name`,
+`--stats`, `--verbose`, `--summary-only`, `--no-banner`, `--no-progress` or
+`--report-file`. For organization or multi-region fact capture, use
+`awsherlock scan ... --save-snapshot PATH` instead.
 
 ## Reading the results
 
