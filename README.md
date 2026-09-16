@@ -38,15 +38,17 @@ Open `awsherlock-report.html` locally. No server, account signup, or internet co
 
 ## Installation
 
-Requires **Python 3.11 or newer** and **Git**. Use pipx to install `awsherlock` as a terminal
-command, available from any directory without activating a virtual environment.
+Requires **Python 3.11 or newer** and **Git**. The supported installation flow
+starts with a clone so the CLI, offline demo and installer are available locally.
 
 ### Windows PowerShell
 
 ```powershell
+git clone https://github.com/0gulcandogann/awsherlock.git
+cd awsherlock
 py -m pip install --user pipx
 py -m pipx ensurepath
-py -m pipx install "git+https://github.com/0gulcandogann/awsherlock.git"
+py -m pipx install .
 ```
 
 Close and reopen your terminal, then run:
@@ -62,7 +64,7 @@ per user; administrator access and manual virtual-environment activation are not
 
 ### macOS / Linux
 
-From a cloned checkout, the included installer creates an isolated user install
+From the cloned checkout, the included installer creates an isolated user install
 under `~/.local/share/awsherlock` and exposes `awsherlock` through `~/.local/bin`.
 It does not require sudo and does not modify system Python:
 
@@ -77,22 +79,19 @@ command to add. Open a new terminal after adding it, then run `awsherlock --vers
 To choose another user-owned location, set `AWSHERLOCK_INSTALL_ROOT` or
 `AWSHERLOCK_BIN_DIR` before running the script.
 
-The pipx route remains available when you prefer it. Install pipx with your
+If you prefer pipx after cloning, install pipx with your
 operating system's package manager (for example, `brew install pipx` on macOS
 or `sudo apt install pipx` on Ubuntu), then:
 
 ```bash
 pipx ensurepath
-pipx install "git+https://github.com/0gulcandogann/awsherlock.git"
+pipx install .
 ```
 
 Reopen your terminal and run `awsherlock --version`. See the
 [pipx installation guide](https://pipx.pypa.io/latest/how-to/install-pipx.html)
-for other systems. The Git URL installs the default branch using your existing Git
-authentication. If the repository is private, your GitHub account must have access;
-anonymous archive downloads may return 404. To pin a release, use
-`git+https://github.com/0gulcandogann/awsherlock.git@v0.1.0`
-instead; the original v0.1.0 release requires `awsherlock --help` for help.
+for other systems. The package is installed from the local clone, so no separate
+download or source archive is needed.
 
 ### Update, remove, or troubleshoot
 
@@ -105,13 +104,12 @@ If the command is not found, run `pipx ensurepath` and restart the terminal
 application, including an IDE's terminal host if necessary. On Windows you can use
 `py -m pipx ensurepath` even when `pipx` itself is not on PATH. Verify discovery with
 `Get-Command awsherlock` in PowerShell or `command -v awsherlock` on macOS/Linux.
-A pipx installation does not create a working source checkout; clone the repository
-below if you want the demo files locally.
+Both routes start from the same local clone, so the offline demo and documentation
+remain available beside the installed command.
 
 ### From a checkout
 
-For a user-wide command from an existing checkout, run `pipx install .`. For
-development only, use an activated virtual environment:
+For development only, use an activated virtual environment:
 
 ```bash
 git clone https://github.com/0gulcandogann/awsherlock.git

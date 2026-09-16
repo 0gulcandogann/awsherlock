@@ -8,6 +8,8 @@
   Windows, macOS and Linux.
 - Added `install.sh` for a sudo-free, isolated Linux/macOS installation from a
   local checkout.
+- Made clone-based installation the primary README flow; pipx, where used, now
+  installs from that local clone instead of a remote package URL.
 
 ## 0.1.0 — 2026-09-16
 
