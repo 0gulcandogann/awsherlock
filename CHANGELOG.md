@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Running `awsherlock` without arguments now displays help and exits successfully,
+  without creating an AWS session.
+- Document user-wide pipx installation, PATH setup, upgrades and removal for
+  Windows, macOS and Linux.
+
 ## 0.1.0 — 2026-09-16
 
 Initial release candidate for a read-only AWS security CLI.

@@ -17,6 +17,7 @@ app = typer.Typer(
     name="awsherlock",
     help="AWSherlock: an open-source AWS security scanner.",
     add_completion=False,
+    invoke_without_command=True,
 )
 
 
@@ -29,6 +30,7 @@ def show_version(value: bool) -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     version: Annotated[
         bool,
         typer.Option(
@@ -40,6 +42,8 @@ def main(
     ] = False,
 ) -> None:
     """Provide top-level CLI options."""
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
 
 
 @app.command()
