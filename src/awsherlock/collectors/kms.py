@@ -12,7 +12,7 @@ def collect_kms(context: ScanContext) -> CollectionResult:
         result.issues.append(CollectionIssue(None, "Region", "Configure an AWS region for KMS"))
         return result
     try:
-        client = context.session.client("kms", region_name=context.region)
+        client = context.client("kms", region_name=context.region)
         seen = set()
         for page in client.get_paginator("list_keys").paginate():
             for key in items(page, "Keys"):

@@ -72,7 +72,7 @@ def collect_ec2(context: ScanContext) -> CollectionResult:
         result.issues.append(CollectionIssue(None, "Region", "Configure an AWS region for EC2"))
         return result
     try:
-        client = context.session.client("ec2", region_name=context.region)
+        client = context.client("ec2", region_name=context.region)
     except AWS_ERRORS as error:
         result.issues.append(CollectionIssue(None, "EC2Client", error_message(error)))
         return result

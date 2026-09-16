@@ -110,7 +110,7 @@ def collect_s3(context: ScanContext) -> S3Collection:
     seen: set[str] = set()
     clients = {}
     try:
-        client = context.session.client("s3")
+        client = context.client("s3")
         pages = client.get_paginator("list_buckets").paginate(PaginationConfig={"PageSize": 1000})
         for page in pages:
             if not isinstance(page, dict) or not isinstance(page.get("Buckets"), list):
@@ -134,7 +134,7 @@ def collect_s3(context: ScanContext) -> S3Collection:
                         raise InvalidResponse()
                     operation = "CreateRegionalClient"
                     if region not in clients:
-                        clients[region] = context.session.client("s3", region_name=region)
+                        clients[region] = context.client("s3", region_name=region)
                     result.resources.append(Resource(
                         service="s3", resource_type="bucket", account_id=context.account_id,
                         region=region, resource_id=name, resource_arn=f"arn:{context.partition}:s3:::{name}",

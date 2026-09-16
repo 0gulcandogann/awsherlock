@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from rich.console import Console
 from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
 from awsherlock.evaluation import Report
 from awsherlock.branding import terminal_text
@@ -10,6 +9,7 @@ from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from awsherlock.terminal import CYAN, GREEN, ORANGE, PURPLE, RED, YELLOW, Console
 
 
 def render_json(report: Report) -> str:
@@ -30,7 +30,26 @@ def render_html(report: Report) -> str:
     return environment.get_template("report.html").render(report=data, accounts=accounts, services=services)
 
 
-SEVERITY_STYLES = {"CRITICAL": "bold red", "HIGH": "red", "MEDIUM": "yellow", "LOW": "cyan", "INFO": "dim"}
+SEVERITY_STYLES = {"CRITICAL": f"bold {RED}", "HIGH": ORANGE, "MEDIUM": YELLOW, "LOW": CYAN, "INFO": GREEN}
+
+
+def render_check_description(details: dict[str, str]) -> None:
+    """Style offline check metadata while preserving plain redirected output."""
+    console = Console()
+    styles = {
+        "Check": (f"bold {CYAN} on {PURPLE}", f"bold {CYAN}"),
+        "Title": (f"bold {ORANGE}", f"bold {ORANGE}"),
+        "Service": (f"bold {CYAN}", CYAN),
+        "Required fact": (f"bold {YELLOW}", YELLOW),
+        "Remediation": (f"bold {GREEN}", GREEN),
+        "Scope": (f"bold {RED}", YELLOW),
+    }
+    for label, value in details.items():
+        label_style, value_style = styles.get(label, ("bold", "default"))
+        line = Text()
+        line.append(f"{terminal_text(label)}:", style=label_style)
+        line.append(f" {terminal_text(value)}", style=value_style)
+        console.print(line)
 
 
 def render_console(report: Report, *, summary_only: bool = False) -> None:
@@ -39,13 +58,14 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     data = report.to_dict()
     summary = data["summary"]
     console.print()
-    console.print("AWSherlock / Scan results", style="bold cyan", markup=False)
-    console.print(f"Account: {terminal_text(report.metadata['account_id'])}", markup=False)
-    console.print(f"Region: {terminal_text(report.metadata.get('region') or 'Global / not configured')}", style="dim", markup=False)
+    console.print("AWSherlock / Scan results", style=f"bold {ORANGE}", markup=False)
+    console.print(f"Account: {terminal_text(report.metadata['account_id'])}", style=CYAN, markup=False)
+    region_label = ", ".join(report.metadata["regions"]) if "regions" in report.metadata else (report.metadata.get("region") or "Global / not configured")
+    console.print(f"Region: {terminal_text(region_label)}", style=CYAN, markup=False)
     console.print()
     console.print(
         f"{summary['findings']} findings   /   {summary['resources']} resources   /   "
-        f"{summary['checks_evaluated']} checks evaluated", style="bold", markup=False,
+        f"{summary['checks_evaluated']} checks evaluated", style=f"bold {CYAN}", markup=False,
     )
     severity_line = Text()
     for severity, count in summary["severity"].items():
@@ -54,45 +74,52 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     if report.incomplete:
         console.print(Panel("Some checks could not run. Review coverage and collection issues below. "
                             "Zero findings do not mean the account is secure.",
-                            title="Incomplete scan coverage", border_style="yellow"))
+                            title="Incomplete scan coverage", border_style=YELLOW, style=YELLOW))
     accounts = report.metadata.get("accounts", [])
     if accounts:
-        table = Table(title="Organization accounts", box=box.SIMPLE, expand=True)
+        table = Table(title="Organization accounts", box=box.SIMPLE, expand=True,
+                      title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}", style=CYAN)
         for label in ("Account", "Name", "State", "Scan status"):
             table.add_column(label)
         for account in accounts:
             table.add_row(*(Text(terminal_text(str(account[key]))) for key in ("account_id", "name", "state", "scan_status")))
         console.print(table)
-    coverage = Table(title="Scan coverage", box=box.SIMPLE, expand=True)
-    for label in ("Account / Service", "Status", "Resources", "Checks", "Not scanned", "Findings"):
+    coverage = Table(title="Scan coverage", box=box.SIMPLE, expand=True,
+                     title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}", style=CYAN)
+    multi_region = "regions" in report.metadata
+    labels = ("Account / Service",) + (("Region / Scope",) if multi_region else ()) + ("Status", "Resources", "Checks", "Not scanned", "Findings")
+    for label in labels:
         coverage.add_column(label, justify="right" if label in {"Resources", "Checks", "Not scanned", "Findings"} else "left")
     for entry in report.coverage:
-        status_style = "green" if entry["status"] == "COMPLETE" else "yellow"
+        status_style = GREEN if entry["status"] == "COMPLETE" else YELLOW
         coverage.add_row(Text(f"{terminal_text(entry['account_id'])} / {terminal_text(entry['service'].upper())}"),
+                         *((Text(terminal_text(entry.get("region") or entry.get("scope") or "global")),) if multi_region else ()),
                          Text(terminal_text(entry["status"]), style=status_style),
                          *(str(entry[key]) for key in ("resources", "evaluated", "not_scanned", "findings")))
     console.print(coverage)
     rank = {severity: index for index, severity in enumerate(SEVERITY_STYLES)}
     findings = sorted(report.findings, key=lambda finding: rank[finding.severity])
     if not summary_only:
-        console.print("Findings", style="bold")
+        console.print("Findings", style=f"bold {ORANGE}")
     for index, finding in enumerate([] if summary_only else findings, 1):
         title = Text(f"{index:02d}  {finding.severity}", style=SEVERITY_STYLES[finding.severity])
-        body = Text(f"{terminal_text(finding.title)}\n", style="bold")
-        body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style="dim")
-        body.append(f"Resource: {terminal_text(finding.resource_id)}\n")
-        body.append(f"{terminal_text(finding.description, multiline=True)}\n\n")
-        body.append("Remediation: ", style="bold")
-        body.append(terminal_text(finding.remediation, multiline=True))
-        console.print(Panel(body, title=title, title_align="left", border_style="dim", padding=(1, 2)))
+        body = Text(f"{terminal_text(finding.title)}\n", style=f"bold {ORANGE}")
+        body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style=CYAN)
+        body.append(f"Resource: {terminal_text(finding.resource_id)}\n", style=CYAN)
+        body.append(f"{terminal_text(finding.description, multiline=True)}\n\n", style=YELLOW)
+        body.append("Remediation: ", style=f"bold {GREEN}")
+        body.append(terminal_text(finding.remediation, multiline=True), style=GREEN)
+        console.print(Panel(body, title=title, title_align="left", border_style=PURPLE, padding=(1, 2)))
     if not findings:
-        console.print("No findings were produced by the evaluated checks. Review scan coverage.", markup=False)
+        console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
-        errors.print("Collection issues", style="bold yellow")
+        errors.print("Collection issues", style=f"bold {RED}")
         for entry, issue in issues:
             message = Text(f"ERROR {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
-                           f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style="yellow")
-            message.append(terminal_text(issue["message"], multiline=True), style="default")
+                           f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style=RED)
+            if multi_region:
+                message.append(f"Region / scope: {terminal_text(entry.get('region') or entry.get('scope') or 'global')}\n", style=CYAN)
+            message.append(terminal_text(issue["message"], multiline=True), style=YELLOW)
             errors.print(message)
-    console.print("Scope: configuration risk indicators; effective access is not determined.", style="dim", markup=False)
+    console.print("Scope: configuration risk indicators; effective access is not determined.", style=YELLOW, markup=False)

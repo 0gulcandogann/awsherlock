@@ -16,7 +16,7 @@ def collect_lambda(context: ScanContext, *, today: date | None = None) -> Collec
     roles = {}
     today = today or date.today()
     try:
-        client = context.session.client("lambda", region_name=context.region)
+        client = context.client("lambda", region_name=context.region)
         for page in client.get_paginator("list_functions").paginate():
             for function in items(page, "Functions"):
                 name = None
@@ -51,7 +51,7 @@ def collect_lambda(context: ScanContext, *, today: date | None = None) -> Collec
                         role = text_field(function.get("Role"))
                         if role not in roles:
                             role_name = role.rsplit("/", 1)[-1]
-                            iam = context.session.client("iam")
+                            iam = context.client("iam")
                             policies = []
                             for policy_page in iam.get_paginator("list_attached_role_policies").paginate(RoleName=role_name):
                                 for policy in items(policy_page, "AttachedPolicies"):

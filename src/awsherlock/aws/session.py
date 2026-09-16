@@ -4,6 +4,7 @@ import re
 
 import boto3
 from boto3.session import Session
+from botocore.config import Config
 from botocore.exceptions import (
     BotoCoreError,
     ClientError,
@@ -26,21 +27,32 @@ def create_scan_context(
     role_session_name: str | None = None,
     external_id: str | None = None,
     source_session: Session | None = None,
+    region: str | None = None,
+    client_config: Config | None = None,
+    expect_account: str | None = None,
 ) -> ScanContext:
     """Resolve the source or assumed-role identity; keep credentials in memory."""
     role_match = _validate_role_options(role, role_session_name, external_id)
+    validate_region(region)
+    validate_account_id(expect_account)
+    if role_match is not None and expect_account is not None and role_match.group(2) != expect_account:
+        raise SessionError("Requested role does not belong to the expected AWS account.")
     if source_session is not None and profile is not None:
         raise SessionError("Specify either a source session or a profile, not both.")
+    if source_session is not None and region is not None and source_session.region_name != region:
+        raise SessionError("Region must match the supplied source session.")
     operation = "caller identity"
+    client_options = {"config": client_config} if client_config is not None else {}
     try:
-        session = source_session if source_session is not None else boto3.Session(profile_name=profile)
+        session = source_session if source_session is not None else boto3.Session(
+            profile_name=profile, **({"region_name": region} if region is not None else {}))
         source_profile = session.profile_name
         if role is not None:
             operation = "AssumeRole"
             parameters = {"RoleArn": role, "RoleSessionName": role_session_name or "AWSherlock"}
             if external_id is not None:
                 parameters["ExternalId"] = external_id
-            response = session.client("sts").assume_role(**parameters)
+            response = session.client("sts", **client_options).assume_role(**parameters)
             credentials = response.get("Credentials") if isinstance(response, dict) else None
             if not isinstance(credentials, dict) or any(
                 not isinstance(credentials.get(key), str) or not credentials[key].strip()
@@ -54,7 +66,7 @@ def create_scan_context(
                 region_name=session.region_name,
             )
             operation = "caller identity"
-        identity = session.client("sts").get_caller_identity()
+        identity = session.client("sts", **client_options).get_caller_identity()
     except ProfileNotFound:
         raise SessionError("AWS profile not found. Check your AWS configuration.") from None
     except (NoCredentialsError, PartialCredentialsError):
@@ -101,6 +113,7 @@ def create_scan_context(
         if caller_arn != expected_arn:
             raise SessionError("AWS caller identity does not match the requested role.")
 
+    verify_account_id(account_id, expect_account)
     return ScanContext(
         account_id=account_id,
         caller_arn=caller_arn,
@@ -108,7 +121,24 @@ def create_scan_context(
         profile=source_profile,
         region=session.region_name,
         session=session,
+        client_config=client_config,
     )
+
+
+def validate_region(region: str | None) -> None:
+    """Validate region syntax without network discovery or echoing input."""
+    if region is not None and not re.fullmatch(r"[a-z]{2}(?:-[a-z]+)+-[0-9]+", region):
+        raise SessionError("Invalid AWS region syntax. Use a region such as eu-west-1.")
+
+
+def validate_account_id(account_id: str | None) -> None:
+    if account_id is not None and not re.fullmatch(r"[0-9]{12}", account_id):
+        raise SessionError("Expected account ID must contain exactly 12 digits.")
+
+
+def verify_account_id(actual: str, expected: str | None) -> None:
+    if expected is not None and actual != expected:
+        raise SessionError("AWS account does not match --expect-account. Scan stopped before collection.")
 
 
 def _validate_role_options(

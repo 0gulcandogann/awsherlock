@@ -3,11 +3,11 @@
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
-from rich.console import Console
 from rich.progress import Progress, ProgressColumn, Task, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.text import Text
 
 from awsherlock.branding import terminal_banner, terminal_text
+from awsherlock.terminal import CYAN, GREEN, ORANGE, YELLOW, Console, COLOR_MODE
 
 ProgressCallback = Callable[[str, int, int], None]
 
@@ -17,7 +17,16 @@ class ASCIIBarColumn(ProgressColumn):
 
     def render(self, task: Task) -> Text:
         filled = min(20, max(0, int(task.percentage / 5)))
-        return Text("[" + "#" * filled + "-" * (20 - filled) + "]", style="cyan")
+        return Text("[" + "#" * filled + "-" * (20 - filled) + "]", style=GREEN)
+
+
+class PaletteElapsedColumn(TimeElapsedColumn):
+    """Retain Rich's elapsed-time calculation with the shared palette."""
+
+    def render(self, task: Task) -> Text:
+        text = super().render(task)
+        text.style = YELLOW
+        return text
 
 
 @contextmanager
@@ -26,14 +35,16 @@ def scan_activity(*, enabled: bool = True, show_banner: bool = True,
     """Show completed work units on stderr without changing terminal screens."""
     console = Console(stderr=True)
     interactive = enabled and console.is_terminal and not console.is_dumb_terminal
+    if COLOR_MODE.get() == "always" and not getattr(console.file, "isatty", lambda: False)():
+        interactive = False
     if interactive and show_banner:
         console.print(terminal_banner(width=console.width, encoding=getattr(console.file, "encoding", None)),
-                      markup=False, highlight=False, soft_wrap=True)
+                      style=ORANGE, markup=False, highlight=False, soft_wrap=True)
     with Progress(
-        TextColumn("{task.description}"),
+        TextColumn("{task.description}", style=CYAN),
         ASCIIBarColumn(),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
+        TaskProgressColumn(text_format=f"[{GREEN}]{{task.percentage:>3.0f}}%"),
+        PaletteElapsedColumn(),
         console=console,
         disable=not interactive,
         refresh_per_second=4,
@@ -46,7 +57,7 @@ def scan_activity(*, enabled: bool = True, show_banner: bool = True,
             progress.update(task, description=terminal_text(stage), completed=completed, total=total)
             if verbose:
                 console.print(f"[scan] {terminal_text(stage)} ({completed}/{total} work units)",
-                              markup=False, highlight=False)
+                              style=YELLOW, markup=False, highlight=False)
             if interactive:
                 progress.refresh()
 

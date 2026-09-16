@@ -61,7 +61,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <div class="metadata">
 <div><span class="eyebrow">Account</span><strong>{{ report.metadata.account_id }}</strong></div>
 <div><span class="eyebrow">Collected at</span><strong>{{ report.metadata.started_at }}</strong></div>
-<div><span class="eyebrow">Configured region</span><strong>{{ report.metadata.region or 'Not configured / global services' }}</strong></div>
+<div><span class="eyebrow">Configured region</span><strong>{% if report.metadata.regions is defined %}{{ report.metadata.regions | join(', ') }}{% else %}{{ report.metadata.region or 'Not configured / global services' }}{% endif %}</strong></div>
 <div><span class="eyebrow">Scan ID</span><strong>{{ report.metadata.scan_id }}</strong></div>
 </div></section>
 {% if report.metadata.accounts is defined %}<section class="panel"><h2>Organization accounts</h2><div class="table-wrap"><table><thead><tr><th>Account</th><th>Name</th><th>State</th><th>Scan status</th></tr></thead><tbody>{% for account in report.metadata.accounts %}<tr><td>{{ account.account_id }}</td><td>{{ account.name }}</td><td>{{ account.state }}</td><td>{{ account.scan_status }}</td></tr>{% else %}<tr><td colspan="4">No accounts discovered. Review discovery coverage.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
@@ -98,8 +98,8 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 </section>
 <section class="panel"><details class="coverage-details"{% if report.summary.incomplete %} open{% endif %}><summary id="coverage-title">Scan coverage &middot; {{ report.coverage | length }} account / service entries</summary>
 <div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
-<thead><tr><th scope="col">Account / Service</th><th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
-<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th><td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
+<thead><tr><th scope="col">Account / Service</th>{% if report.metadata.regions is defined %}<th scope="col">Region / Scope</th>{% endif %}<th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
+<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th>{% if report.metadata.regions is defined %}<td>{{ entry.region | default(none) or entry.scope | default('global') }}</td>{% endif %}<td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
 <td>{% if entry.issues %}<details><summary>{{ entry.issues | length }} issue(s)</summary><ul>{% for issue in entry.issues %}<li><strong>{{ issue.resource_id or 'Account' }} · {{ issue.operation }}</strong>: {{ issue.message }}</li>{% endfor %}</ul></details>{% else %}<span class="muted">No collection errors</span>{% endif %}</td></tr>{% endfor %}</tbody>
 </table></div></details></section>
 <footer>AWSherlock {{ report.metadata.version }} · Standalone report · Configuration indicators do not prove effective access. Facts reflect collection time.</footer>

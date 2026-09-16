@@ -75,7 +75,7 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
     now = now or datetime.now(timezone.utc)
     result = CollectionResult()
     try:
-        client = context.session.client("iam")
+        client = context.client("iam")
         pages = client.get_paginator("get_account_authorization_details").paginate()
         for page in pages:
             if not isinstance(page, dict):

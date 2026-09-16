@@ -12,22 +12,36 @@ from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, error_mess
 from awsherlock.evaluation import Report, evaluate_snapshot
 from awsherlock.coverage import coverage_status
 from awsherlock.snapshot import SnapshotError, capture_snapshot
+from awsherlock.regional import SnapshotSink, collection_scopes, scan_regions
 
 
 def scan_organization(source: ScanContext, services: list[str], role_name: str = "AWSherlockAuditRole",
                       external_id: str | None = None, role_session_name: str | None = None,
-                      progress: Callable[[str, int, int], None] | None = None) -> Report:
+                      progress: Callable[[str, int, int], None] | None = None,
+                      regions: list[str] | None = None,
+                      snapshot_sink: SnapshotSink | None = None) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
                      "account_id": source.account_id, "region": source.region, "version": __version__,
                      "mode": "organization", "accounts": []}, [], [])
     accounts = report.metadata["accounts"]
+    if regions is not None:
+        report.metadata.update(region=None, regions=regions)
+    def account_failures(account_id: str, operation: str, message: str,
+                         status: str = "ERROR") -> None:
+        scopes = collection_scopes(services, regions) if regions is not None else [(None, services)]
+        for region, selected in scopes:
+            for service in selected:
+                entry = failed_coverage(account_id, service, operation, message, status)
+                if regions is not None:
+                    entry.update(region=region, scope="bucket" if service == "s3" else ("global" if region is None else "regional"))
+                report.coverage.append(entry)
     seen = set()
     if progress is not None:
         progress("Discovering accounts", 0, 1)
     try:
-        client = source.session.client("organizations")
+        client = source.client("organizations")
         for page in client.get_paginator("list_accounts").paginate():
             for raw in items(page, "Accounts"):
                 if not isinstance(raw, dict) or not isinstance(raw.get("Id"), str) or not re.fullmatch(r"[0-9]{12}", raw["Id"]):
@@ -48,21 +62,26 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             progress(f"Scanning account {account_id}", index + 1, len(accounts) + 2)
         if account["state"] != "ACTIVE":
             account["scan_status"] = "NOT_SCANNED"
-            for service in services:
-                report.coverage.append(failed_coverage(account_id, service, "AccountState", "Account is not ACTIVE", "NOT_SCANNED"))
+            account_failures(account_id, "AccountState", "Account is not ACTIVE", "NOT_SCANNED")
             if progress is not None:
                 progress(f"Account {account_id} skipped", index + 2, len(accounts) + 2)
             continue
         try:
             context = create_scan_context(source_session=source.session,
                                           role=f"arn:{source.partition}:iam::{account_id}:role/{role_name}",
-                                          external_id=external_id, role_session_name=role_session_name)
-            result = evaluate_snapshot(capture_snapshot(context, services))
+                                          external_id=external_id, role_session_name=role_session_name,
+                                          **({"client_config": source.client_config} if source.client_config is not None else {}))
+            if regions is not None:
+                result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink)
+            else:
+                snapshot = capture_snapshot(context, services)
+                if snapshot_sink is not None:
+                    snapshot_sink(snapshot, context.region or "global")
+                result = evaluate_snapshot(snapshot)
         except (SessionError, SnapshotError) as error:
             account["scan_status"] = coverage_status([{"message": str(error)}], 0, 0)
-            for service in services:
-                operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"
-                report.coverage.append(failed_coverage(account_id, service, operation, str(error)))
+            operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"
+            account_failures(account_id, operation, str(error))
             if progress is not None:
                 progress(f"Account {account_id} unavailable", index + 2, len(accounts) + 2)
             continue

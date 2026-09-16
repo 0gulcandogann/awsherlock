@@ -13,7 +13,7 @@ def collect_secrets(context: ScanContext) -> CollectionResult:
         return result
     keys = {}
     try:
-        client = context.session.client("secretsmanager", region_name=context.region)
+        client = context.client("secretsmanager", region_name=context.region)
         for page in client.get_paginator("list_secrets").paginate():
             for secret in items(page, "SecretList"):
                 name = None
@@ -42,7 +42,7 @@ def collect_secrets(context: ScanContext) -> CollectionResult:
                             return {"manager": "AWS", "state": "Enabled"}  # aws/secretsmanager default.
                         key = text_field(key)
                         if key not in keys:
-                            kms = context.session.client("kms", region_name=context.region)
+                            kms = context.client("kms", region_name=context.region)
                             response = kms.describe_key(KeyId=key)
                             metadata = response.get("KeyMetadata") if isinstance(response, dict) else None
                             if not isinstance(metadata, dict):

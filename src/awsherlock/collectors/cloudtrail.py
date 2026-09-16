@@ -11,7 +11,7 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
         result.issues.append(CollectionIssue(None, "Region", "Configure an AWS region for CloudTrail"))
         return result
     try:
-        client = context.session.client("cloudtrail", region_name=context.region)
+        client = context.client("cloudtrail", region_name=context.region)
         trails = items(client.describe_trails(includeShadowTrails=True), "trailList")
         seen = set()
         clients = {context.region: client}
@@ -38,7 +38,7 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                 collect_fact(result, resource, "trail_settings", "TrailSettings", settings)
                 def status():
                     if home not in clients:
-                        clients[home] = context.session.client("cloudtrail", region_name=home)
+                        clients[home] = context.client("cloudtrail", region_name=home)
                     response = clients[home].get_trail_status(Name=arn)
                     if not isinstance(response, dict) or type(response.get("IsLogging")) is not bool:
                         raise InvalidResponse()

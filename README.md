@@ -2,7 +2,7 @@
 
 # AWSherlock
 
-[![Release v0.1.0](https://img.shields.io/badge/release-v0.1.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.0)
+[![Release v0.1.5](https://img.shields.io/badge/release-v0.1.5-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.5)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![28 security checks](https://img.shields.io/badge/security_checks-28-7C3AED?style=flat-square)](#checks)
 [![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
@@ -89,7 +89,9 @@ To use the default credential chain:
 awsherlock scan
 ```
 
-Set the region in your profile or through `AWS_DEFAULT_REGION`. Regional services use that one configured region. IAM is global, and S3 buckets are inspected in their own regions. There is no `--region` flag or automatic scan of every AWS region.
+Set the region in your profile or through `AWS_DEFAULT_REGION`, override it with
+`--region`, or select explicit regions with `--regions`. IAM is global, and S3
+buckets are inspected in their own regions. Regions are not automatically discovered.
 
 Your identity needs permission to read the configuration being inspected. See [checks and required permissions](#checks-and-permissions) before assigning access to an audit role. AWSherlock does not create roles or attach policies for you.
 
@@ -119,6 +121,7 @@ awsherlock scan --no-progress
 ```bash
 awsherlock scan --verbose
 awsherlock scan --summary-only
+awsherlock scan --region eu-west-1
 ```
 
 `--verbose` writes scan stages and completed work units to stderr, including with
@@ -127,6 +130,62 @@ API payloads. JSON stdout remains unchanged.
 `--summary-only` keeps console counts, scan coverage and collection issues while
 hiding individual finding cards. Incomplete scans still exit with code 1.
 It requires console output and cannot be combined with `--output json` or `html`.
+
+`--region` overrides the SDK region for live regional services, including member
+accounts in `scan organization`. Without it, SDK configuration remains in effect.
+IAM remains global; S3 still discovers bucket locations rather than filtering
+buckets to the selected region. Other regions are outside the regional scan scope.
+The option validates syntax, not region availability or account opt-in status;
+AWS failures retain incomplete coverage. Offline snapshots cannot use `--region`.
+Session region selection uses the standard [Boto3 session API](https://docs.aws.amazon.com/boto3/latest/reference/core/session.html).
+
+```bash
+awsherlock scan --expect-account 123456789012 --save-snapshot facts.json
+awsherlock scan --regions eu-central-1,eu-west-1 --save-snapshot scan-facts --stats
+awsherlock scan organization --regions eu-central-1,eu-west-1 --save-snapshot org-facts
+awsherlock scan --connect-timeout 5 --read-timeout 30
+awsherlock scan --timeout 30 --color never
+awsherlock --color always --list-checks
+```
+
+`--expect-account` verifies the authenticated target account before collecting
+resources. In organization mode it checks the discovery/source account; member
+accounts come from discovery. With `--role` it checks the target role account.
+Offline scans check snapshot metadata before evaluating. A mismatch exits with
+code 1; malformed IDs fail as usage errors before AWS work.
+
+`--regions` scans explicit, comma-separated regions sequentially using the shared
+authenticated session. Repeated regions are removed in order. It cannot be combined
+with `--region` or an offline snapshot. IAM and S3 run once per account; regional
+coverage is labeled in console, JSON and HTML, including denied/skipped accounts.
+Identical repeated findings (such as CloudTrail shadow trails) are shown once;
+different evidence is retained. Resource/check counts represent collection and
+evaluation observations across the selected scopes. Other regions remain outside
+the selected scope, and failures retain incomplete coverage and exit code 1.
+
+`--save-snapshot` writes normalized facts, including collection issues, without
+another collection pass. A single live scan writes a new JSON file. Organization
+or `--regions` scans create a new directory of `ACCOUNT-SCOPE.json` files; replay
+an individual file with `awsherlock scan scan-facts/123456789012-eu-west-1.json`.
+Destinations must not exist; existing artifacts are never overwritten. Failed
+account authentication cannot produce a snapshot. A failed scan can leave the
+successfully saved subset in the new directory; review report coverage for omissions.
+
+`--connect-timeout` and `--read-timeout` accept finite positive seconds up to 3600
+for socket connection/read requests, including STS, organization discovery and
+collector auxiliary calls. Unspecified settings keep SDK defaults. `--timeout`
+sets both and cannot be combined with either separate option. Retries can make
+total elapsed time longer; these flags are not an overall scan deadline.
+The `snapshot` command also supports these timeouts, `--region`, `--expect-account`
+and `--color`.
+
+`--stats` writes measured elapsed time and resource/check/finding totals to stderr;
+it does not claim to count AWS API calls or alter JSON data.
+`--color auto|always|never` is available at the top level and on scan/snapshot.
+Place it before `--help` or `--version` to style eager output. `auto` detects the
+terminal; `always` explicitly allows ANSI colors even when redirected; `never`
+disables ANSI styling. `NO_COLOR` disables colors in every mode. Forcing colors
+does not enable the progress display on a redirected stream. JSON remains unstyled.
 These switches also work with organization and offline snapshot scans. They do
 not hide findings, permission failures or incomplete coverage, or change exit codes.
 
@@ -134,9 +193,22 @@ not hide findings, permission failures or incomplete coverage, or change exit co
 
 ```bash
 awsherlock --doctor
+awsherlock --describe-check AWSH-CT-001
 awsherlock --list-checks
 awsherlock --list-services
 ```
+
+`--describe-check ID` shows a supported check's title, service, required normalized
+fact, remediation and scope limitations. IDs are case-insensitive; unknown IDs
+fail with a usage error. This describes configuration indicators without evaluating
+resources. Use `--list-checks` to find IDs.
+
+Terminal output shares one palette: orange headings, cyan information, green
+completion/remediation, yellow cautions, red errors and purple borders/badges.
+Finding severity remains explicit in text: CRITICAL red, HIGH orange, MEDIUM
+yellow, LOW cyan and INFO green. Colors adapt to terminal support; redirected
+output is plain by default. Set `NO_COLOR=1` to disable colors. JSON, HTML and snapshot
+contents are unaffected by the terminal palette.
 
 These commands do not contact AWS or resolve credentials. `--doctor` shows the
 running Python, package location, PATH launcher, dependency versions and terminal
@@ -514,7 +586,9 @@ For the default Linux/macOS script install, remove the `~/.local/bin/awsherlock`
 
 **The report says `AccessDenied`.** Review the specific operation in the collection issues, then compare your role permissions with [checks and permissions](#checks-and-permissions). Other checks can still produce findings, but denied checks have not been evaluated.
 
-**A regional service could not be scanned.** Set a region in your profile or through `AWS_DEFAULT_REGION` and rerun. One scan covers one configured region for regional services.
+**A regional service could not be scanned.** Set a region through your profile,
+`AWS_DEFAULT_REGION`, `--region` or `--regions`; review per-region coverage and
+permissions. Only explicitly selected or configured regional scope is inspected.
 
 **A report file cannot be created.** Check the output directory and choose a file name that does not already exist. AWSherlock refuses to overwrite reports and snapshots.
 
@@ -548,7 +622,16 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
-Version 0.1.0 is the initial release candidate, dated 2026-09-16. It includes the 28 checks, standard SDK authentication, assumed roles, organization scans, offline snapshots, three report formats and visible permission coverage described above. The command scans all supported services by default; running it without arguments displays help without contacting AWS. Python packaging and a non-root Docker image are supported.
+Version 0.1.5, dated 2026-09-16, adds explicit single/multiple-region selection,
+per-region coverage in all reports, expected-account verification, per-request
+timeouts and reusable snapshot saving during scans. IAM/S3 are collected once per
+account; identical repeated findings are deduplicated. New offline discovery
+commands explain checks and diagnose installation issues. Terminal output shares
+one palette with color controls, compact summaries, stage diagnostics and measured
+duration/count statistics. Existing 28 checks, SDK authentication, organization
+scanning, offline evaluation and report formats remain supported. Collection stays
+sequential; this release does not claim new security rules or measured API-call
+performance improvements. Version 0.1.0 remains the original release baseline.
 
 Recent changes simplify installation from a clone, add the convenience update command, organize terminal findings into severity-ordered cards, and give HTML reports a light theme with purple borders and orange shadows. Untrusted terminal control and directional formatting characters are shown as visible escapes in terminal results and CLI file messages. JSON and HTML retain the original data. Examples and development artifacts are excluded from the public tree and source distribution.
 

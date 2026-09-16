@@ -1,6 +1,7 @@
 """Versioned normalized snapshots, excluding sessions and secret-bearing fields."""
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -127,6 +128,23 @@ def write_snapshot(snapshot: Snapshot, path: Path) -> None:
     # Do not overwrite an existing artifact silently.
     with path.open("x", encoding="utf-8") as output:
         output.write(content + "\n")
+
+
+def snapshot_saver(path: Path, *, bundle: bool = False) -> Callable[[Snapshot, str], None]:
+    """Save new replayable files; create bundles only after identity is verified."""
+    created = False
+    def save(snapshot: Snapshot, label: str) -> None:
+        nonlocal created
+        if not bundle:
+            write_snapshot(snapshot, path)
+            return
+        if not re.fullmatch(r"[a-z0-9-]+", label):
+            raise SnapshotError("Invalid snapshot scope label")
+        if not created:
+            path.mkdir()
+            created = True
+        write_snapshot(snapshot, path / f"{snapshot.metadata.account_id}-{label}.json")
+    return save
 
 
 def _unique_pairs(pairs: list[tuple]) -> dict:
