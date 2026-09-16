@@ -5,7 +5,7 @@ from pathlib import Path
 from rich.console import Console
 from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
 from awsherlock.evaluation import Report
-from awsherlock.branding import BANNER
+from awsherlock.branding import terminal_banner
 
 
 def render_json(report: Report) -> str:
@@ -29,7 +29,7 @@ def render_html(report: Report) -> str:
 def render_console(report: Report) -> None:
     console = Console()
     errors = Console(stderr=True)
-    console.print(BANNER, markup=False, highlight=False)
+    console.print(terminal_banner(), markup=False, highlight=False)
     console.print(f"Account: {report.metadata['account_id']}", markup=False)
     for account in report.metadata.get("accounts", []):
         console.print(f"Account {account['account_id']} {account['name']}: {account['state']} / {account['scan_status']}", markup=False)
