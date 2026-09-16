@@ -2,17 +2,25 @@
 
 # AWSherlock
 
+[![Release v0.1.0](https://img.shields.io/badge/release-v0.1.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.0)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+[![28 security checks](https://img.shields.io/badge/security_checks-28-7C3AED?style=flat-square)](#checks)
+[![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
+[![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](LICENSE)
+
 AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 28 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
 
-The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
+> [!NOTE]
+> **Read-only scanning.** The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
 
 ```bash
+# Scan with an existing AWS profile
 awsherlock scan --profile production
 ```
 
-**Python 3.11+ · IAM, S3, EC2, Lambda, Secrets Manager, CloudTrail, KMS · MIT**
-
 [Installation](#installation) · [First scan](#first-scan) · [Reports](#reports) · [Checks and permissions](#checks-and-permissions) · [Troubleshooting](#troubleshooting)
+
+---
 
 ## Installation
 
@@ -23,8 +31,11 @@ Install Python 3.11 or newer and Git before starting. AWSherlock installs into a
 Open PowerShell:
 
 ```powershell
+# Clone the repository
 git clone https://github.com/0gulcandogann/awsherlock.git
 cd awsherlock
+
+# Install the command in an isolated environment
 py -m pip install --user pipx
 py -m pipx ensurepath
 py -m pipx install .
@@ -42,6 +53,7 @@ Installation is per user and does not need administrator access. Running `awsher
 ### Linux and macOS
 
 ```bash
+# Clone and install without sudo
 git clone https://github.com/0gulcandogann/awsherlock.git
 cd awsherlock
 ./install.sh
@@ -114,13 +126,21 @@ A failed resource listing can hide resources the scanner never learned about. Th
 | `1` | Coverage was incomplete, or an operational error occurred. |
 | `2` | The command or its arguments were invalid. |
 
-Exit code `0` does not mean there are no security findings. If a scan is partial, AWSherlock still writes the available report before returning `1`.
+> [!IMPORTANT]
+> Exit code `0` does not mean there are no security findings. If a scan is partial, AWSherlock still writes the available report before returning `1`.
 
 ## Reports
+
+| Terminal | HTML | JSON |
+| --- | --- | --- |
+| Review findings while scanning | Explore findings in your browser | Process structured scan data |
+| Severity-ordered cards and coverage | Search, filters, evidence and remediation | Metadata, findings and collection issues |
+| Default output | `--output html` | `--output json` |
 
 ### HTML
 
 ```bash
+# Generate a standalone browser report
 awsherlock scan --profile production --output html
 ```
 
@@ -132,7 +152,8 @@ awsherlock scan --profile production --output html --report-file production.html
 
 The report uses a light theme with bordered cards. It includes scan metadata, severity counts, findings, evidence, remediation, and coverage details. Use the search field and severity, service, and account filters to narrow the findings. Sorting is available by severity, service, resource, or check ID.
 
-HTML reports are single files with embedded styles and JavaScript. They need no server or internet connection. All findings remain readable with JavaScript disabled.
+> [!TIP]
+> HTML reports are single files with embedded styles and JavaScript. They need no server or internet connection. All findings remain readable with JavaScript disabled.
 
 ### JSON
 
