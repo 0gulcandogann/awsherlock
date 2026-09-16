@@ -1,6 +1,7 @@
 """Versioned normalized snapshots, excluding sessions and secret-bearing fields."""
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,14 +63,19 @@ class Snapshot:
         return data
 
 
-def capture_snapshot(context: ScanContext, services: list[str]) -> Snapshot:
+def capture_snapshot(context: ScanContext, services: list[str],
+                     progress: Callable[[str, int, int], None] | None = None) -> Snapshot:
     metadata = ScanMetadata(scan_id=str(uuid4()), started_at=datetime.now(timezone.utc),
                             account_id=context.account_id, region=context.region, version=__version__)
     results = {}
-    for service in services:
+    for index, service in enumerate(services):
+        if progress is not None:
+            progress(f"Scanning {service.upper()}", index, len(services))
         collector, _ = service_components(service)
         result = collector(context)
         results[service] = CollectionResult(result.resources, result.issues)
+        if progress is not None:
+            progress(f"Collected {service.upper()}", index + 1, len(services))
     return Snapshot(metadata, results)
 
 

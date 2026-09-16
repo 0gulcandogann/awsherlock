@@ -1,6 +1,7 @@
 """Read-only organization discovery and sequential account orchestration."""
 
 import re
+from collections.abc import Callable
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -14,7 +15,8 @@ from awsherlock.snapshot import SnapshotError, capture_snapshot
 
 
 def scan_organization(source: ScanContext, services: list[str], role_name: str = "AWSherlockAuditRole",
-                      external_id: str | None = None, role_session_name: str | None = None) -> Report:
+                      external_id: str | None = None, role_session_name: str | None = None,
+                      progress: Callable[[str, int, int], None] | None = None) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
@@ -22,6 +24,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                      "mode": "organization", "accounts": []}, [], [])
     accounts = report.metadata["accounts"]
     seen = set()
+    if progress is not None:
+        progress("Discovering accounts", 0, 1)
     try:
         client = source.session.client("organizations")
         for page in client.get_paginator("list_accounts").paginate():
@@ -36,12 +40,18 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 accounts.append(account)
     except AWS_ERRORS as error:
         report.coverage.append(failed_coverage(source.account_id, "organizations", "ListAccounts", error_message(error)))
-    for account in accounts:
+    if progress is not None:
+        progress("Accounts discovered", 1, len(accounts) + 2)
+    for index, account in enumerate(accounts):
         account_id = account["account_id"]
+        if progress is not None:
+            progress(f"Scanning account {account_id}", index + 1, len(accounts) + 2)
         if account["state"] != "ACTIVE":
             account["scan_status"] = "NOT_SCANNED"
             for service in services:
                 report.coverage.append(failed_coverage(account_id, service, "AccountState", "Account is not ACTIVE", "NOT_SCANNED"))
+            if progress is not None:
+                progress(f"Account {account_id} skipped", index + 2, len(accounts) + 2)
             continue
         try:
             context = create_scan_context(source_session=source.session,
@@ -53,10 +63,16 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             for service in services:
                 operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"
                 report.coverage.append(failed_coverage(account_id, service, operation, str(error)))
+            if progress is not None:
+                progress(f"Account {account_id} unavailable", index + 2, len(accounts) + 2)
             continue
         report.findings.extend(result.findings)
         report.coverage.extend(result.coverage)
         account["scan_status"] = "PARTIAL" if result.incomplete else "COMPLETE"
+        if progress is not None:
+            progress(f"Account {account_id} finished", index + 2, len(accounts) + 2)
+    if progress is not None:
+        progress("Finalizing results", len(accounts) + 1, len(accounts) + 2)
     return report
 
 

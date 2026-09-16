@@ -10,6 +10,7 @@ import sys
 import typer
 
 from awsherlock import __version__
+from awsherlock.activity import scan_activity
 from awsherlock.aws.session import SessionError, create_scan_context
 from awsherlock.snapshot import SnapshotError, capture_snapshot, read_snapshot, write_snapshot
 from awsherlock.scanner import parse_services
@@ -128,20 +129,35 @@ def scan(
     except ValueError:
         raise typer.BadParameter("Unsupported service selection.", param_hint="--services") from None
     try:
-        if organization:
-            context = create_scan_context(profile=profile, role=role)
-            report = scan_organization(context, selected, role_name or "AWSherlockAuditRole", external_id, role_session_name)
-        elif snapshot_path is not None:
-            snapshot = read_snapshot(snapshot_path)
-            if services is not None:
-                if any(service not in snapshot.services for service in selected):
-                    raise SnapshotError("Selected service is absent from the snapshot")
-                snapshot.services = {service: snapshot.services[service] for service in selected}
-        else:
-            context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id)
-            snapshot = capture_snapshot(context, selected)
-        if not organization:
-            report = evaluate_snapshot(snapshot)
+        with scan_activity() as activity:
+            if organization:
+                context = create_scan_context(profile=profile, role=role)
+                activity("Discovering accounts", 0, 1)
+                def account_progress(stage: str, completed: int, total: int) -> None:
+                    activity(stage, completed + 1 if completed else 0, total + 1)
+                report = scan_organization(
+                    context, selected, role_name or "AWSherlockAuditRole", external_id,
+                    role_session_name, progress=account_progress,
+                )
+            elif snapshot_path is not None:
+                activity("Reading snapshot", 0, 2)
+                snapshot = read_snapshot(snapshot_path)
+                if services is not None:
+                    if any(service not in snapshot.services for service in selected):
+                        raise SnapshotError("Selected service is absent from the snapshot")
+                    snapshot.services = {service: snapshot.services[service] for service in selected}
+                activity("Evaluating security checks", 1, 2)
+            else:
+                activity("Connecting to AWS", 0, len(selected) + 2)
+                context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id)
+                activity("Collecting AWS resources", 1, len(selected) + 2)
+                def service_progress(stage: str, completed: int, total: int) -> None:
+                    activity(stage, completed + 1, total + 2)
+                snapshot = capture_snapshot(context, selected, progress=service_progress)
+                activity("Evaluating security checks", len(selected) + 1, len(selected) + 2)
+            if not organization:
+                report = evaluate_snapshot(snapshot)
+            activity("Scan finished - incomplete coverage" if report.incomplete else "Scan finished", 1, 1)
         if output == "html":
             destination = report_file or Path("awsherlock-report.html")
             write_report(render_html(report), destination)
