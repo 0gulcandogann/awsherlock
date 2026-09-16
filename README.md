@@ -104,6 +104,47 @@ awsherlock scan --profile production --services ec2,lambda,kms
 
 Accepted names are `iam`, `s3`, `ec2`, `lambda`, `secretsmanager`, `cloudtrail`, and `kms`.
 
+### Control the startup display
+
+Interactive scans show the AWSherlock banner and a percentage bar. The percentage
+counts finished scan steps; it is not an estimate of remaining time.
+
+```bash
+awsherlock scan --no-banner
+awsherlock scan --no-progress
+```
+
+`--no-banner` hides the logo while keeping the bar. `--no-progress` hides both.
+
+```bash
+awsherlock scan --verbose
+awsherlock scan --summary-only
+```
+
+`--verbose` writes scan stages and completed work units to stderr, including with
+`--no-progress` or redirected output. It does not enable SDK debug logs or print
+API payloads. JSON stdout remains unchanged.
+`--summary-only` keeps console counts, scan coverage and collection issues while
+hiding individual finding cards. Incomplete scans still exit with code 1.
+It requires console output and cannot be combined with `--output json` or `html`.
+These switches also work with organization and offline snapshot scans. They do
+not hide findings, permission failures or incomplete coverage, or change exit codes.
+
+### Inspect the installation and available checks
+
+```bash
+awsherlock --doctor
+awsherlock --list-checks
+awsherlock --list-services
+```
+
+These commands do not contact AWS or resolve credentials. `--doctor` shows the
+running Python, package location, PATH launcher, dependency versions and terminal
+information. Use it when the command appears to run an older installation.
+`--list-checks` lists the registered check IDs and titles; `--list-services` shows
+each supported service and its check count. Use one action at a time, without a
+`scan` or `snapshot` command.
+
 ## Reading the results
 
 Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource, explains the configuration issue, and gives a remediation suggestion. Collection errors appear in a separate section.

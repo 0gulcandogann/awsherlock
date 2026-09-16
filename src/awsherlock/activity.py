@@ -21,11 +21,12 @@ class ASCIIBarColumn(ProgressColumn):
 
 
 @contextmanager
-def scan_activity() -> Iterator[ProgressCallback]:
+def scan_activity(*, enabled: bool = True, show_banner: bool = True,
+                  verbose: bool = False) -> Iterator[ProgressCallback]:
     """Show completed work units on stderr without changing terminal screens."""
     console = Console(stderr=True)
-    interactive = console.is_terminal and not console.is_dumb_terminal
-    if interactive:
+    interactive = enabled and console.is_terminal and not console.is_dumb_terminal
+    if interactive and show_banner:
         console.print(terminal_banner(width=console.width, encoding=getattr(console.file, "encoding", None)),
                       markup=False, highlight=False, soft_wrap=True)
     with Progress(
@@ -43,6 +44,9 @@ def scan_activity() -> Iterator[ProgressCallback]:
 
         def update(stage: str, completed: int, total: int) -> None:
             progress.update(task, description=terminal_text(stage), completed=completed, total=total)
+            if verbose:
+                console.print(f"[scan] {terminal_text(stage)} ({completed}/{total} work units)",
+                              markup=False, highlight=False)
             if interactive:
                 progress.refresh()
 

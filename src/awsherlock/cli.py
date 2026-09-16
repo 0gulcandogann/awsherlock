@@ -18,6 +18,8 @@ from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report
 from awsherlock.branding import terminal_banner, terminal_text
+from awsherlock.catalog import check_catalog
+from awsherlock.diagnostics import runtime_diagnostics
 
 app = typer.Typer(
     name="awsherlock",
@@ -82,8 +84,32 @@ def main(
             help="Update this installation from the latest GitHub main branch.",
         ),
     ] = False,
+    doctor: Annotated[bool, typer.Option("--doctor", help="Show local installation and terminal diagnostics; no AWS calls.")] = False,
+    list_checks: Annotated[bool, typer.Option("--list-checks", help="List supported checks without contacting AWS.")] = False,
+    list_services: Annotated[bool, typer.Option("--list-services", help="List supported services and check counts; no AWS calls.")] = False,
 ) -> None:
     """Provide top-level CLI options."""
+    actions = sum((update, doctor, list_checks, list_services))
+    if actions > 1:
+        raise typer.BadParameter("Choose only one of --update, --doctor, --list-checks or --list-services.")
+    if actions and ctx.invoked_subcommand is not None:
+        raise typer.BadParameter("Top-level actions cannot be combined with a command.")
+    if doctor:
+        for label, value in runtime_diagnostics().items():
+            typer.echo(f"{label}: {terminal_text(value)}")
+        raise typer.Exit()
+    if list_checks:
+        checks = check_catalog()
+        for check_id, service, title in checks:
+            typer.echo(f"{check_id}  {service:<14}  {title}")
+        typer.echo(f"\n{len(checks)} supported checks. Configuration indicators; effective access is not determined.")
+        raise typer.Exit()
+    if list_services:
+        checks = check_catalog()
+        for service in parse_services(None):
+            count = sum(entry[1] == service for entry in checks)
+            typer.echo(f"{service:<14} {count} checks")
+        raise typer.Exit()
     if update:
         update_installation()
         raise typer.Exit()
@@ -113,12 +139,18 @@ def scan(
     output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, or html.")] = None,
     report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.")] = None,
     role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).")] = None,
+    no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.")] = False,
+    no_banner: Annotated[bool, typer.Option("--no-banner", help="Hide the startup banner while keeping the progress bar.")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Show sanitized scan stages on stderr; no SDK payloads.")] = False,
+    summary_only: Annotated[bool, typer.Option("--summary-only", help="Console counts and coverage without finding cards.")] = False,
 ) -> None:
     """Identify the AWS account, scan selected services, or evaluate an offline snapshot."""
     if output not in {None, "console", "json", "html"}:
         raise typer.BadParameter("Use console, json, or html.", param_hint="--output")
     if report_file is not None and output not in {"json", "html"}:
         raise typer.BadParameter("--report-file requires --output json or html.")
+    if summary_only and output in {"json", "html"}:
+        raise typer.BadParameter("--summary-only requires console output.")
     organization = snapshot_path == Path("organization")
     if role_name is not None and not organization:
         raise typer.BadParameter("--role-name requires scan organization.")
@@ -129,7 +161,7 @@ def scan(
     except ValueError:
         raise typer.BadParameter("Unsupported service selection.", param_hint="--services") from None
     try:
-        with scan_activity() as activity:
+        with scan_activity(enabled=not no_progress, show_banner=not no_banner, verbose=verbose) as activity:
             if organization:
                 context = create_scan_context(profile=profile, role=role)
                 activity("Discovering accounts", 0, 1)
@@ -170,7 +202,10 @@ def scan(
             else:
                 typer.echo(content, nl=False)
         else:
-            render_console(report)
+            if summary_only:
+                render_console(report, summary_only=True)
+            else:
+                render_console(report)
         if report.incomplete:
             raise typer.Exit(code=1)
     except (SessionError, SnapshotError) as error:

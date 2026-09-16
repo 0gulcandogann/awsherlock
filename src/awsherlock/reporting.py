@@ -33,7 +33,7 @@ def render_html(report: Report) -> str:
 SEVERITY_STYLES = {"CRITICAL": "bold red", "HIGH": "red", "MEDIUM": "yellow", "LOW": "cyan", "INFO": "dim"}
 
 
-def render_console(report: Report) -> None:
+def render_console(report: Report, *, summary_only: bool = False) -> None:
     console = Console()
     errors = Console(stderr=True)
     data = report.to_dict()
@@ -72,10 +72,11 @@ def render_console(report: Report) -> None:
                          Text(terminal_text(entry["status"]), style=status_style),
                          *(str(entry[key]) for key in ("resources", "evaluated", "not_scanned", "findings")))
     console.print(coverage)
-    console.print("Findings", style="bold")
     rank = {severity: index for index, severity in enumerate(SEVERITY_STYLES)}
     findings = sorted(report.findings, key=lambda finding: rank[finding.severity])
-    for index, finding in enumerate(findings, 1):
+    if not summary_only:
+        console.print("Findings", style="bold")
+    for index, finding in enumerate([] if summary_only else findings, 1):
         title = Text(f"{index:02d}  {finding.severity}", style=SEVERITY_STYLES[finding.severity])
         body = Text(f"{terminal_text(finding.title)}\n", style="bold")
         body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style="dim")
