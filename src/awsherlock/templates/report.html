@@ -5,18 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AWSherlock · Security report</title>
 <style>
-:root{color-scheme:light;--ink:#182c37;--muted:#596b75;--paper:#f3f6f7;--line:#d9e2e6;--accent:#087e8b}
+:root{color-scheme:light;--ink:#182c37;--muted:#596b75;--paper:#eef3f5;--line:#d7e2e7;--accent:#087e8b;--teal:#28b7b1;--shadow:0 14px 34px rgba(18,43,56,.08)}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-header{background:#122b38;color:#fff;padding:36px max(24px,calc((100vw - 1160px)/2));border-bottom:5px solid #28b7b1}
+header{background:linear-gradient(120deg,#0d2734,#174858 70%,#0f313b);color:#fff;padding:42px max(24px,calc((100vw - 1160px)/2));border-bottom:5px solid var(--teal);position:relative;overflow:hidden}header::after{content:"";position:absolute;right:-90px;top:-130px;width:330px;height:330px;border:1px solid rgba(118,221,209,.28);border-radius:50%;box-shadow:0 0 0 28px rgba(118,221,209,.04),0 0 0 58px rgba(118,221,209,.03)}
+.hero{position:relative;z-index:1;display:flex;justify-content:space-between;gap:32px;align-items:flex-end}.hero-copy{max-width:760px}.hero-stamp{min-width:150px;padding:14px 16px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:rgba(255,255,255,.08);font-size:12px;color:#d6eeef}.hero-stamp strong{display:block;color:#fff;font-size:20px;margin-top:3px}
 .brand{font-size:15px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-h1{font-size:clamp(28px,4vw,42px);line-height:1.2;margin:18px 0 10px}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:20px 0 6px}p{margin:8px 0}
-header p{color:#c7dce4}main{max-width:1208px;margin:auto;padding:28px 24px 64px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px}
+h1{font-size:clamp(30px,4vw,46px);line-height:1.12;margin:18px 0 10px;letter-spacing:-.03em}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:20px 0 6px}p{margin:8px 0}
+header p{color:#c7dce4;font-size:16px}main{max-width:1208px;margin:auto;padding:30px 24px 64px}.panel{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:var(--shadow)}
 .metadata{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.metadata strong{display:block;overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}
-.stat{padding:20px 24px;background:#fff;border:1px solid var(--line);border-radius:12px}.stat b{display:block;font-size:32px;line-height:1.3}.muted{color:var(--muted)}
-.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.severity-grid b{display:block;font-size:24px}.severity-grid>div{border-top:3px solid var(--line);padding-top:10px}
+.stat{padding:21px 24px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 20px rgba(18,43,56,.05);position:relative;overflow:hidden}.stat::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--teal)}.stat b{display:block;font-size:34px;line-height:1.3}.muted{color:var(--muted)}
+.severity-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.severity-grid b{display:block;font-size:24px}.severity-grid>div{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fbfdfd}.severity-track{height:5px;margin-top:10px;border-radius:9px;background:#e7eef0;overflow:hidden;display:block}.severity-track i{display:block;height:100%;width:var(--width);border-radius:9px}
 .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:.04em;background:#e9eef1;color:#374954}
 .CRITICAL{background:#ffe1e9;color:#9f1239}.HIGH{background:#ffead9;color:#a43d05}.MEDIUM{background:#fff1c5;color:#785800}.LOW{background:#dff2f4;color:#126572}.INFO{background:#e8ebf1;color:#475569}
-.warning{border-left:4px solid #d18b10;background:#fff7e5;padding:16px 20px;margin-bottom:24px}.finding{background:#fff;border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
+.warning{border-left:4px solid #d18b10;background:#fff7e5;padding:16px 20px;margin-bottom:24px}.finding{background:#fff;border:1px solid var(--line);border-radius:12px;margin:12px 0;overflow:hidden;box-shadow:0 7px 18px rgba(18,43,56,.045)}
 .finding summary{cursor:pointer;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}.finding summary::before{content:"+";font-weight:700;color:var(--accent)}.finding[open] summary::before{content:"−"}.finding-title{font-weight:650;display:block}.finding-id{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
 .finding-body{border-top:1px solid var(--line);padding:4px 24px 24px;overflow-wrap:anywhere}.resource-line{font-size:13px;color:var(--muted);overflow-wrap:anywhere}pre{padding:16px;border-radius:8px;background:#f1f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}
 footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:10px}
@@ -24,13 +25,13 @@ footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;tex
 .filter-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px}.result-count{color:var(--muted);font-size:13px}[hidden]{display:none!important}
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}caption{text-align:left;color:var(--muted);padding-bottom:12px}th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td ul{padding-left:18px;margin:6px 0;overflow-wrap:anywhere}.COMPLETE{background:#ddf2e9;color:#176343}.PARTIAL,.NOT_SCANNED{background:#fff1c5;color:#785800}.ERROR{background:#ffe1e9;color:#9f1239}
 @media(max-width:950px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters .search-label{grid-column:1/-1}}
-@media(max-width:640px){.stats{grid-template-columns:1fr}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,1fr)}.finding summary{flex-wrap:wrap}.panel{padding:18px}}
+@media(max-width:640px){.hero{display:block}.hero-stamp{margin-top:24px;width:max-content}.stats{grid-template-columns:1fr}.metadata{grid-template-columns:1fr}.severity-grid{grid-template-columns:repeat(3,1fr)}.finding summary{flex-wrap:wrap}.panel{padding:18px}}
 @media print{body{background:#fff}header{color:#000;background:#fff;padding:16px;border-bottom:2px solid #333}header p{color:#333}.finding{break-inside:avoid}main{padding:16px}.finding-body{display:block}.filter-panel{display:none}}
 </style>
 </head>
 <body>
-<header><div class="brand">AWSherlock <span style="color:#76ddd1">/</span> Security assessment</div>
-<h1>AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></header>
+<header><div class="hero"><div class="hero-copy"><div class="brand">AWSherlock <span style="color:#76ddd1">/</span> Security assessment</div>
+<h1>AWS security report</h1><p>Configuration findings, evidence, and next steps.</p></div><div class="hero-stamp">SCAN STATUS<strong>{% if report.summary.incomplete %}REVIEW{% else %}COMPLETE{% endif %}</strong>{{ report.metadata.version }}</div></div></header>
 <main>
 <section class="panel" aria-labelledby="metadata-title"><h2 id="metadata-title">Scan overview</h2>
 <div class="metadata">
@@ -45,7 +46,7 @@ footer{margin-top:32px;color:var(--muted);font-size:12px}.empty{padding:36px;tex
 <div class="stat"><span class="eyebrow">Checks evaluated</span><b>{{ report.summary.checks_evaluated }}</b></div>
 <div class="stat"><span class="eyebrow">Findings</span><b>{{ report.summary.findings }}</b></div></div>
 <section class="panel"><h2>Severity distribution</h2><div class="severity-grid">
-{% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b></div>{% endfor %}
+{% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b><span class="severity-track"><i class="{{ severity }}" style="--width: {{ (count / report.summary.findings * 100) | round(0) if report.summary.findings else 0 }}%"></i></span></div>{% endfor %}
 </div></section>
 <section class="panel" aria-labelledby="coverage-title"><h2 id="coverage-title">Scan coverage</h2>
 <div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>

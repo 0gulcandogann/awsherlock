@@ -10,6 +10,9 @@
   local checkout.
 - Made clone-based installation the primary README flow; pipx, where used, now
   installs from that local clone instead of a remote package URL.
+- Refreshed the standalone HTML report with a stronger visual hierarchy, status
+  stamp, card styling and severity bars. Human-facing terminal output and the
+  installer now share a small AWSherlock cat banner; JSON remains unchanged.
 
 ## 0.1.0 — 2026-09-16
 

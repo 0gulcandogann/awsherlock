@@ -12,6 +12,7 @@ from awsherlock.scanner import parse_services
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report
+from awsherlock.branding import BANNER
 
 app = typer.Typer(
     name="awsherlock",
@@ -43,6 +44,7 @@ def main(
 ) -> None:
     """Provide top-level CLI options."""
     if ctx.invoked_subcommand is None:
+        typer.echo(BANNER)
         typer.echo(ctx.get_help())
 
 
@@ -144,6 +146,7 @@ def snapshot_command(
     except OSError:
         typer.echo("Error: Could not create snapshot file. Check the path; existing files are not overwritten.", err=True)
         raise typer.Exit(code=1) from None
+    typer.echo(BANNER)
     typer.echo(f"Snapshot saved: {output}")
     if any(result.issues for result in snapshot.services.values()):
         typer.echo("Snapshot has incomplete collection coverage; inspect its issues.", err=True)
