@@ -306,7 +306,7 @@ awsherlock scan scan-facts/123456789012-eu-west-1.json --summary-only --no-progr
 
 Replace the account ID, profile and role trust values with your actual configuration.
 Explicit exclusions make coverage incomplete and retain exit code 1. These selectors
-do not suppress findings after scanning. Resource/tag and OU selection are not implemented.
+do not suppress findings after scanning. Exact resource ID/ARN and descendant OU selection are implemented; tag selection remains deferred.
 
 ```bash
 awsherlock scan facts.json --checks AWSH-S3-001,AWSH-S3-003 --output json
@@ -469,7 +469,7 @@ awsherlock scan snapshot.json --output html --report-file offline.html
 
 Offline scans use the same rules as live scans. Authentication arguments such as `--profile` and `--role` cannot be used with a snapshot. `--services` can select services already present in the file. Existing snapshot files are never overwritten.
 
-Snapshots reflect the time of collection. They contain account IDs, resource names, policies, and security metadata. Treat snapshots and reports as internal audit data and sanitize them before sharing. Organization snapshot capture is not supported.
+Snapshots reflect the time of collection. They contain account IDs, resource names, policies, and security metadata. Treat snapshots and reports as internal audit data and sanitize them before sharing. Organization scans can save per-account/scope snapshots with `scan organization --save-snapshot`; replay individual files, not the directory.
 
 ## Checks
 
@@ -773,12 +773,15 @@ or decrypted data is requested.
 | AWSH-CT-001 | No usable CloudTrail trail is visible in the scanned region | HIGH |
 | AWSH-CT-002 | Multi-region or global service event logging is disabled | MEDIUM |
 | AWSH-CT-003 | Log file validation is disabled | MEDIUM |
+| AWSH-CT-004 | Management events or supported KMS/RDS Data API sources are excluded | MEDIUM |
 | AWSH-KMS-001 | Eligible customer key has automatic rotation disabled | MEDIUM |
 | AWSH-KMS-002 | Customer key policy allows a broad principal | MEDIUM |
 
 ### Validation and limits
 
-The latest local regression run passed 393 tests. A separate LocalStack run collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
+The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [35-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
+
+A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
 Positive scenarios exercised 27 of the 28 checks. IAM key-age and stale-key scenarios used the collector's controlled clock advanced by 91 days. The S3 missing-default-encryption scenario could not be reproduced because the emulator retained automatic encryption after deletion. Pagination and organization multi-account behavior were not validated in that integration run. Lambda execution, secret rotation execution and actual log delivery were not tested.
 
@@ -853,7 +856,7 @@ The updater forces reinstallation so GitHub main changes are installed even when
 "$HOME/.local/share/awsherlock/venv/bin/python" -m pip install --upgrade --force-reinstall 'git+https://github.com/0gulcandogann/awsherlock.git@main'
 ```
 
-The refreshed animation becomes available on the next invocation. `awsherlock --version` alone cannot distinguish code changes that share a version number.
+The refreshed updater takes effect on the next invocation and displays real installer logs. `awsherlock --version` alone cannot distinguish code changes that share a version number.
 
 To remove a Windows pipx install:
 
