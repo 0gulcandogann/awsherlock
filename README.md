@@ -847,6 +847,14 @@ Reinstalling from the updated clone also picks up changes that keep the same ver
 
 In an interactive terminal, `--update` shows a portable spinner, the current installer attempt and elapsed time. Installer output stays hidden while the animation runs; the line clears before the final result. Redirected output and dumb terminals keep ordinary installer logs without animation. Ctrl+C stops the animation and exits with code 130.
 
+The updater forces reinstallation so GitHub main changes are installed even when the package version stays the same. Older installed updaters can report success while leaving the old code in place. For Linux installs created by `install.sh`, refresh that updater once:
+
+```bash
+"$HOME/.local/share/awsherlock/venv/bin/python" -m pip install --upgrade --force-reinstall 'git+https://github.com/0gulcandogann/awsherlock.git@main'
+```
+
+The refreshed animation becomes available on the next invocation. `awsherlock --version` alone cannot distinguish code changes that share a version number.
+
 To remove a Windows pipx install:
 
 ```powershell

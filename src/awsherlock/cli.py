@@ -92,13 +92,13 @@ def update_installation() -> None:
     message("Updating AWSherlock from GitHub...")
     commands: list[list[str]] = []
     if importlib.util.find_spec("pip") is not None:
-        commands.append([sys.executable, "-m", "pip", "install", "--upgrade", REPOSITORY_URL])
+        commands.append([sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", REPOSITORY_URL])
     pipx = shutil.which("pipx")
     if pipx:
-        commands.append([pipx, "upgrade", "awsherlock"])
+        commands.append([pipx, "upgrade", "awsherlock", "--pip-args=--force-reinstall"])
     launcher = shutil.which("py") or shutil.which("python3") or shutil.which("python")
     if launcher:
-        commands.append([launcher, "-m", "pipx", "upgrade", "awsherlock"])
+        commands.append([launcher, "-m", "pipx", "upgrade", "awsherlock", "--pip-args=--force-reinstall"])
     if not commands:
         message("Update failed: pipx or a Python launcher was not found.", style=RED, err=True)
         raise typer.Exit(code=1)
