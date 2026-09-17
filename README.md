@@ -1,12 +1,13 @@
-![AWSherlock](awsherlock.png)
+![AWSherlock](https://raw.githubusercontent.com/0gulcandogann/awsherlock/main/awsherlock.png)
 
 # AWSherlock
 
 [![Release v0.1.10](https://img.shields.io/badge/release-v0.1.10-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.10)
+[![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
 [![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
-[![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](LICENSE)
+[![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE)
 
 AWSherlock is a command-line scanner for AWS security configuration. It has 35 registered checks across seven core services: 29 default configuration checks and six opt-in IAM identity governance checks. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
 
@@ -24,7 +25,21 @@ awsherlock scan --profile production
 
 ## Installation
 
-Install Python 3.11 or newer and Git before starting. AWSherlock installs into an isolated environment so it can run from any directory without activating a virtual environment. There is no PyPI installation step; install from this repository.
+Install Python 3.11 or newer. AWSherlock installs into an isolated environment so it can run from any directory without activating a virtual environment. Git is needed only for repository installation or the built-in GitHub updater.
+
+### PyPI installation
+
+[AWSherlock is available on PyPI](https://pypi.org/project/awsherlock/). With pipx installed, run:
+
+```bash
+pipx install awsherlock
+awsherlock --version
+awsherlock --help
+```
+
+Alternatively, in an activated virtual environment, use `python -m pip install awsherlock`. Git is not required for an index installation. Upgrade an index-based pipx installation with `pipx upgrade awsherlock`; use `python -m pip install --upgrade awsherlock` in a virtual environment. The built-in `awsherlock --update` installs the GitHub `main` source and can include changes beyond the latest PyPI release.
+
+Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/publishing.md) for validation and first-publication steps.
 
 ### Windows
 
@@ -779,7 +794,7 @@ or decrypted data is requested.
 
 ### Validation and limits
 
-The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [35-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
+The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [35-check validation matrix](https://github.com/0gulcandogann/awsherlock/blob/main/docs/validation-matrix.md) and [pilot guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
 
 A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
@@ -935,4 +950,4 @@ Recent changes simplify installation from a clone, add the convenience update co
 
 ## License
 
-[MIT](LICENSE).
+[MIT](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE).

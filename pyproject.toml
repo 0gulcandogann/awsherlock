@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
@@ -18,7 +18,8 @@ classifiers = [
 ]
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
   { name = "AWSherlock Contributors" }
 ]
@@ -33,6 +34,7 @@ dependencies = [
 awsherlock = "awsherlock.cli:app"
 
 [project.urls]
+Documentation = "https://github.com/0gulcandogann/awsherlock#readme"
 Repository = "https://github.com/0gulcandogann/awsherlock"
 Issues = "https://github.com/0gulcandogann/awsherlock/issues"
 
