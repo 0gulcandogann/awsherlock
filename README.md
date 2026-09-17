@@ -836,7 +836,16 @@ git pull --ff-only
 py -m pipx install --force .
 ```
 
-Then run `awsherlock --version`. Reinstalling from the updated clone also picks up changes that keep the same version number. `awsherlock --update` is available as a convenience command; if it does not refresh a clone-based pipx install, use the commands above.
+Alternatively, update directly from GitHub main (internet required):
+
+```bash
+awsherlock --update
+awsherlock --version
+```
+
+Reinstalling from the updated clone also picks up changes that keep the same version number. If `awsherlock --update` does not refresh a clone-based pipx install, use the platform-specific commands above. Run update as a standalone command, without `scan` or other top-level actions. These instructions also appear in `awsherlock --help` and when running `awsherlock` without arguments.
+
+In an interactive terminal, `--update` shows a portable spinner, the current installer attempt and elapsed time. Installer output stays hidden while the animation runs; the line clears before the final result. Redirected output and dumb terminals keep ordinary installer logs without animation. Ctrl+C stops the animation and exits with code 130.
 
 To remove a Windows pipx install:
 

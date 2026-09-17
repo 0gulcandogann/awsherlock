@@ -14,7 +14,7 @@ from botocore.config import Config
 import typer
 
 from awsherlock import __version__
-from awsherlock.activity import scan_activity
+from awsherlock.activity import scan_activity, update_activity
 from awsherlock.aws.session import SessionError, create_scan_context, validate_region, validate_account_id, verify_account_id
 from awsherlock.snapshot import SnapshotError, capture_snapshot, read_snapshot, write_snapshot, snapshot_saver
 from awsherlock.scanner import parse_services
@@ -40,6 +40,13 @@ app = typer.Typer(
         "[#5bfcfc]awsherlock scan --profile production[/] - Use your AWS profile.\n\n"
         "[#5bfcfc]awsherlock scan facts.json[/] - Evaluate saved facts offline.\n\n"
         "[#5bfcfc]awsherlock --describe-check AWSH-CT-001[/] - Explain a check offline.\n\n"
+        "[bold #ff7e55]Update[/]\n\n"
+        "[#5bfcfc]awsherlock --update[/] - Update from GitHub main; internet required.\n\n"
+        "[#ffd369]Interactive terminals show a spinner, installer attempt and elapsed time. "
+        "Ctrl+C cancels. Redirected output keeps ordinary installer logs.[/]\n\n"
+        "[#5bfcfc]awsherlock --version[/] - Verify the installed version after updating.\n\n"
+        "[#ffd369]If a clone-based pipx install stays unchanged, pull the clone and reinstall. "
+        "Instructions: https://github.com/0gulcandogann/awsherlock#update-or-remove[/]\n\n"
         "[bold #ff7e55]All scan options and examples:[/] [#9dff7a]awsherlock scan --help[/]\n\n"
         "[bold #ff7e55]Snapshot options and examples:[/] [#9dff7a]awsherlock snapshot --help[/]\n\n"
         "[#ffd369]Put scan options after scan; snapshot options after snapshot. "
@@ -96,15 +103,28 @@ def update_installation() -> None:
         message("Update failed: pipx or a Python launcher was not found.", style=RED, err=True)
         raise typer.Exit(code=1)
     last_error: Exception | None = None
-    for command in commands:
-        try:
-            subprocess.run(command, check=True)
-            message("AWSherlock updated successfully. Run `awsherlock --version` to verify.", style=GREEN)
-            return
-        except (OSError, subprocess.CalledProcessError) as error:
-            last_error = error
-    message(f"Update failed: {terminal_text(str(last_error))}", style=RED, err=True)
-    raise typer.Exit(code=1)
+    try:
+        with update_activity() as (stage, interactive):
+            for index, command in enumerate(commands):
+                installer = "pip" if command[1:3] == ["-m", "pip"] else "pipx"
+                prefix = "Updating" if index == 0 else "Retrying update"
+                stage(f"{prefix} with {installer} ({index + 1}/{len(commands)} installers)")
+                try:
+                    output_options = {"capture_output": True, "text": True} if interactive else {}
+                    subprocess.run(command, check=True, **output_options)
+                    break
+                except (OSError, subprocess.CalledProcessError) as error:
+                    last_error = error
+            else:
+                raise typer.Exit(code=1)
+    except KeyboardInterrupt:
+        message("Update cancelled.", style=YELLOW, err=True)
+        raise typer.Exit(code=130) from None
+    except typer.Exit:
+        message(f"Update failed: {terminal_text(str(last_error))}", style=RED, err=True)
+        raise
+    message("AWSherlock updated successfully. Run `awsherlock --version` to verify.", style=GREEN)
+    return
 
 
 @app.callback()
