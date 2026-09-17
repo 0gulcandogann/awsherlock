@@ -21,6 +21,8 @@ header p,.muted{color:var(--muted)}
 main{max-width:1080px;margin:auto;padding:30px 20px 48px}
 .panel{background:var(--surface);border:2px solid var(--purple);border-radius:8px;padding:22px;margin-bottom:26px;box-shadow:5px 5px 0 var(--orange)}
 .metadata{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}.metadata strong{display:block;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.metadata .eyebrow{color:var(--purple);font-weight:600}.metadata strong{margin-top:6px;padding:7px 10px;border-radius:6px;background:var(--paper);border:1px solid var(--line)}
+.account-value,.scan-value{color:var(--purple)}.region-value{color:var(--accent)}.time-value{color:var(--amber)}
 .eyebrow{font-size:11px;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:24px 0 28px}
 .stat{padding:16px 20px;background:var(--surface);border:2px solid var(--purple);border-radius:8px;box-shadow:4px 4px 0 var(--orange)}.stat b{display:block;font-size:30px;color:var(--accent);font-weight:650;letter-spacing:-.04em}
@@ -59,12 +61,12 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <main>
 <section class="panel" aria-labelledby="metadata-title"><h2 id="metadata-title">Scan overview</h2>
 <div class="metadata">
-<div><span class="eyebrow">Account</span><strong>{{ report.metadata.account_id }}</strong></div>
-<div><span class="eyebrow">Collected at</span><strong>{{ report.metadata.started_at }}</strong></div>
-<div><span class="eyebrow">Configured region</span><strong>{% if report.metadata.regions is defined %}{{ report.metadata.regions | join(', ') }}{% else %}{{ report.metadata.region or 'Not configured / global services' }}{% endif %}</strong></div>
-<div><span class="eyebrow">Scan ID</span><strong>{{ report.metadata.scan_id }}</strong></div>
+<div><span class="eyebrow">Account</span><strong class="account-value">{{ report.metadata.account_id }}</strong></div>
+<div><span class="eyebrow">Collected at</span><strong class="time-value">{{ report.metadata.started_at }}</strong></div>
+<div><span class="eyebrow">Configured region</span><strong class="region-value">{% if report.metadata.regions is defined %}{{ report.metadata.regions | join(', ') }}{% else %}{{ report.metadata.region or 'Not configured / global services' }}{% endif %}</strong></div>
+<div><span class="eyebrow">Scan ID</span><strong class="scan-value">{{ report.metadata.scan_id }}</strong></div>
 </div></section>
-{% if report.metadata.accounts is defined %}<section class="panel"><h2>Organization accounts</h2><div class="table-wrap"><table><thead><tr><th>Account</th><th>Name</th><th>State</th><th>Scan status</th></tr></thead><tbody>{% for account in report.metadata.accounts %}<tr><td>{{ account.account_id }}</td><td>{{ account.name }}</td><td>{{ account.state }}</td><td>{{ account.scan_status }}</td></tr>{% else %}<tr><td colspan="4">No accounts discovered. Review discovery coverage.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% if report.metadata.accounts is defined %}<section class="panel"><h2>Organization accounts</h2><div class="table-wrap"><table><thead><tr><th>Account</th><th>Name</th><th>State</th><th>Scan status</th></tr></thead><tbody>{% for account in report.metadata.accounts %}<tr><td class="account-value">{{ account.account_id }}</td><td>{{ account.name }}</td><td>{{ account.state }}</td><td>{{ account.scan_status }}</td></tr>{% else %}<tr><td colspan="4">No accounts discovered. Review discovery coverage.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
 {% if report.summary.incomplete %}<aside class="warning" role="note"><strong>Incomplete scan coverage.</strong> Some checks could not run. Zero findings do not mean the account is secure.</aside>{% endif %}
 <div class="stats"><div class="stat"><span class="eyebrow">Resources</span><b>{{ report.summary.resources }}</b></div>
 <div class="stat"><span class="eyebrow">Checks evaluated</span><b>{{ report.summary.checks_evaluated }}</b></div>
@@ -76,7 +78,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 {% if report.identities is defined %}<section class="panel" aria-labelledby="identities-title"><h2 id="identities-title">Identity governance</h2>
 <p class="muted">AI declarations, workload bindings, configured trust and observed callers are separate evidence. Unknown attribution does not establish approval or safety.</p>
 <div class="table-wrap"><table><thead><tr><th>Account / identity</th><th>AI attribution</th><th>Approval</th><th>Observed connection</th><th>Evidence</th></tr></thead><tbody>
-{% for identity in report.identities %}<tr><td>{{ identity.account_id }}<br>{{ identity.name }}<br><span class="muted">{{ identity.type }} / {{ identity.evaluation_scope }}</span></td><td>{{ identity.ai_attribution }}<br><span class="muted">{{ identity.classification_source }}</span>{% if identity.shared_declared %}<br>Shared identity declared; individual actor unresolved{% endif %}</td><td>{{ identity.approval_status }}</td><td>{{ identity.observed_mechanisms | join(', ') or 'Unknown / not observed' }}</td><td><details><summary>Review identity evidence</summary><pre>{{ identity | tojson(indent=2) }}</pre></details></td></tr>{% endfor %}
+{% for identity in report.identities %}<tr><td><span class="account-value">{{ identity.account_id }}</span><br>{{ identity.name }}<br><span class="muted">{{ identity.type }} / {{ identity.evaluation_scope }}</span></td><td>{{ identity.ai_attribution }}<br><span class="muted">{{ identity.classification_source }}</span>{% if identity.shared_declared %}<br>Shared identity declared; individual actor unresolved{% endif %}</td><td>{{ identity.approval_status }}</td><td>{{ identity.observed_mechanisms | join(', ') or 'Unknown / not observed' }}</td><td><details><summary>Review identity evidence</summary><pre>{{ identity | tojson(indent=2) }}</pre></details></td></tr>{% endfor %}
 </tbody></table></div></section>{% endif %}
 <div class="panel filter-panel" aria-label="Finding filters">
 <div class="filters">
@@ -92,7 +94,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <details class="finding" data-severity="{{ finding.severity }}" data-service="{{ finding.service }}" data-account="{{ finding.account_id }}" data-id="{{ finding.id }}" data-resource="{{ finding.resource_id }}" data-index="{{ loop.index0 }}">
 <summary><span class="badge {{ finding.severity }}">{{ finding.severity }}</span><span><span class="finding-title">{{ finding.title }}</span><span class="finding-id">{{ finding.id }}</span><span class="resource-line"> · {{ finding.service }} · {{ finding.resource_id }}</span></span></summary>
 <div class="finding-body"><p>{{ finding.description }}</p>
-<p class="resource-line">Account {{ finding.account_id }} · Region {{ finding.region or 'Global' }}<br>{{ finding.resource_arn or finding.resource_id }}</p>
+<p class="resource-line">Account <span class="account-value">{{ finding.account_id }}</span> · Region <span class="region-value">{{ finding.region or 'Global' }}</span><br>{{ finding.resource_arn or finding.resource_id }}</p>
 <h3>Evidence</h3><pre>{{ finding.evidence | tojson(indent=2) }}</pre>
 <h3>Risk</h3><p>{{ finding.risk }}</p><h3>Remediation</h3><p>{{ finding.remediation }}</p>
 {% if finding.references %}<h3>References</h3><ul>{% for reference in finding.references %}<li>{{ reference }}</li>{% endfor %}</ul>{% endif %}
@@ -104,7 +106,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <section class="panel"><details class="coverage-details"{% if report.summary.incomplete %} open{% endif %}><summary id="coverage-title">Scan coverage &middot; {{ report.coverage | length }} account / service entries</summary>
 <div class="table-wrap"><table><caption>Coverage of the selected checks at collection time. COMPLETE describes evaluation coverage, not a secure account.</caption>
 <thead><tr><th scope="col">Account / Service</th>{% if report.metadata.regions is defined %}<th scope="col">Region / Scope</th>{% endif %}<th scope="col">Status</th><th scope="col">Resources</th><th scope="col">Evaluated</th><th scope="col">Not scanned</th><th scope="col">Issues</th></tr></thead>
-<tbody>{% for entry in report.coverage %}<tr><th scope="row">{{ entry.account_id }} / {{ entry.service }}</th>{% if report.metadata.regions is defined %}<td>{{ entry.region | default(none) or entry.scope | default('global') }}</td>{% endif %}<td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
+<tbody>{% for entry in report.coverage %}<tr><th scope="row"><span class="account-value">{{ entry.account_id }}</span> / {{ entry.service }}</th>{% if report.metadata.regions is defined %}<td class="region-value">{{ entry.region | default(none) or entry.scope | default('global') }}</td>{% endif %}<td><span class="badge {{ entry.status }}">{{ entry.status }}</span></td><td>{{ entry.resources }}</td><td>{{ entry.evaluated }}</td><td>{{ entry.not_scanned }}</td>
 <td>{% if entry.issues %}<details><summary>{{ entry.issues | length }} issue(s)</summary><ul>{% for issue in entry.issues %}<li><strong>{{ issue.resource_id or 'Account' }} · {{ issue.operation }}</strong>: {{ issue.message }}</li>{% endfor %}</ul></details>{% else %}<span class="muted">No collection errors</span>{% endif %}</td></tr>{% endfor %}</tbody>
 </table></div></details></section>
 <footer>AWSherlock {{ report.metadata.version }} · Standalone report · Configuration indicators do not prove effective access. Facts reflect collection time.</footer>
