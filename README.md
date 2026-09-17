@@ -11,6 +11,9 @@
 
 AWSherlock is a command-line scanner for AWS security configuration. It has 35 registered checks across seven core services: 29 default configuration checks and six opt-in IAM identity governance checks. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
 
+> [!TIP]
+> **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
+
 > [!NOTE]
 > **Read-only scanning.** The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
 
@@ -37,7 +40,13 @@ awsherlock --version
 awsherlock --help
 ```
 
-Alternatively, in an activated virtual environment, use `python -m pip install awsherlock`. Git is not required for an index installation. Upgrade an index-based pipx installation with `pipx upgrade awsherlock`; use `python -m pip install --upgrade awsherlock` in a virtual environment. The built-in `awsherlock --update` installs the GitHub `main` source and can include changes beyond the latest PyPI release.
+Alternatively, install with pip in an activated virtual environment:
+
+```bash
+python -m pip install awsherlock
+```
+
+Git is not required for an index installation. Upgrade an index-based pipx installation with `pipx upgrade awsherlock`; use `python -m pip install --upgrade awsherlock` in a virtual environment. The built-in `awsherlock --update` installs the GitHub `main` source and can include changes beyond the latest PyPI release.
 
 Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/publishing.md) for validation and first-publication steps.
 
