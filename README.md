@@ -220,12 +220,17 @@ The profile is configuration metadata, not a separately verified source account.
 An assumed-role caller ARN is displayed as returned by STS, without inventing an
 IAM role path. Identity verification does not prove scanner permission coverage.
 
-`profiles list` shows locally configured profile names and configured regions
+`profiles list` shows a table of locally configured profile names and configured regions
 (or `unknown`), including profiles defined only in the shared credentials file.
 It uses SDK config parsing without resolving credentials, executing a credential
 process, checking SSO sessions or contacting AWS. It does not display credential
 fields; a listed profile is not proof of a usable login or access to an account.
 No profiles or credentials are changed.
+The table uses cyan profile names, green known regions and yellow unknown or
+unverified state, with a profile count and an explicit `Not verified` identity
+column. Region color indicates configured metadata, not authentication success.
+Use `--color never` or `NO_COLOR=1` for an uncolored table; redirected output is
+uncolored by default.
 
 Live scans now show verified identity and selected scope on stderr before
 collection. Organization scans distinguish discovery identity from each verified

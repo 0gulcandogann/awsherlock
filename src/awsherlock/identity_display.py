@@ -1,8 +1,36 @@
 """Human-readable identity diagnostics, separate from finding reports."""
 
 from awsherlock.aws.context import ScanContext
-from awsherlock.terminal import Console
+from rich import box
+from rich.table import Table
+from rich.text import Text
+
+from awsherlock.terminal import Console, CYAN, GREEN, ORANGE, PURPLE, YELLOW
 from awsherlock.branding import terminal_text
+from awsherlock.aws.profiles import ProfileMetadata
+
+
+def show_profiles(profiles: list[ProfileMetadata]) -> None:
+    """Present local metadata; colors never imply verified login or identity."""
+    console = Console()
+    console.print(Text(f"AWS profiles ({len(profiles)} configured)", style=f"bold {ORANGE}"))
+    if profiles:
+        table = Table(box=box.ROUNDED, border_style=PURPLE, header_style=f"bold {ORANGE}",
+                      padding=(0, 1), expand=False)
+        table.add_column("Profile", style=f"bold {CYAN}", overflow="fold")
+        table.add_column("Configured region", overflow="fold")
+        table.add_column("Identity", style=YELLOW, width=12, overflow="fold")
+        for profile in profiles:
+            table.add_row(Text(terminal_text(profile.name)),
+                          Text(terminal_text(profile.region or "unknown"),
+                               style=GREEN if profile.region else YELLOW),
+                          Text("Not verified"))
+        console.print(table)
+    else:
+        console.print(Text("No configured AWS profiles found.", style=YELLOW))
+    console.print(Text("Local configuration only; login, account and permissions are not verified.",
+                       style=YELLOW))
+    console.print(Text("Verify a profile: awsherlock whoami --profile NAME", style=CYAN))
 
 
 def principal_type(arn: str) -> str:

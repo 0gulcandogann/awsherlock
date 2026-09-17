@@ -30,7 +30,7 @@ from awsherlock.terminal import CYAN, GREEN, ORANGE, RED, YELLOW, configure_type
 from awsherlock.regional import collection_scopes, parse_regions, scan_regions
 from awsherlock.selection import parse_check_selection, parse_account_selection, parse_ou_selection, parse_resource_selection
 from awsherlock.identity_config import IdentityOptions, read_inventory
-from awsherlock.identity_display import show_identity, show_offline_identity
+from awsherlock.identity_display import show_identity, show_offline_identity, show_profiles
 from awsherlock.aws.profiles import list_profiles
 from awsherlock.aws.context import ScanContext
 
@@ -102,11 +102,7 @@ def profiles_list(
     except SessionError as error:
         show_session_error(error, None)
         raise typer.Exit(code=1) from None
-    if not profiles:
-        message("No configured AWS profiles found.")
-    for profile in profiles:
-        message(f"Profile: {terminal_text(profile.name)} / Configured region: {terminal_text(profile.region or 'unknown')}")
-    message("Local configuration only; login, account and permissions are not verified.")
+    show_profiles(profiles)
 
 
 def request_options(connect_timeout: float | None, read_timeout: float | None,
