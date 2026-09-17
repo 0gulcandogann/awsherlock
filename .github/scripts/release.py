@@ -138,9 +138,10 @@ def smoke(dist: Path) -> None:
     runner = CliRunner()
     for args, marker in [(["--version"], version), (["--help"], "Quick start"),
                          (["scan", "--help"], "--identity-governance"), (["--list-checks"], "AWSH-IAM-012")]:
-        result = runner.invoke(app, args, terminal_width=160)
+        result = runner.invoke(app, args, terminal_width=160,
+                               env={"COLUMNS": "160", "NO_COLOR": "1", "TERM": "dumb"})
         if result.exit_code != 0 or marker not in result.output:
-            raise ValueError(f"CLI smoke failed: {args}")
+            raise ValueError(f"CLI smoke failed: {args}; exit={result.exit_code}; output={result.output!r}")
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
         metadata = ScanMetadata(scan_id="release-smoke", started_at=datetime(2026, 9, 17, tzinfo=timezone.utc),
