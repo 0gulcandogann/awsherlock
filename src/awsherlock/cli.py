@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import math
+import shlex
 from dataclasses import replace
 from time import perf_counter
 from botocore.config import Config
@@ -29,6 +30,9 @@ from awsherlock.terminal import CYAN, GREEN, ORANGE, RED, YELLOW, configure_type
 from awsherlock.regional import collection_scopes, parse_regions, scan_regions
 from awsherlock.selection import parse_check_selection, parse_account_selection, parse_ou_selection, parse_resource_selection
 from awsherlock.identity_config import IdentityOptions, read_inventory
+from awsherlock.identity_display import show_identity, show_offline_identity
+from awsherlock.aws.profiles import list_profiles
+from awsherlock.aws.context import ScanContext
 
 configure_typer_styles()
 
@@ -41,6 +45,68 @@ app = typer.Typer(
 )
 
 REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
+
+
+def show_session_error(error: SessionError, profile: str | None) -> None:
+    message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
+    command = None
+    if error.recovery == "profiles":
+        command = "awsherlock profiles list"
+    elif error.recovery in {"sso", "configuration"}:
+        command = "aws sso login" if error.recovery == "sso" else "aws configure list"
+        if profile is not None:
+            if terminal_text(profile) != profile:
+                command += " --help"
+            else:
+                quoted = "'" + profile.replace("'", "''") + "'" if sys.platform == "win32" else shlex.quote(profile)
+                command += f" --profile {quoted}"
+    if command is not None:
+        message(f"Next: {command}", err=True)
+
+
+@app.command()
+def whoami(
+    profile: Annotated[str | None, typer.Option("--profile", help="Use a named AWS SDK profile.")] = None,
+    role: Annotated[str | None, typer.Option("--role", help="Assume this IAM role before identity verification.")] = None,
+    role_session_name: Annotated[str | None, typer.Option("--role-session-name", help="Assumed-role session name (default: AWSherlock).")] = None,
+    external_id: Annotated[str | None, typer.Option("--external-id", help="External ID required by the role trust policy.")] = None,
+    region: Annotated[str | None, typer.Option("--region", help="Override the SDK region.")] = None,
+    expect_account: Annotated[str | None, typer.Option("--expect-account", help="Stop if the verified account differs from this ID.")] = None,
+    timeout: Annotated[float | None, typer.Option("--timeout", help="Set socket connect/read timeouts; not an overall deadline.")] = None,
+    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
+) -> None:
+    """Verify the effective AWS account/principal live, without collecting resources."""
+    options = request_options(None, None, timeout, expect_account)
+    try:
+        context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name,
+                                      external_id=external_id, **({"region": region} if region is not None else {}),
+                                      **options)
+    except SessionError as error:
+        show_session_error(error, profile)
+        raise typer.Exit(code=1) from None
+    show_identity(context)
+    message("Identity verification does not prove scanner permission coverage.")
+
+
+profiles_app = typer.Typer(help="Inspect local AWS profile metadata; no AWS calls.", add_completion=False)
+app.add_typer(profiles_app, name="profiles")
+
+
+@profiles_app.command("list")
+def profiles_list(
+    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
+) -> None:
+    """List configured profile names and regions without resolving credentials."""
+    try:
+        profiles = list_profiles()
+    except SessionError as error:
+        show_session_error(error, None)
+        raise typer.Exit(code=1) from None
+    if not profiles:
+        message("No configured AWS profiles found.")
+    for profile in profiles:
+        message(f"Profile: {terminal_text(profile.name)} / Configured region: {terminal_text(profile.region or 'unknown')}")
+    message("Local configuration only; login, account and permissions are not verified.")
 
 
 def request_options(connect_timeout: float | None, read_timeout: float | None,
@@ -322,11 +388,16 @@ def scan(
                 if identity_options is not None:
                     context = replace(context, identity_options=identity_options)
                 activity("Discovering accounts", 0, 1)
+                show_identity(context, err=True, regions=selected_regions, purpose="organization discovery")
+                def target_identity(target: ScanContext) -> None:
+                    show_identity(target, err=True, regions=selected_regions, services=selected,
+                                  purpose="organization target")
                 def account_progress(stage: str, completed: int, total: int) -> None:
                     activity(stage, completed + 1 if completed else 0, total + 1)
                 report = scan_organization(
                     context, selected, role_name or "AWSherlockAuditRole", external_id,
                     role_session_name, progress=account_progress,
+                    identity_callback=target_identity,
                     **selection_options,
                     **({"selected_accounts": selected_accounts} if selected_accounts is not None else {}),
                     **({"selected_ous": selected_ous} if selected_ous is not None else {}),
@@ -337,6 +408,7 @@ def scan(
                 activity("Reading snapshot", 0, 2)
                 snapshot = read_snapshot(snapshot_path)
                 verify_account_id(snapshot.metadata.account_id, expect_account)
+                show_offline_identity(snapshot.metadata.account_id)
                 if services is not None:
                     if any(service not in snapshot.services for service in selected):
                         raise SnapshotError("Selected service is absent from the snapshot")
@@ -349,6 +421,7 @@ def scan(
                 context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id, **region_options, **extra_options)
                 if identity_options is not None:
                     context = replace(context, identity_options=identity_options)
+                show_identity(context, err=True, regions=selected_regions, services=selected)
                 activity("Collecting AWS resources", 1, work_total)
                 def service_progress(stage: str, completed: int, total: int) -> None:
                     activity(stage, completed + 1, total + 2)
@@ -393,7 +466,10 @@ def scan(
         if report.incomplete:
             raise typer.Exit(code=1)
     except (SessionError, SnapshotError) as error:
-        message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
+        if isinstance(error, SessionError):
+            show_session_error(error, profile)
+        else:
+            message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
         raise typer.Exit(code=1) from None
     except OSError:
         message("Error: Could not read or create the file. Check paths; existing reports are not overwritten.", style=RED, err=True)

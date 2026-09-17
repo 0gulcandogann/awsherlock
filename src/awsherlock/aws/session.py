@@ -11,6 +11,8 @@ from botocore.exceptions import (
     NoCredentialsError,
     PartialCredentialsError,
     ProfileNotFound,
+    SSOTokenLoadError,
+    UnauthorizedSSOTokenError,
 )
 
 from awsherlock.aws.context import ScanContext
@@ -18,6 +20,10 @@ from awsherlock.aws.context import ScanContext
 
 class SessionError(RuntimeError):
     """A safe, user-facing failure to establish an AWS scan context."""
+
+    def __init__(self, message: str, *, recovery: str | None = None) -> None:
+        super().__init__(message)
+        self.recovery = recovery
 
 
 def create_scan_context(
@@ -68,10 +74,15 @@ def create_scan_context(
             operation = "caller identity"
         identity = session.client("sts", **client_options).get_caller_identity()
     except ProfileNotFound:
-        raise SessionError("AWS profile not found. Check your AWS configuration.") from None
+        raise SessionError("AWS profile not found. Check your AWS configuration.",
+                           recovery="profiles") from None
+    except (SSOTokenLoadError, UnauthorizedSSOTokenError):
+        raise SessionError("AWS SSO session is unavailable. Sign in again with the selected profile.",
+                           recovery="sso") from None
     except (NoCredentialsError, PartialCredentialsError):
         raise SessionError(
-            "AWS credentials are missing or incomplete. Configure the AWS SDK credential chain."
+            "AWS credentials are missing or incomplete. Configure the AWS SDK credential chain.",
+            recovery="configuration",
         ) from None
     except ClientError as error:
         code = error.response.get("Error", {}).get("Code")
@@ -84,7 +95,7 @@ def create_scan_context(
             message = "AWS credentials are expired or invalid. Refresh your AWS login or credentials."
         else:
             message = f"AWS rejected the {operation} request. Check your AWS configuration."
-        raise SessionError(message) from None
+        raise SessionError(message, recovery="configuration" if code not in {"AccessDenied", "AccessDeniedException"} else None) from None
     except BotoCoreError:
         # SDK errors may embed credential-process output, tokens, or endpoint URLs.
         raise SessionError(

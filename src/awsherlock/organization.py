@@ -56,7 +56,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                       selected_checks: list[str] | None = None,
                       selected_accounts: list[str] | None = None,
                       selected_ous: list[str] | None = None,
-                      selected_resources: list[str] | None = None) -> Report:
+                      selected_resources: list[str] | None = None,
+                      identity_callback: Callable[[ScanContext], None] | None = None) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
@@ -142,6 +143,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 context = replace(context, measurements=source.measurements)
             if source.identity_options is not None:
                 context = replace(context, identity_options=source.identity_options, region=source.region)
+            if identity_callback is not None:
+                identity_callback(context)
             if regions is not None:
                 result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
                                       **resource_options,

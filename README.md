@@ -204,6 +204,36 @@ does not enable the progress display on a redirected stream. JSON remains unstyl
 These switches also work with organization and offline snapshot scans. They do
 not hide findings, permission failures or incomplete coverage, or change exit codes.
 
+### Inspect the active identity and local profiles
+
+```bash
+awsherlock profiles list
+awsherlock whoami --profile production
+awsherlock whoami --profile production --expect-account 123456789012
+```
+
+`whoami` verifies the effective account and principal through the same AWS SDK
+session layer used by scanning, without collecting resources. It contacts STS;
+credential resolution may also use SSO, credential_process or metadata providers.
+Its output shows account ID, principal type, caller ARN, profile and region.
+The profile is configuration metadata, not a separately verified source account.
+An assumed-role caller ARN is displayed as returned by STS, without inventing an
+IAM role path. Identity verification does not prove scanner permission coverage.
+
+`profiles list` shows locally configured profile names and configured regions
+(or `unknown`), including profiles defined only in the shared credentials file.
+It uses SDK config parsing without resolving credentials, executing a credential
+process, checking SSO sessions or contacting AWS. It does not display credential
+fields; a listed profile is not proof of a usable login or access to an account.
+No profiles or credentials are changed.
+
+Live scans now show verified identity and selected scope on stderr before
+collection. Organization scans distinguish discovery identity from each verified
+target identity. Offline replay labels the account as snapshot metadata and does
+not verify a live identity. These summaries remain visible with `--no-progress`
+and keep JSON stdout unchanged. Recognized SSO-session failures suggest an
+external login command; AWSherlock does not log in automatically.
+
 ### Inspect the installation and available checks
 
 ```bash
@@ -230,16 +260,18 @@ running Python, package location, PATH launcher, dependency versions and termina
 information. Use it when the command appears to run an older installation.
 `--list-checks` lists the registered check IDs and titles; `--list-services` shows
 each supported service and its check count. Use one action at a time, without a
-`scan` or `snapshot` command.
+subcommand.
 
 ## Command reference
 
 Every supported option is listed below, including `--help`. Options belong to the
 command shown in each table; for example, use `awsherlock --doctor` and
-`awsherlock scan --stats`. `--color` is available in all three locations.
+`awsherlock scan --stats`. `--color` is also available on `whoami` and `profiles list`.
 
 ```bash
 awsherlock --help
+awsherlock whoami --help
+awsherlock profiles list --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -259,7 +291,35 @@ awsherlock snapshot --help
 
 Choose one of `--update`, `--doctor`, `--list-checks`, `--list-services` or
 `--describe-check`; these actions cannot be combined with each other or with a
-`scan`/`snapshot` command. `--version` exits eagerly rather than running other actions.
+subcommand. `--version` exits eagerly rather than running other actions.
+
+### Identity options: `awsherlock whoami [OPTIONS]`
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--profile NAME` | SDK credential chain | Select an AWS profile. |
+| `--role ARN` | Not selected | Assume this IAM role before STS identity verification. |
+| `--role-session-name NAME` | `AWSherlock` when assuming a role | Requires `--role`. |
+| `--external-id ID` | Not selected | Trust-policy external ID; requires `--role` and is not displayed. |
+| `--region REGION` | SDK configuration | Select the SDK region. |
+| `--expect-account ID` | Not selected | Require this 12-digit verified account; mismatch exits 1 without identity output. |
+| `--timeout SECONDS` | SDK defaults | Set both socket timeouts, greater than 0 and at most 3600; not an overall deadline. |
+| `--color MODE` | `auto` | `auto`, `always` or `never`. |
+| `--help` | Off | Show help without authentication. |
+
+Successful verification exits 0; session failures exit 1; invalid options exit 2.
+This command produces human-readable diagnostics, not a findings report.
+
+### Profile options: `awsherlock profiles list [OPTIONS]`
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--color MODE` | `auto` | `auto`, `always` or `never`. |
+| `--help` | Off | Show local profile command help. |
+
+Missing config files or an empty profile list are normal (exit 0); unreadable or
+malformed configuration exits 1 with a sanitized error. SDK configuration paths,
+including `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`, are respected.
 
 ### Scan options: `awsherlock scan [OPTIONS] [snapshot_path]`
 
