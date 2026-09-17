@@ -2,13 +2,13 @@
 
 # AWSherlock
 
-[![Release v0.1.5](https://img.shields.io/badge/release-v0.1.5-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.5)
+[![Release v0.1.10](https://img.shields.io/badge/release-v0.1.10-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.10)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-[![29 security checks](https://img.shields.io/badge/security_checks-29-7C3AED?style=flat-square)](#checks)
+[![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
 [![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](LICENSE)
 
-AWSherlock is a command-line scanner for AWS security configuration. It reads your account's settings, runs 29 checks across seven services, and reports the findings in your terminal, as JSON, or as an HTML file you can open in a browser.
+AWSherlock is a command-line scanner for AWS security configuration. It has 35 registered checks across seven core services: 29 default configuration checks and six opt-in IAM identity governance checks. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
 
 > [!NOTE]
 > **Read-only scanning.** The scanner does not change AWS resources. It uses your existing AWS authentication and records which checks it could actually run. If a permission is missing, the report shows the gap alongside any findings it was able to produce.
@@ -237,7 +237,7 @@ awsherlock snapshot --help
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
-| `--list-checks` | Off | List all 29 registered check IDs and titles; no AWS calls. |
+| `--list-checks` | Off | List all 35 registered check IDs and titles; no AWS calls. Six identity governance checks are opt-in. |
 | `--list-services` | Off | List supported services and their check counts; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
@@ -261,6 +261,16 @@ member accounts, or pass a normalized JSON file for offline evaluation.
 | `--services LIST` | All seven services | Comma-separated supported service names. Offline selection must exist in the snapshot. |
 | `--checks LIST` | All checks | Evaluate comma-separated registered IDs, such as `AWSH-S3-001,AWSH-S3-003`. Collection is unchanged; IDs must belong to the selected services/snapshot. Excluded checks remain visible in coverage. |
 | `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
+| `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
+| `--resources LIST` | All discovered resources | Evaluate exact comma-separated resource IDs or ARNs, case-sensitive; collection/saved snapshots remain unchanged. No wildcards or tags. Exclusions and unmatched selectors remain visible; works offline. |
+| `--identity-governance` | Off | Collect IAM role/user ownership, purpose, trust, usage and joined policy evidence, plus regional Lambda/EC2 role bindings. Live scans require IAM in `--services`; offline scans expose missing facts. Saved governance evidence is evaluated automatically. |
+| `--identity-inventory FILE` | Not supplied | Version-1 exact ARN declarations/approvals; requires `--identity-governance`. Works live/offline. Missing, partial or out-of-scope approval evidence remains unknown. |
+| `--identity-events` | Off | Live opt-in regional CloudTrail management-event attribution, including role chains. Requires `--identity-governance`. No raw events or credential identifiers are exported. |
+| `--identity-ai-services` | Off | Live Bedrock/AgentCore execution-role metadata through the shared session; requires `--identity-governance`. No agent invocation or prompt/model-log reads. |
+| `--identity-analyzers` | Off | Read active findings from existing regional Access Analyzer instances. Requires live `--identity-governance`; never creates analyzers or query jobs. |
+| `--identity-days N` | 30 | CloudTrail lookback, 1–90 days; a non-default value requires `--identity-events`. |
+| `--identity-max-pages N` | 20 | Evidence page/read budget, 1–1000, shared across regions within each supplemental collector. Requires live `--identity-governance`. |
+| `--identity-max-seconds N` | 60 | Evidence time budget between requests, 1–3600 seconds, within each supplemental collector. In-flight SDK timeouts/retries may exceed it. Requires live `--identity-governance`. |
 | `--output FORMAT` | `console` | `console`, `json` or `html`. JSON goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
 | `--report-file PATH` | Not supplied | Write a new JSON/HTML report; requires `--output json` or `--output html`. Existing files are not overwritten. |
 | `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
@@ -301,6 +311,8 @@ do not suppress findings after scanning. Resource/tag and OU selection are not i
 ```bash
 awsherlock scan facts.json --checks AWSH-S3-001,AWSH-S3-003 --output json
 awsherlock scan organization --accounts 123456789012,999999999999 --services iam,s3
+awsherlock scan organization --ous ou-abcd-12345678 --services iam,s3
+awsherlock scan facts.json --resources arn:aws:s3:::example-bucket --output json
 ```
 Saved directories contain individually replayable files; pass a file, not the
 directory, to offline `scan`. Coverage and error exit codes remain visible in all modes.
@@ -428,7 +440,7 @@ Temporary credentials stay in memory. Explicit assumed-role credentials do not a
 awsherlock scan organization --profile management --output html --report-file organization.html
 ```
 
-The source account needs access to `organizations:ListAccounts` and permission to assume the audit roles in member accounts. AWSherlock discovers accounts and scans active accounts sequentially using `AWSherlockAuditRole` by default.
+The source account needs access to `organizations:ListAccounts` and permission to assume the audit roles in member accounts. With `--ous`, it also needs `organizations:ListChildren` to discover descendant OUs/accounts. OU and account selectors intersect; excluded accounts remain visible. If any OU branch fails, OU membership is treated as unverified and no selected member roles are assumed. AWSherlock discovers accounts and scans active accounts sequentially using `AWSherlockAuditRole` by default.
 
 Choose another role name or path, and limit services if needed:
 
@@ -463,12 +475,12 @@ Snapshots reflect the time of collection. They contain account IDs, resource nam
 
 | Service | Count | Configuration reviewed |
 | --- | ---: | --- |
-| IAM | 6 | AdministratorAccess, broad policy actions and resources, console MFA, old and unused active keys |
+| IAM | 12 | Six default policy/credential checks; six opt-in ownership, purpose, stale role, trust and approval checks |
 | S3 | 5 | Public access safeguards, default encryption, versioning, access logging, public policy status |
 | EC2 | 6 | Internet-wide SSH, RDP and database ingress; IMDSv1; public addresses; EBS encryption |
 | Lambda | 3 | Public function URLs, broad managed execution-role policies, deprecated runtimes |
 | Secrets Manager | 3 | Rotation, broad resource-policy principals, custom encryption key state |
-| CloudTrail | 3 | Usable trail, multi-region and global logging, log validation |
+| CloudTrail | 4 | Usable trail, multi-region/global logging, log validation and management-event exclusions |
 | KMS | 2 | Eligible key rotation, broad key-policy principals |
 
 [Checks and permissions](#checks-and-permissions) lists the check IDs, finding triggers, required AWS actions, and service-specific limits.
@@ -497,6 +509,7 @@ are reused. Required read permissions:
 - `s3:ListAllMyBuckets`
 - `s3:GetBucketLocation`
 - `s3:GetBucketPublicAccessBlock`
+- `s3:GetAccountPublicAccessBlock` (account context through S3 Control)
 - `s3:GetEncryptionConfiguration`
 - `s3:GetBucketVersioning`
 - `s3:GetBucketLogging`
@@ -523,8 +536,12 @@ not delivery success or alternative CloudTrail coverage.
 
 `AWSH-S3-001` produces a MEDIUM finding when the bucket configuration is absent
 or any of its four safeguards is disabled. This identifies potential exposure;
-it does not prove anonymous access. Account-level controls, policy documents,
-ACLs, access points, and object access are not evaluated. AWS applies the
+it does not prove anonymous access. Account Block Public Access is read once per
+collection and attached as normalized context. Findings show bucket, account and
+combined flags (logical OR per safeguard); the bucket finding remains even if
+account safeguards compensate. Missing account permission or old snapshots without
+account facts remain partial. Policy documents, ACLs, access points, and object
+access are not evaluated. AWS applies the
 [most restrictive applicable Block Public Access settings](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html).
 
 Missing configuration is distinct from AccessDenied. Failed or malformed reads
@@ -551,6 +568,121 @@ are necessary for some actions. Stale passwords/root credentials are not checked
 
 Required reads: `iam:GetAccountAuthorizationDetails`, `iam:GetLoginProfile`,
 `iam:ListMFADevices`, `iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`.
+
+### Identity governance and AI attribution
+
+Start with IAM governance, then opt into additional evidence:
+
+```bash
+awsherlock scan --services iam --region eu-central-1 --identity-governance
+awsherlock scan --services iam --regions eu-central-1,eu-west-1 --identity-governance --identity-inventory identities.json --identity-events --identity-ai-services --identity-analyzers --save-snapshot identity-facts
+awsherlock scan identity-facts/123456789012-global-bucket.json --identity-governance --identity-inventory identities.json --output html --report-file identities.html
+```
+
+The JSON report contains an `identities` inventory; console and standalone HTML
+show classification, approval and observed connection mechanisms. HTML includes
+the normalized trust, policy source, usage, workload and event evidence. Excluded
+identities remain visible with `NOT_SCANNED` evaluation scope. Saved evidence is
+replayed offline without AWS calls; requesting governance on old snapshots exposes
+missing facts. Governance capture uses `scan --save-snapshot`.
+
+| Check | Finding trigger | Severity |
+| --- | --- | --- |
+| AWSH-IAM-007 | Owner absent from `Owner` tag and supplied declaration | MEDIUM |
+| AWSH-IAM-008 | Purpose absent from `Purpose` tag and supplied declaration | MEDIUM |
+| AWSH-IAM-009 | Role last used over 90 days ago, or over-90-day-old role with no recorded use in the tracking window | MEDIUM |
+| AWSH-IAM-010 | Supported trust is broad, including OIDC without exact provider audience/subject restrictions | HIGH |
+| AWSH-IAM-011 | Identity absent from a complete approval inventory for its account | MEDIUM |
+| AWSH-IAM-012 | Supported role trust or observed caller differs from approvals, or declared required trust controls are missing | HIGH |
+
+Service-linked roles are excluded from ownership, purpose and stale-role checks.
+The tag convention is `Owner`, `Purpose`, and optional `IdentityType` with values
+`ai`, `workload`, `human` or `unknown`. Only tag presence/kind is retained; arbitrary
+tag values are not exported. Governance joins managed policy default versions and
+user group grants to their identities; unresolved associations remain partial.
+Broad grants are review indicators. Boundaries, denies and organization controls
+can restrict effective permissions; IAM role age/usage does not prove an identity
+can be safely retired. [RoleLastUsed](https://docs.aws.amazon.com/IAM/latest/APIReference/API_RoleLastUsed.html)
+covers at most the trailing 400 days and may cover less in some regions.
+
+An `identities.json` declaration file uses this exact version-1 schema:
+
+```json
+{
+  "schema_version": 1,
+  "accounts": ["123456789012"],
+  "complete": false,
+  "identities": [
+    {
+      "arn": "arn:aws:iam::123456789012:role/invoice-agent",
+      "kind": "ai",
+      "owner": "finance-platform",
+      "purpose": "invoice processing",
+      "allowed_principals": ["arn:aws:iam::999999999999:role/integration"],
+      "shared": false,
+      "external_id_required": true,
+      "source_identity_required": false
+    }
+  ]
+}
+```
+
+`external_id_required` and `source_identity_required` are optional booleans,
+defaulting to false. Required controls must cover every supported role-assumption
+Allow branch. ExternalId is integration-specific and is not an AI identifier;
+its value is never exported. Approval principal values are exact AWS accounts,
+IAM principal/provider ARNs or AWS service principals; no wildcard declarations.
+`complete: true` asserts that the supplied list contains every approved identity
+in the listed accounts. Absence from a partial/out-of-scope list stays unknown.
+An unregistered identity is a governance mismatch, not proof of compromise.
+Missing inventory leaves approval checks `NOT_SCANNED` and coverage incomplete.
+The file stores governance declarations, never AWS credentials.
+
+Connection evidence covers five branches:
+
+- Same/cross-account role callers and observed role chains; missing source events
+  retain issuer-only, account-only or incomplete-chain attribution.
+- IAM users, long-lived-key metadata and temporary federated-user issuers.
+- OIDC/federation: supported provider-specific exact audience/subject constraints;
+  unsupported condition shapes remain unknown. CI workloads are not automatically AI.
+- Lambda/EC2 role bindings and optional Bedrock/AgentCore native AI bindings.
+- Declared shared human/agent identities and intermediary applications: the AWS
+  signer may be known while the individual application actor remains unresolved.
+
+`declared_ai` comes from the supplied inventory or `IdentityType` tag;
+`verified_ai_binding` comes from a native agent resource's execution-role metadata.
+Neither identifies every session of a reused role as AI execution. Ordinary
+compute bindings prove workload association, not AI purpose. Names, IP changes,
+SDK user agents, sourceIdentity presence and permitted Bedrock actions alone do
+not prove AI use. Unknown classification is explicit.
+
+Event evidence uses [CloudTrail LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html),
+with regional management history limited to 90 days and logical requests spaced
+at least 0.55 seconds apart per region. It does not read data-event logs, so model
+invocations and object accesses may be outside this evidence. Page/time truncation,
+unsupported/unmapped actors and denied reads remain visible. Empty history does
+not prove non-use. Request budgets are checked between calls; configure socket
+timeouts for in-flight requests. Credential/session identifiers are correlated
+only in memory; raw events, ExternalId/sourceIdentity values and key IDs are not
+exported. Native detail SDK responses are reduced immediately to role bindings;
+instructions, environment values, code and model content are not retained/reported.
+
+Additional read permissions, according to enabled evidence:
+
+| Evidence | IAM actions |
+| --- | --- |
+| IAM profiles/policy joins | `iam:ListRoleTags`, `iam:ListUserTags`, `iam:GetPolicy`, `iam:GetPolicyVersion`, in addition to the IAM reads above |
+| Workload bindings | `lambda:ListFunctions`, `ec2:DescribeInstances`, `iam:GetInstanceProfile` |
+| Audit history | `cloudtrail:LookupEvents` |
+| Native AI bindings | `bedrock:ListAgents`, `bedrock:GetAgent`, `bedrock-agentcore:ListAgentRuntimes`, `bedrock-agentcore:GetAgentRuntime` |
+| Existing analyzer evidence | `access-analyzer:ListAnalyzers`, `access-analyzer:ListFindings`, `access-analyzer:GetFinding` (the latter two authorize V2 reads too) |
+
+Analyzer imports retain active finding type/status, update time, tracking window,
+unused services/actions and supported external principals. Absence, errors and
+inactive analyzers remain visible; AWSherlock never creates one or changes access.
+Existing unused-access analyzers have [AWS charges](https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings.html).
+Findings remain configuration/usage indicators rather than automatic deletion or
+effective-permission decisions. No live agent is executed during scanning.
 
 ### EC2 scanner
 
@@ -589,11 +721,16 @@ reads status in the home region, and checks for a usable trail visible in the
 configured region, multi-region/global-event settings, log file validation and
 management-event selectors (`AWSH-CT-004`). Usability requires applicable regional
 coverage and management events in addition to logging and no reported delivery error.
-Basic selectors and advanced eventCategory/readOnly selectors are supported;
-restrictive advanced management-event filters remain unknown/partial. Read/write
-or event-source exclusions may still limit coverage; a positive indicator does not
-prove all API events are logged. Selector facts are normalized to a boolean.
+Basic selectors and advanced eventCategory/readOnly selectors are supported, along
+with documented trail eventSource NotEquals exclusions for `kms.amazonaws.com`
+and `rdsdata.amazonaws.com`. Unsupported source/name/resource filters remain
+unknown/partial. Facts preserve inclusion plus source exclusions common to every
+management-enabled selector; `AWSH-CT-004` reports those exclusions even when other
+management events are included. Per-selector read/write gaps are not simulated;
+a positive indicator does not prove all API events are logged.
 Old snapshots remain readable; absent selector facts count as NOT_SCANNED.
+Snapshots with a positive management indicator but no source-exclusion context
+cannot complete `AWSH-CT-004`; coverage remains partial.
 CloudTrail Lake, log contents, actual delivery and every region are not inspected.
 Requires `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus` and
 [`cloudtrail:GetEventSelectors`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_GetEventSelectors.html).
@@ -753,12 +890,15 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
-Unreleased local work adds explicit `--checks`/organization `--accounts` selectors,
-scan-local collection measurements, successful CloudTrail status/selector reuse,
-one IAM client per Lambda collection, clearer collection failure categories and
-management-event check `AWSH-CT-004`. Measurements count SDK invocations separately
-from HTTP retries; `--stats` remains elapsed time and result counts. Synthetic
-benchmarks do not establish live AWS performance. No new tag has been published.
+Version 0.1.10 adds opt-in NHI/AI identity governance, declarations/approvals,
+bounded audit attribution across five connection branches, metadata-only native
+AI role bindings and existing Access Analyzer evidence. The catalog has 35 checks
+(29 default and six opt-in governance checks). It also includes explicit check,
+account, OU and resource selectors, S3 account safeguard context, CloudTrail
+management/source exclusions, scan-local collection measurements, successful
+trail read reuse and safer partial collection. Measurements count SDK invocations
+separately from HTTP retries; `--stats` remains elapsed/result counts. Synthetic
+benchmarks do not establish live AWS performance. Collection remains read-only.
 
 Version 0.1.5, dated 2026-09-16, adds explicit single/multiple-region selection,
 per-region coverage in all reports, expected-account verification, per-request

@@ -17,6 +17,7 @@ SCHEMAS = {
     ("secretsmanager", "encryption"): {"manager": str, "state": str},
     ("cloudtrail", "usable_trail"): bool,
     ("cloudtrail", "management_events"): bool,
+    ("cloudtrail", "management_excluded_sources"): [str],
     ("cloudtrail", "trail_settings"): {"IsMultiRegionTrail": bool, "IncludeGlobalServiceEvents": bool, "LogFileValidationEnabled": bool, "IsOrganizationTrail": bool},
     ("cloudtrail", "trail_status"): {"logging": bool, "destination": str, "delivery_error": bool},
     ("kms", "policy"): [RESOURCE_STATEMENT],
@@ -33,6 +34,12 @@ def _matches(value, shape) -> bool:
 
 def validate_resource_facts(resource: Resource) -> None:
     for fact, value in resource.data.items():
+        if resource.service == "iam" and fact.startswith("identity_"):
+            from awsherlock.identity_validation import validate_identity_fact
+            validate_identity_fact(fact, value)
+            if fact == "identity_bindings" and any(binding["role_arn"] != resource.resource_arn for binding in value):
+                raise ValueError("Binding does not match identity")
+            continue
         if resource.service == "s3":
             validate_fact(fact, value)
             continue
@@ -58,6 +65,10 @@ def validate_resource_facts(resource: Resource) -> None:
             shape = SCHEMAS.get((resource.service, fact))
         if shape is None or not _matches(value, shape):
             raise ValueError("Invalid normalized fact shape")
+        if resource.service == "cloudtrail" and fact == "management_excluded_sources":
+            from awsherlock.cloudtrail_facts import MANAGEMENT_SOURCES
+            if not set(value) <= MANAGEMENT_SOURCES:
+                raise ValueError("Invalid management source exclusions")
         if fact in {"statements", "policy"}:
             if any(s["effect"] not in {"Allow", "Deny"} or not s["actions"] for s in value):
                 raise ValueError("Invalid policy facts")

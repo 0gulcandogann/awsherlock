@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import math
+from dataclasses import replace
 from time import perf_counter
 from botocore.config import Config
 
@@ -25,7 +26,8 @@ from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.diagnostics import runtime_diagnostics
 from awsherlock.terminal import CYAN, GREEN, ORANGE, RED, YELLOW, configure_typer_styles, color_option, field, message
 from awsherlock.regional import collection_scopes, parse_regions, scan_regions
-from awsherlock.selection import parse_check_selection, parse_account_selection
+from awsherlock.selection import parse_check_selection, parse_account_selection, parse_ou_selection, parse_resource_selection
+from awsherlock.identity_config import IdentityOptions, read_inventory
 
 configure_typer_styles()
 
@@ -176,13 +178,17 @@ def main(
     "[#5bfcfc]awsherlock scan organization --role-name audit/Reader[/]\n\n"
     "[#5bfcfc]awsherlock scan facts.json --output json[/]\n\n"
     "[#5bfcfc]awsherlock scan facts.json --checks AWSH-S3-001[/]\n\n"
+    "[#5bfcfc]awsherlock scan --services iam --region eu-central-1 --identity-governance[/]\n\n"
+    "[#5bfcfc]awsherlock scan --services iam --identity-governance --identity-inventory identities.json --identity-events[/]\n\n"
     "[#ffd369]Default: all seven services, console output, SDK-configured region. "
     "Use --region OR --regions. --summary-only requires console output. "
     "--report-file requires JSON/HTML. --timeout sets both request limits; "
     "do not combine with separate timeout flags. Offline scans reject AWS "
     "authentication, regions, request timeouts and --save-snapshot. "
-    "--accounts is organization-only. --checks selects evaluation, not collection. "
+    "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
+    "Identity evidence is opt-in; live governance requires IAM and regions for workload/audit reads. "
+    "Saved identity facts replay offline. Missing approvals or evidence remain incomplete. "
     "Incomplete coverage exits 1; findings alone do not change exit 0.[/]"
 ))
 def scan(
@@ -220,6 +226,16 @@ def scan(
     stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.")] = False,
     checks: Annotated[str | None, typer.Option("--checks", help="Evaluate comma-separated check IDs; collection is unchanged and exclusions remain visible.")] = None,
     accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.")] = None,
+    ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.")] = None,
+    resources: Annotated[str | None, typer.Option("--resources", help="Evaluate exact comma-separated resource IDs/ARNs; collection is unchanged. Exclusions and unmatched IDs remain visible.")] = None,
+    identity_governance: Annotated[bool, typer.Option("--identity-governance", help="Collect/evaluate IAM role and user governance evidence, including workload role bindings.")] = False,
+    identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.")] = None,
+    identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.")] = False,
+    identity_ai_services: Annotated[bool, typer.Option("--identity-ai-services", help="Read Bedrock/AgentCore execution-role metadata; requires live --identity-governance.")] = False,
+    identity_analyzers: Annotated[bool, typer.Option("--identity-analyzers", help="Read existing Access Analyzer findings; never creates analyzers. Requires live --identity-governance.")] = False,
+    identity_days: Annotated[int, typer.Option("--identity-days", min=1, max=90, help="CloudTrail lookback days (1–90); requires --identity-events.")] = 30,
+    identity_max_pages: Annotated[int, typer.Option("--identity-max-pages", min=1, max=1000, help="Page/read budget per optional evidence collector, across requested regions.")] = 20,
+    identity_max_seconds: Annotated[int, typer.Option("--identity-max-seconds", min=1, max=3600, help="Time budget between evidence requests; in-flight SDK retries/timeouts may exceed it.")] = 60,
 ) -> None:
     """Identify the AWS account, scan selected services, or evaluate an offline snapshot."""
     if output not in {None, "console", "json", "html"}:
@@ -229,14 +245,32 @@ def scan(
     if summary_only and output in {"json", "html"}:
         raise typer.BadParameter("--summary-only requires console output.")
     organization = snapshot_path == Path("organization")
+    offline = snapshot_path is not None and not organization
+    identity_extra = identity_inventory is not None or identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60
+    if identity_extra and not identity_governance:
+        raise typer.BadParameter("Identity evidence options require --identity-governance.")
+    if identity_days != 30 and not identity_events:
+        raise typer.BadParameter("--identity-days requires --identity-events.")
+    if offline and (identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60):
+        raise typer.BadParameter("Live identity evidence options cannot be used with offline snapshots; saved evidence is evaluated automatically.")
+    try:
+        declarations = read_inventory(identity_inventory) if identity_inventory is not None else None
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from None
     if accounts is not None and not organization:
         raise typer.BadParameter("--accounts requires scan organization.")
+    if ous is not None and not organization:
+        raise typer.BadParameter("--ous requires scan organization.")
     try:
         selected_checks = parse_check_selection(checks)
         selected_accounts = parse_account_selection(accounts)
+        selected_ous = parse_ou_selection(ous)
+        selected_resources = parse_resource_selection(resources)
     except ValueError as error:
         raise typer.BadParameter(str(error)) from None
     selection_options = ({"selected_checks": selected_checks} if selected_checks is not None else {})
+    if selected_resources is not None:
+        selection_options["selected_resources"] = selected_resources
     if region is not None and regions is not None:
         raise typer.BadParameter("Choose either --region or --regions.")
     selected_regions = None
@@ -272,6 +306,15 @@ def scan(
     except ValueError:
         raise typer.BadParameter("Unsupported service selection.", param_hint="--services") from None
     started = perf_counter()
+    if identity_governance and not offline and "iam" not in selected:
+        raise typer.BadParameter("--identity-governance requires iam in --services.")
+    identity_options = IdentityOptions(inventory=declarations, events=identity_events, ai_services=identity_ai_services,
+                                       analyzers=identity_analyzers, days=identity_days, max_pages=identity_max_pages,
+                                       max_seconds=identity_max_seconds, regions=tuple(selected_regions or ([region] if region else []))) if identity_governance else None
+    if offline and identity_governance:
+        selection_options["identity_governance"] = True
+        if declarations is not None:
+            selection_options["identity_inventory"] = declarations
     if selected_checks is not None:
         services_by_check = {identifier: owner for identifier, owner, _ in check_catalog()}
         if any(services_by_check[identifier] not in selected for identifier in selected_checks):
@@ -282,6 +325,8 @@ def scan(
         with scan_activity(enabled=not no_progress, show_banner=not no_banner, verbose=verbose) as activity:
             if organization:
                 context = create_scan_context(profile=profile, role=role, **region_options, **extra_options)
+                if identity_options is not None:
+                    context = replace(context, identity_options=identity_options)
                 activity("Discovering accounts", 0, 1)
                 def account_progress(stage: str, completed: int, total: int) -> None:
                     activity(stage, completed + 1 if completed else 0, total + 1)
@@ -290,6 +335,7 @@ def scan(
                     role_session_name, progress=account_progress,
                     **selection_options,
                     **({"selected_accounts": selected_accounts} if selected_accounts is not None else {}),
+                    **({"selected_ous": selected_ous} if selected_ous is not None else {}),
                     **({"regions": selected_regions} if selected_regions is not None else {}),
                     **({"snapshot_sink": sink} if sink is not None else {}),
                 )
@@ -307,6 +353,8 @@ def scan(
             else:
                 activity("Connecting to AWS", 0, work_total)
                 context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id, **region_options, **extra_options)
+                if identity_options is not None:
+                    context = replace(context, identity_options=identity_options)
                 activity("Collecting AWS resources", 1, work_total)
                 def service_progress(stage: str, completed: int, total: int) -> None:
                     activity(stage, completed + 1, total + 2)

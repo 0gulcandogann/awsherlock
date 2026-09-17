@@ -13,6 +13,10 @@ class S3PublicAccessRule:
         if "public_access_block" not in resource.data:
             raise ValueError("S3 public access block facts were not collected")
         configuration = resource.data["public_access_block"]
+        account_known = "account_public_access_block" in resource.data
+        account = resource.data.get("account_public_access_block")
+        if account_known:
+            validate_fact("account_public_access_block", account)
         keys = ("BlockPublicAcls", "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets")
         if configuration is not None:
             if not isinstance(configuration, dict) or any(type(configuration.get(key)) is not bool for key in keys):
@@ -25,9 +29,13 @@ class S3PublicAccessRule:
                         "This is potential exposure, not confirmation of public access.",
             severity=Severity.MEDIUM, service="s3", account_id=resource.account_id,
             region=resource.region, resource_id=resource.resource_id, resource_arn=resource.resource_arn,
-            evidence={"public_access_block": configuration, "scope": "bucket"},
-            risk="Public policies or ACLs may expose data. Account-level controls may still block access; "
-                 "effective access and account-level settings were not evaluated.",
+            evidence={"public_access_block": configuration, "scope": "bucket",
+                      "account_context": "known" if account_known else "unknown",
+                      **({"account_public_access_block": account,
+                          "combined_public_access_block": {key: bool((configuration or {}).get(key) or (account or {}).get(key)) for key in keys}}
+                         if account_known else {})},
+            risk="Public policies or ACLs may expose data. Known account controls are shown in evidence "
+                 "and may still block access; effective anonymous access was not evaluated.",
             remediation="Review intended access and enable all four bucket Block Public Access settings.",
             references=["https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"],
         )]

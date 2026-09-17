@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from awsherlock.models import Finding, Resource, Severity
+from awsherlock.rules.identity import IDENTITY_RULES
 
 
 @dataclass(frozen=True)
@@ -54,3 +55,5 @@ IAM_RULES = (
     IAMRule(5, "key_age", "Active access key is older than 90 days", "Prefer temporary credentials; rotate required long-lived keys."),
     IAMRule(6, "key_stale", "Active access key is potentially stale", "Review keys unused for over 90 days and disable unnecessary credentials."),
 )
+
+IAM_RULES += IDENTITY_RULES

@@ -9,7 +9,7 @@ import json
 from awsherlock import __version__
 from awsherlock.aws.context import ScanContext
 from awsherlock.aws.session import validate_region
-from awsherlock.evaluation import Report, evaluate_snapshot
+from awsherlock.evaluation import Report, evaluate_snapshot, finalize_resource_selection
 from awsherlock.snapshot import Snapshot, SnapshotError, capture_snapshot
 from awsherlock.catalog import check_catalog
 
@@ -36,7 +36,9 @@ def collection_scopes(services: list[str], regions: list[str]) -> list[tuple[str
 def scan_regions(context: ScanContext, services: list[str], regions: list[str], *,
                  progress: Callable[[str, int, int], None] | None = None,
                  snapshot_sink: SnapshotSink | None = None,
-                 selected_checks: list[str] | None = None) -> Report:
+                 selected_checks: list[str] | None = None,
+                 selected_resources: list[str] | None = None,
+                 report_unmatched: bool = True) -> Report:
     """Collect global services once and label every regional coverage entry."""
     # One cache per orchestration, never retained on the caller's context.
     context = replace(context, trail_status_cache={}, trail_selector_cache={})
@@ -49,6 +51,9 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
     seen_findings: set[str] = set()
     if selected_checks is not None:
         report.metadata["selected_checks"] = list(selected_checks)
+    matched_resources = set()
+    if selected_resources is not None:
+        report.metadata["selected_resources"] = list(selected_resources)
     for region, selected in scopes:
         label = region or "global-bucket"
         target = replace(context, region=region) if region is not None else context
@@ -65,7 +70,10 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
             scope_ids = {identifier for identifier, service, _ in check_catalog() if service in selected}
             scope_checks = ([identifier for identifier in selected_checks if identifier in scope_ids]
                             if selected_checks is not None else None)
-            result = evaluate_snapshot(snapshot, **({"selected_checks": scope_checks} if scope_checks is not None else {}))
+            result = evaluate_snapshot(snapshot, **({"selected_checks": scope_checks} if scope_checks is not None else {}),
+                                       **({"selected_resources": selected_resources, "report_unmatched": False} if selected_resources is not None else {}))
+            matched_resources.update(result.metadata.get("matched_resource_selectors", []))
+            report.identities.extend(result.identities)
             entries = result.coverage
             for entry in entries:
                 entry["findings"] = 0
@@ -91,4 +99,8 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
             progress(f"{label} finished", finished, total)
     if progress is not None:
         progress("Regions evaluated", total, total)
+    if selected_resources is not None:
+        report.metadata["matched_resource_selectors"] = sorted(matched_resources)
+        if report_unmatched:
+            finalize_resource_selection(report)
     return report

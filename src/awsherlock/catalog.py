@@ -19,8 +19,9 @@ _S3_REMEDIATION = {
 }
 _EC2_REMEDIATION = "Restrict ingress and public addressing; require IMDSv2 and use encrypted EBS volumes as applicable."
 _SCOPES = {
-    "iam": "Global IAM configuration; effective permissions are not simulated.",
-    "s3": "Bucket configuration; account-level controls and effective anonymous access are not evaluated.",
+    "iam": "Global IAM policy indicators and opt-in role/user governance; declarations and observed callers are separate evidence. Effective permissions are not simulated.",
+    "s3": "Bucket configuration with known account Block Public Access context; effective anonymous access is not evaluated.",
+    "cloudtrail": "Regional trail indicators; supported source exclusions are reported. Full API logging, delivery and retention are not established.",
     "ec2": "Regional configuration; network routes, NACLs and application controls are not evaluated.",
 }
 

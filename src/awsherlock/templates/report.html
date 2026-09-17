@@ -73,6 +73,11 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 {% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b><span class="severity-track"><i class="{{ severity }}" style="--width: {{ (count / report.summary.findings * 100) | round(0) if report.summary.findings else 0 }}%"></i></span></div>{% endfor %}
 </div></section>
 <section aria-labelledby="findings-title"><h2 id="findings-title">Findings</h2>
+{% if report.identities is defined %}<section class="panel" aria-labelledby="identities-title"><h2 id="identities-title">Identity governance</h2>
+<p class="muted">AI declarations, workload bindings, configured trust and observed callers are separate evidence. Unknown attribution does not establish approval or safety.</p>
+<div class="table-wrap"><table><thead><tr><th>Account / identity</th><th>AI attribution</th><th>Approval</th><th>Observed connection</th><th>Evidence</th></tr></thead><tbody>
+{% for identity in report.identities %}<tr><td>{{ identity.account_id }}<br>{{ identity.name }}<br><span class="muted">{{ identity.type }} / {{ identity.evaluation_scope }}</span></td><td>{{ identity.ai_attribution }}<br><span class="muted">{{ identity.classification_source }}</span>{% if identity.shared_declared %}<br>Shared identity declared; individual actor unresolved{% endif %}</td><td>{{ identity.approval_status }}</td><td>{{ identity.observed_mechanisms | join(', ') or 'Unknown / not observed' }}</td><td><details><summary>Review identity evidence</summary><pre>{{ identity | tojson(indent=2) }}</pre></details></td></tr>{% endfor %}
+</tbody></table></div></section>{% endif %}
 <div class="panel filter-panel" aria-label="Finding filters">
 <div class="filters">
 <label class="search-label" for="search">Search findings<input id="search" type="search" placeholder="Finding ID, resource, evidence…" autocomplete="off"></label>

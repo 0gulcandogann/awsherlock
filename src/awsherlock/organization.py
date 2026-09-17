@@ -10,10 +10,42 @@ from awsherlock import __version__
 from awsherlock.aws.context import ScanContext
 from awsherlock.aws.session import SessionError, create_scan_context
 from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, error_message, items, text_field
-from awsherlock.evaluation import Report, evaluate_snapshot
+from awsherlock.evaluation import Report, evaluate_snapshot, finalize_resource_selection
 from awsherlock.coverage import coverage_status
 from awsherlock.snapshot import SnapshotError, capture_snapshot
 from awsherlock.regional import SnapshotSink, collection_scopes, scan_regions
+from awsherlock.selection import parse_ou_selection
+
+
+def discover_ou_accounts(client, selected_ous: list[str]) -> set[str]:
+    """Read descendants with SDK pagination; any failed branch invalidates selection."""
+    pending = list(selected_ous)
+    visited = set()
+    members = set()
+    while pending:
+        parent = pending.pop()
+        if parent in visited:
+            continue
+        visited.add(parent)
+        for kind in ("ACCOUNT", "ORGANIZATIONAL_UNIT"):
+            for page in client.get_paginator("list_children").paginate(ParentId=parent, ChildType=kind):
+                for child in items(page, "Children"):
+                    if not isinstance(child, dict) or child.get("Type") != kind:
+                        raise InvalidResponse()
+                    identifier = child.get("Id")
+                    if not isinstance(identifier, str):
+                        raise InvalidResponse()
+                    if kind == "ACCOUNT":
+                        if not re.fullmatch(r"[0-9]{12}", identifier):
+                            raise InvalidResponse()
+                        members.add(identifier)
+                    else:
+                        try:
+                            parse_ou_selection(identifier)
+                        except ValueError:
+                            raise InvalidResponse() from None
+                        pending.append(identifier)
+    return members
 
 
 def scan_organization(source: ScanContext, services: list[str], role_name: str = "AWSherlockAuditRole",
@@ -22,17 +54,27 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                       regions: list[str] | None = None,
                       snapshot_sink: SnapshotSink | None = None,
                       selected_checks: list[str] | None = None,
-                      selected_accounts: list[str] | None = None) -> Report:
+                      selected_accounts: list[str] | None = None,
+                      selected_ous: list[str] | None = None,
+                      selected_resources: list[str] | None = None) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
                      "account_id": source.account_id, "region": source.region, "version": __version__,
                      "mode": "organization", "accounts": []}, [], [])
     accounts = report.metadata["accounts"]
+    matched_resources = set()
+    if selected_resources is not None:
+        report.metadata["selected_resources"] = list(selected_resources)
+    resource_options = ({"selected_resources": selected_resources, "report_unmatched": False}
+                        if selected_resources is not None else {})
     if selected_checks is not None:
         report.metadata["selected_checks"] = list(selected_checks)
     if selected_accounts is not None:
         report.metadata["selected_accounts"] = list(selected_accounts)
+    if selected_ous is not None:
+        parse_ou_selection(",".join(selected_ous))
+        report.metadata["selected_ous"] = list(selected_ous)
     if regions is not None:
         report.metadata.update(region=None, regions=regions)
     def account_failures(account_id: str, operation: str, message: str,
@@ -61,6 +103,14 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 accounts.append(account)
     except AWS_ERRORS as error:
         report.coverage.append(failed_coverage(source.account_id, "organizations", "ListAccounts", error_message(error)))
+    ou_members = None
+    if selected_ous is not None:
+        try:
+            ou_members = discover_ou_accounts(source.client("organizations"), selected_ous)
+            for account_id in sorted(ou_members - seen):
+                account_failures(account_id, "OUSelection", "OU member was not discovered by ListAccounts", "NOT_SCANNED")
+        except AWS_ERRORS as error:
+            report.coverage.append(failed_coverage(source.account_id, "organizations", "ListChildren", error_message(error)))
     if progress is not None:
         progress("Accounts discovered", 1, len(accounts) + 2)
     for index, account in enumerate(accounts):
@@ -72,6 +122,10 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             account_failures(account_id, "AccountSelection", "Account excluded by --accounts", "NOT_SCANNED")
             if progress is not None:
                 progress(f"Account {account_id} excluded", index + 2, len(accounts) + 2)
+            continue
+        if selected_ous is not None and (ou_members is None or account_id not in ou_members):
+            account["scan_status"] = "NOT_SCANNED"
+            account_failures(account_id, "OUSelection", "OU membership could not be verified" if ou_members is None else "Account excluded by --ous", "NOT_SCANNED")
             continue
         if account["state"] != "ACTIVE":
             account["scan_status"] = "NOT_SCANNED"
@@ -86,14 +140,17 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                                           **({"client_config": source.client_config} if source.client_config is not None else {}))
             if source.measurements is not None:
                 context = replace(context, measurements=source.measurements)
+            if source.identity_options is not None:
+                context = replace(context, identity_options=source.identity_options, region=source.region)
             if regions is not None:
                 result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
+                                      **resource_options,
                                       **({"selected_checks": selected_checks} if selected_checks is not None else {}))
             else:
                 snapshot = capture_snapshot(context, services)
                 if snapshot_sink is not None:
                     snapshot_sink(snapshot, context.region or "global")
-                result = evaluate_snapshot(snapshot, **({"selected_checks": selected_checks} if selected_checks is not None else {}))
+                result = evaluate_snapshot(snapshot, **resource_options, **({"selected_checks": selected_checks} if selected_checks is not None else {}))
         except (SessionError, SnapshotError) as error:
             account["scan_status"] = coverage_status([{"message": str(error)}], 0, 0)
             operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"
@@ -102,6 +159,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 progress(f"Account {account_id} unavailable", index + 2, len(accounts) + 2)
             continue
         report.findings.extend(result.findings)
+        report.identities.extend(result.identities)
+        matched_resources.update(result.metadata.get("matched_resource_selectors", []))
         report.coverage.extend(result.coverage)
         account["scan_status"] = "PARTIAL" if result.incomplete else "COMPLETE"
         if progress is not None:
@@ -112,6 +171,9 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
         for account_id in selected_accounts:
             if account_id not in seen:
                 account_failures(account_id, "AccountSelection", "Selected account was not discovered", "NOT_SCANNED")
+    if selected_resources is not None:
+        report.metadata["matched_resource_selectors"] = sorted(matched_resources)
+        finalize_resource_selection(report)
     return report
 
 

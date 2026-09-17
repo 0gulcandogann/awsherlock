@@ -74,6 +74,8 @@ def _user_credentials(client: Any, context: ScanContext, user: Resource,
 def collect_iam(context: ScanContext, *, now: datetime | None = None) -> CollectionResult:
     now = now or datetime.now(timezone.utc)
     result = CollectionResult()
+    raw_entries = {}
+    client = None
     try:
         client = context.client("iam")
         pages = client.get_paginator("get_account_authorization_details").paginate()
@@ -98,6 +100,8 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
                         arn = text_field(entry.get("Arn"))
                         resource = _resource(context, kind, name, arn, {})
                         result.resources.append(resource)
+                        if kind in {"role", "user"}:
+                            raw_entries[(kind, name)] = entry
                         try:
                             if kind != "policy":
                                 resource.data["attached"] = [text_field(p.get("PolicyArn")) if isinstance(p, dict) else text_field(None)
@@ -123,4 +127,8 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
                         result.issues.append(CollectionIssue(name, "AuthorizationDetails", error_message(error)))
     except AWS_ERRORS as error:
         result.issues.append(CollectionIssue(None, "GetAccountAuthorizationDetails", error_message(error)))
+    if context.identity_options is not None:
+        from awsherlock.collectors.identity import enrich_identities
+        if client is not None:
+            enrich_identities(context, result, raw_entries, now, client)
     return result

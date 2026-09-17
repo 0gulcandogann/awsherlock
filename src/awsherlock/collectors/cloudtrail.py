@@ -3,7 +3,7 @@
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.common import AWS_ERRORS, CollectionIssue, CollectionResult, InvalidResponse, collect_fact, error_message, items, text_field
 from awsherlock.models import Resource
-from awsherlock.cloudtrail_facts import management_events
+from awsherlock.cloudtrail_facts import management_context
 
 
 def collect_cloudtrail(context: ScanContext) -> CollectionResult:
@@ -61,10 +61,11 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                     if cached is None:
                         if home not in clients:
                             clients[home] = context.client("cloudtrail", region_name=home)
-                        cached = management_events(clients[home].get_event_selectors(TrailName=arn))
+                        cached = management_context(clients[home].get_event_selectors(TrailName=arn))
                         if cache is not None:
                             cache[key] = cached
-                    return cached
+                    resource.data["management_excluded_sources"] = list(cached["management_excluded_sources"])
+                    return cached["management_events"]
                 collect_fact(result, resource, "management_events", "GetEventSelectors", selectors)
                 if all(fact in resource.data for fact in ("trail_status", "trail_settings", "management_events")):
                     status_data = resource.data["trail_status"]

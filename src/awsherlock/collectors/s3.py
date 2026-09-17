@@ -106,6 +106,8 @@ def collect_s3(context: ScanContext) -> S3Collection:
     result = S3Collection()
     seen: set[str] = set()
     clients = {}
+    account_facts: dict[str, JSONValue] = {}
+    account_read = False
     try:
         client = context.client("s3")
         pages = client.get_paginator("list_buckets").paginate(PaginationConfig={"PageSize": 1000})
@@ -120,6 +122,18 @@ def collect_s3(context: ScanContext) -> S3Collection:
                 if name in seen:
                     continue
                 seen.add(name)
+                if not account_read:
+                    account_read = True
+                    try:
+                        response = context.client("s3control").get_public_access_block(AccountId=context.account_id)
+                        account_facts["account_public_access_block"] = _normalize("public_access_block", response)
+                    except ClientError as error:
+                        if error.response.get("Error", {}).get("Code") == "NoSuchPublicAccessBlockConfiguration":
+                            account_facts["account_public_access_block"] = None
+                        else:
+                            result.issues.append(CollectionIssue(None, "GetAccountPublicAccessBlock", _message(error)))
+                    except (BotoCoreError, InvalidResponse) as error:
+                        result.issues.append(CollectionIssue(None, "GetAccountPublicAccessBlock", _message(error)))
                 operation = "GetBucketLocation"
                 try:
                     location = client.get_bucket_location(Bucket=name, ExpectedBucketOwner=context.account_id)
@@ -135,7 +149,7 @@ def collect_s3(context: ScanContext) -> S3Collection:
                     result.resources.append(Resource(
                         service="s3", resource_type="bucket", account_id=context.account_id,
                         region=region, resource_id=name, resource_arn=f"arn:{context.partition}:s3:::{name}",
-                        data=_bucket_facts(clients[region], name, context.account_id, result),
+                        data={**_bucket_facts(clients[region], name, context.account_id, result), **account_facts},
                     ))
                 except (ClientError, BotoCoreError, InvalidResponse) as error:
                     result.issues.append(CollectionIssue(name, operation, _message(error)))

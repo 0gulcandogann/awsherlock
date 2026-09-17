@@ -84,6 +84,17 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
         for account in accounts:
             table.add_row(*(Text(terminal_text(str(account[key]))) for key in ("account_id", "name", "state", "scan_status")))
         console.print(table)
+    if report.identities:
+        table = Table(title="Identity governance", box=box.SIMPLE, expand=True,
+                      title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}")
+        for label in ("Account / identity", "AI attribution", "Approval", "Observed connection", "Scope"):
+            table.add_column(label)
+        for identity in report.identities:
+            values = (identity["account_id"] + " / " + identity["name"], identity["ai_attribution"],
+                      identity["approval_status"], ", ".join(identity["observed_mechanisms"]) or "unknown / not observed",
+                      identity["evaluation_scope"])
+            table.add_row(*(Text(terminal_text(value)) for value in values))
+        console.print(table)
     coverage = Table(title="Scan coverage", box=box.SIMPLE, expand=True,
                      title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}", style=CYAN)
     multi_region = "regions" in report.metadata
@@ -114,10 +125,10 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
         console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
-        has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection"} for _, issue in issues)
+        has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection"} for _, issue in issues)
         errors.print("Scan issues and exclusions" if has_exclusions else "Collection issues", style=f"bold {RED}")
         for entry, issue in issues:
-            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection"} else "ERROR"
+            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection", "AccountPublicAccessContext"} else "ERROR"
             message = Text(f"{label} {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
                            f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style=RED)
             if multi_region:

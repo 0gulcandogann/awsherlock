@@ -6,6 +6,7 @@ from boto3.session import Session
 from botocore.config import Config
 from botocore.client import BaseClient
 from awsherlock.measurement import ScanMeasurements
+from awsherlock.identity_config import IdentityOptions
 
 
 @dataclass(frozen=True)
@@ -19,10 +20,11 @@ class ScanContext:
     region: str | None
     session: Session = field(repr=False, compare=False)
     client_config: Config | None = field(default=None, repr=False, compare=False)
+    identity_options: IdentityOptions | None = field(default=None, repr=False, compare=False)
     measurements: ScanMeasurements | None = field(default=None, repr=False, compare=False)
     trail_status_cache: dict[tuple[str, str, str, str], dict[str, bool]] | None = field(
         default=None, repr=False, compare=False)
-    trail_selector_cache: dict[tuple[str, str, str, str], bool] | None = field(
+    trail_selector_cache: dict[tuple[str, str, str, str], dict] | None = field(
         default=None, repr=False, compare=False)
 
     def client(self, service_name: str, **options: object) -> BaseClient:

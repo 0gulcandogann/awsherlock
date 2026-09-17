@@ -18,7 +18,7 @@ from awsherlock.fact_validation import validate_resource_facts
 
 SCHEMA_VERSION = 1
 FACTS = {
-    ("s3", "bucket"): {"public_access_block", "encryption", "versioning", "logging", "policy_public"},
+    ("s3", "bucket"): {"public_access_block", "account_public_access_block", "encryption", "versioning", "logging", "policy_public"},
     ("iam", "user"): {"attached", "statements", "console_mfa"},
     **{("iam", kind): {"attached", "statements"} for kind in ("role", "group")},
     ("iam", "policy"): {"statements"},
@@ -26,10 +26,14 @@ FACTS = {
     ("ec2", "security-group"): {"ingress"}, ("ec2", "instance"): {"metadata", "addresses"}, ("ec2", "volume"): {"encrypted"},
     ("lambda", "function"): {"urls", "runtime", "role_policies"},
     ("secretsmanager", "secret"): {"rotation", "policy", "encryption"},
-    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events"},
+    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events", "management_excluded_sources"},
     ("cloudtrail", "regional_summary"): {"usable_trail"},
     ("kms", "key"): {"rotation", "policy"},
 }
+IDENTITY_COMMON = {"identity_requested", "identity_profile", "identity_approval", "identity_policy_context",
+                   "identity_bindings", "identity_activity", "identity_analyzer_findings"}
+FACTS[("iam", "role")] |= IDENTITY_COMMON | {"identity_trust", "identity_usage"}
+FACTS[("iam", "user")] |= IDENTITY_COMMON
 FORBIDDEN = {"session", "credentials", "accesskeyid", "awsaccesskeyid", "secretaccesskey", "awssecretaccesskey",
              "sessiontoken", "awssessiontoken", "secretstring", "secretbinary", "privatekey", "password", "environment", "variables"}
 
