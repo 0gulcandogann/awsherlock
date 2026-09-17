@@ -68,6 +68,7 @@ def field(label: str, value: str) -> None:
 def configure_typer_styles() -> None:
     """Configure Typer's Rich style constants once when constructing our CLI."""
     from typer import rich_utils
+    rich_utils.OPTIONS_PANEL_TITLE = "[bold #c7a4e8]Options[/]"
     styles = {
         "STYLE_OPTION": f"bold {CYAN}", "STYLE_SWITCH": f"bold {GREEN}",
         "STYLE_NEGATIVE_OPTION": f"bold {ORANGE}", "STYLE_NEGATIVE_SWITCH": f"bold {ORANGE}",

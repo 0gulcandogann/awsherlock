@@ -3,39 +3,13 @@
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
-from rich.progress import Progress, ProgressColumn, SpinnerColumn, Task, TaskProgressColumn, TextColumn, TimeElapsedColumn
+from rich.progress import Progress, ProgressColumn, Task, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.text import Text
 
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.terminal import CYAN, GREEN, ORANGE, YELLOW, Console, COLOR_MODE
 
 ProgressCallback = Callable[[str, int, int], None]
-
-
-@contextmanager
-def update_activity() -> Iterator[tuple[Callable[[str], None], bool]]:
-    """Animate real update work without inventing download percentages."""
-    console = Console(stderr=True)
-    interactive = console.is_terminal and not console.is_dumb_terminal
-    if COLOR_MODE.get() == "always" and not getattr(console.file, "isatty", lambda: False)():
-        interactive = False
-    with Progress(
-        SpinnerColumn(spinner_name="line", style=ORANGE),
-        TextColumn("{task.description}", style=CYAN),
-        PaletteElapsedColumn(),
-        console=console,
-        disable=not interactive,
-        transient=True,
-        refresh_per_second=10,
-        redirect_stdout=False,
-        redirect_stderr=False,
-    ) as progress:
-        task = progress.add_task("Preparing update", total=None)
-
-        def stage(description: str) -> None:
-            progress.update(task, description=terminal_text(description), refresh=interactive)
-
-        yield stage, interactive
 
 
 class ASCIIBarColumn(ProgressColumn):

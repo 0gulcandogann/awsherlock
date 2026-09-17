@@ -845,7 +845,7 @@ awsherlock --version
 
 Reinstalling from the updated clone also picks up changes that keep the same version number. If `awsherlock --update` does not refresh a clone-based pipx install, use the platform-specific commands above. Run update as a standalone command, without `scan` or other top-level actions. These instructions also appear in `awsherlock --help` and when running `awsherlock` without arguments.
 
-In an interactive terminal, `--update` shows a portable spinner, the current installer attempt and elapsed time. Installer output stays hidden while the animation runs; the line clears before the final result. Redirected output and dumb terminals keep ordinary installer logs without animation. Ctrl+C stops the animation and exits with code 130.
+`--update` displays the installer logs directly. Ctrl+C cancels the update with exit code 130. The Quick start examples in `awsherlock --help` and the bare command are displayed in a bordered command/description table.
 
 The updater forces reinstallation so GitHub main changes are installed even when the package version stays the same. Older installed updaters can report success while leaving the old code in place. For Linux installs created by `install.sh`, refresh that updater once:
 
