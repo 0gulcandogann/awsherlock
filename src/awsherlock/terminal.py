@@ -12,6 +12,10 @@ GREEN = "#9dff7a"
 YELLOW = "#ffd369"
 RED = "#ff0000"
 CYAN = "#5bfcfc"
+LIGHT_PURPLE = "#c7a4e8"
+LIGHT_BLUE = "#8be9fd"
+PINK = "#ff9de2"
+SOFT_BLUE = "#b8c0ff"
 COLOR_MODE: ContextVar[str] = ContextVar("awsherlock_color_mode", default="auto")
 
 
@@ -68,14 +72,14 @@ def field(label: str, value: str) -> None:
 def configure_typer_styles() -> None:
     """Configure Typer's Rich style constants once when constructing our CLI."""
     from typer import rich_utils
-    rich_utils.OPTIONS_PANEL_TITLE = "[bold #c7a4e8]Options[/]"
-    rich_utils.COMMANDS_PANEL_TITLE = "[bold #c7a4e8]Commands[/]"
+    rich_utils.OPTIONS_PANEL_TITLE = f"[bold {LIGHT_PURPLE}]Options[/]"
+    rich_utils.COMMANDS_PANEL_TITLE = f"[bold {LIGHT_BLUE}]Commands[/]"
     styles = {
         "STYLE_OPTION": f"bold {CYAN}", "STYLE_SWITCH": f"bold {GREEN}",
         "STYLE_NEGATIVE_OPTION": f"bold {ORANGE}", "STYLE_NEGATIVE_SWITCH": f"bold {ORANGE}",
-        "STYLE_TYPES": YELLOW, "STYLE_USAGE": ORANGE, "STYLE_USAGE_COMMAND": f"bold {CYAN}",
-        "STYLE_HELPTEXT_FIRST_LINE": CYAN, "STYLE_HELPTEXT": CYAN,
-        "STYLE_OPTION_HELP": CYAN, "STYLE_OPTION_DEFAULT": YELLOW,
+        "STYLE_TYPES": YELLOW, "STYLE_USAGE": ORANGE, "STYLE_USAGE_COMMAND": f"bold {PINK}",
+        "STYLE_HELPTEXT_FIRST_LINE": CYAN, "STYLE_HELPTEXT": SOFT_BLUE,
+        "STYLE_OPTION_HELP": LIGHT_BLUE, "STYLE_OPTION_DEFAULT": YELLOW,
         "STYLE_OPTION_ENVVAR": YELLOW, "STYLE_REQUIRED_SHORT": RED, "STYLE_REQUIRED_LONG": RED,
         "STYLE_OPTIONS_PANEL_BORDER": PURPLE, "STYLE_COMMANDS_PANEL_BORDER": PURPLE,
         "STYLE_COMMANDS_TABLE_FIRST_COLUMN": f"bold {GREEN}",
