@@ -126,9 +126,11 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
         has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection"} for _, issue in issues)
-        errors.print("Scan issues and exclusions" if has_exclusions else "Collection issues", style=f"bold {RED}")
+        has_missing_facts = any(issue["operation"] == "RequiredFact" for _, issue in issues)
+        errors.print("Scan issues and exclusions" if has_exclusions else "Scan issues" if has_missing_facts else "Collection issues",
+                     style=f"bold {RED}")
         for entry, issue in issues:
-            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection", "AccountPublicAccessContext"} else "ERROR"
+            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection", "AccountPublicAccessContext", "RequiredFact"} else "ERROR"
             message = Text(f"{label} {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
                            f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style=RED)
             if multi_region:

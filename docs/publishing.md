@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.1.10 is published on [PyPI](https://pypi.org/project/awsherlock/0.1.10/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.1.10/). Preserve these immutable files. The next automated release must use a new version, for example 0.1.11.
+AWSherlock 0.1.10 is published on [PyPI](https://pypi.org/project/awsherlock/0.1.10/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.1.10/). Preserve these immutable files. The prepared next candidate is 0.1.15; do not create its Git tag until `MILESTONES.md` records COMPLETE and the owner authorizes release.
 
 ## One-time Trusted Publishing setup
 
@@ -29,7 +29,7 @@ CI runs committed package smoke checks, not the ignored local full scanner test 
 
 1. Update `__version__` in `src/awsherlock/__init__.py`, update release documentation, and commit the exact source intended for release. Run relevant local tests.
 2. Push that commit to `main`.
-3. Create and push its matching stable tag, for example `v0.1.11` for package version `0.1.11`.
+3. Create and push its matching stable tag, for example `v0.1.15` for package version `0.1.15`, only after the release gate and owner authorization.
 4. Check that all **Publish Python package** jobs pass.
 
 Tag pushes matching `v*` trigger the workflow; only exact `vX.Y.Z` tags matching the source version pass validation. Prerelease tags are intentionally unsupported. Package source is checked out at the event's tagged commit. Pushing a normal `main` commit does not publish.

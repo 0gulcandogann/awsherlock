@@ -119,6 +119,21 @@ buckets are inspected in their own regions. Regions are not automatically discov
 
 Your identity needs permission to read the configuration being inspected. See [checks and required permissions](#checks-and-permissions) before assigning access to an audit role. AWSherlock does not create roles or attach policies for you.
 
+### Preview a scan
+
+```bash
+awsherlock scan --preview --profile production --services iam,s3
+awsherlock scan organization --preview --accounts 123456789012
+awsherlock scan facts.json --preview
+```
+
+The preview validates local options and shows targets, services, evaluation-only
+check/resource selectors, and intended report/snapshot destinations. Live identity,
+credentials and organization membership remain unverified; no AWS calls, resource
+collection, rule evaluation or output files occur. Offline preview reads snapshot
+metadata and checks requested services/checks locally. Preview prints a text plan
+even when `--output json` or `html` is selected; it never writes those reports.
+
 ### Choose services
 
 A plain scan selects all seven supported services. To limit the scan, pass a comma-separated list:
@@ -352,6 +367,7 @@ member accounts, or pass a normalized JSON file for offline evaluation.
 | `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
 | `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
 | `--resources LIST` | All discovered resources | Evaluate exact comma-separated resource IDs or ARNs, case-sensitive; collection/saved snapshots remain unchanged. No wildcards or tags. Exclusions and unmatched selectors remain visible; works offline. |
+| `--preview` | Off | Validate and print a local scan plan without AWS calls, rule evaluation or output files. Offline mode reads snapshot metadata. Identity and organization membership remain unverified. |
 | `--identity-governance` | Off | Collect IAM role/user ownership, purpose, trust, usage and joined policy evidence, plus regional Lambda/EC2 role bindings. Live scans require IAM in `--services`; offline scans expose missing facts. Saved governance evidence is evaluated automatically. |
 | `--identity-inventory FILE` | Not supplied | Version-1 exact ARN declarations/approvals; requires `--identity-governance`. Works live/offline. Missing, partial or out-of-scope approval evidence remains unknown. |
 | `--identity-events` | Off | Live opt-in regional CloudTrail management-event attribution, including role chains. Requires `--identity-governance`. No raw events or credential identifiers are exported. |
@@ -440,7 +456,7 @@ Snapshot does not accept scan-only `--regions`, `--save-snapshot`, `--role-name`
 
 ## Reading the results
 
-Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource, explains the configuration issue, and gives a remediation suggestion. Collection errors appear in a separate section.
+Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource, explains the configuration issue, and gives a remediation suggestion. Scan issues, including collection errors, appear in a separate section.
 
 Severity describes the reported configuration risk. Coverage tells you whether the scanner had enough information to evaluate the selected checks. Read both before drawing a conclusion from the results.
 
@@ -820,6 +836,10 @@ a positive indicator does not prove all API events are logged.
 Old snapshots remain readable; absent selector facts count as NOT_SCANNED.
 Snapshots with a positive management indicator but no source-exclusion context
 cannot complete `AWSH-CT-004`; coverage remains partial.
+For selected CloudTrail checks, coverage issues name the check ID and missing
+fact. If a related collection issue exists, inspect that operation for denial or
+failure; otherwise the fact is absent from the snapshot. These explanations do
+not add findings or turn unknown facts into a PASS.
 CloudTrail Lake, log contents, actual delivery and every region are not inspected.
 Requires `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus` and
 [`cloudtrail:GetEventSelectors`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_GetEventSelectors.html).
@@ -998,6 +1018,13 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Version 0.1.15 is prepared locally and has not been tagged or published. It
+adds `scan --preview` for an unverified local plan without AWS calls or output
+files, plus per-check CloudTrail missing-fact explanations in coverage issues.
+The published release badge above continues to point to v0.1.10 until the new
+version is verified remotely. No new AWS reads, checks or report format were
+added in this candidate.
 
 Version 0.1.10 adds opt-in NHI/AI identity governance, declarations/approvals,
 bounded audit attribution across five connection branches, metadata-only native

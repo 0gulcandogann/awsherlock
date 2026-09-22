@@ -22,6 +22,7 @@ class RootHelpGroup(TyperGroup):
             ("awsherlock whoami --profile production", "Verify the effective account and principal live."),
             ("awsherlock scan", "Scan with existing AWS credentials."),
             ("awsherlock scan --profile production", "Use your AWS profile."),
+            ("awsherlock scan --preview", "Inspect a local plan without AWS calls."),
             ("awsherlock scan facts.json", "Evaluate saved facts offline."),
             ("awsherlock --describe-check AWSH-CT-001", "Explain a check offline."),
             ("awsherlock --update", "Update from GitHub main; internet required."),

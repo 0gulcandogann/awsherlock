@@ -3,7 +3,7 @@
 from dataclasses import asdict, dataclass, field
 from awsherlock.collectors.common import CollectionIssue
 from awsherlock.engine import evaluate_rules
-from awsherlock.models import Finding, Severity
+from awsherlock.models import Finding, Resource, Severity
 from awsherlock.coverage import coverage_status
 from awsherlock.scanner import service_components
 from awsherlock.snapshot import FACTS, Snapshot
@@ -28,6 +28,19 @@ class Report:
                             "findings": len(self.findings), "checks_evaluated": sum(entry["evaluated"] for entry in self.coverage),
                             "incomplete": self.incomplete,
                             "severity": {severity.value: sum(f.severity == severity for f in self.findings) for severity in Severity}}}
+
+
+def cloudtrail_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                                  collection_issues: list[CollectionIssue]) -> dict:
+    """Explain absent CloudTrail facts without exporting raw collector payloads."""
+    operation = {"management_events": "GetEventSelectors", "management_excluded_sources": "GetEventSelectors",
+                 "trail_settings": "TrailSettings"}.get(fact)
+    failed = any(issue.operation == operation and issue.resource_id in {None, resource.resource_id}
+                 for issue in collection_issues) if operation else bool(collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
 
 
 def finalize_resource_selection(report: Report) -> None:
@@ -104,6 +117,14 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                     continue
                 if fact not in resource.data:
                     missing += 1
+                    if service == "cloudtrail":
+                        issues.append(cloudtrail_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    continue
+                if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True and \
+                        "management_excluded_sources" not in resource.data:
+                    missing += 1
+                    issues.append(cloudtrail_missing_fact_issue(resource, identifier,
+                                                                "management_excluded_sources", collection.issues))
                     continue
                 try:
                     result = evaluate_rules([resource], [rule])
@@ -117,7 +138,7 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                 from awsherlock.identity_reporting import identity_summary
                 identities.append(identity_summary(resource, resource_excluded))
         status = coverage_status(issues, evaluated, missing)
-        if not evaluated and issues and all(issue["operation"] in {"AccountPublicAccessContext", "CheckSelection", "ResourceSelection"} for issue in issues):
+        if not evaluated and issues and all(issue["operation"] in {"AccountPublicAccessContext", "CheckSelection", "ResourceSelection", "RequiredFact"} for issue in issues):
             status = "NOT_SCANNED"
         coverage.append({"account_id": snapshot.metadata.account_id, "service": service, "status": status, "resources": len(collection.resources),
                          "evaluated": evaluated, "not_scanned": missing, "findings": found, "issues": issues})

@@ -229,6 +229,7 @@ def main(
 @app.command(epilog=(
     "[bold #ff7e55]Examples[/]\n\n"
     "[#5bfcfc]awsherlock scan --services iam,s3 --summary-only[/]\n\n"
+    "[#5bfcfc]awsherlock scan --preview --profile production[/]\n\n"
     "[#5bfcfc]awsherlock scan --regions eu-central-1,eu-west-1[/]\n\n"
     "[#5bfcfc]awsherlock scan --save-snapshot facts.json --stats[/]\n\n"
     "[#5bfcfc]awsherlock scan organization --role-name audit/Reader[/]\n\n"
@@ -242,6 +243,7 @@ def main(
     "do not combine with separate timeout flags. Offline scans reject AWS "
     "authentication, regions, request timeouts and --save-snapshot. "
     "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
+    "--preview validates a local plan without AWS calls or output files; identity and organization membership remain unverified. "
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
     "Identity evidence is opt-in; live governance requires IAM and regions for workload/audit reads. "
     "Saved identity facts replay offline. Missing approvals or evidence remain incomplete. "
@@ -284,6 +286,7 @@ def scan(
     accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.")] = None,
     ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.")] = None,
     resources: Annotated[str | None, typer.Option("--resources", help="Evaluate exact comma-separated resource IDs/ARNs; collection is unchanged. Exclusions and unmatched IDs remain visible.")] = None,
+    preview: Annotated[bool, typer.Option("--preview", help="Show the locally validated scan plan without contacting AWS or creating reports.")] = False,
     identity_governance: Annotated[bool, typer.Option("--identity-governance", help="Collect/evaluate IAM role and user governance evidence, including workload role bindings.")] = False,
     identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.")] = None,
     identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.")] = False,
@@ -352,7 +355,6 @@ def scan(
     if save_snapshot is not None and (save_snapshot.exists() or
                                      (report_destination is not None and save_snapshot.resolve() == report_destination.resolve())):
         raise typer.BadParameter("Snapshot destination must be new and different from --report-file.")
-    sink = snapshot_saver(save_snapshot, bundle=organization or selected_regions is not None) if save_snapshot is not None else None
     if role_name is not None and not organization:
         raise typer.BadParameter("--role-name requires scan organization.")
     if snapshot_path is not None and not organization and any(value is not None for value in (profile, role, role_session_name, external_id)):
@@ -375,6 +377,56 @@ def scan(
         services_by_check = {identifier: owner for identifier, owner, _ in check_catalog()}
         if any(services_by_check[identifier] not in selected for identifier in selected_checks):
             raise typer.BadParameter("Selected checks must belong to the --services selection.")
+    if preview:
+        snapshot_metadata = None
+        if offline:
+            try:
+                saved = read_snapshot(snapshot_path)
+                verify_account_id(saved.metadata.account_id, expect_account)
+                if services is not None and any(service not in saved.services for service in selected):
+                    raise SnapshotError("Selected service is absent from the snapshot")
+                if selected_checks is not None and any(services_by_check[identifier] not in saved.services
+                                                       for identifier in selected_checks):
+                    raise SnapshotError("Selected checks are absent from the snapshot")
+                snapshot_metadata = saved.metadata
+            except (SnapshotError, SessionError) as error:
+                message(f"Error: {error}", style=RED, err=True)
+                raise typer.Exit(code=1) from None
+            except OSError:
+                message("Error: Could not read the snapshot file. Check the path.", style=RED, err=True)
+                raise typer.Exit(code=1) from None
+        message("Scan preview: no AWS calls or output files")
+        message(f"Mode: {'organization' if organization else 'offline snapshot' if offline else 'single account'}")
+        if offline:
+            message(f"Snapshot: {snapshot_path}")
+            message(f"Snapshot account: {snapshot_metadata.account_id}")
+            message(f"Snapshot region: {snapshot_metadata.region or 'unknown'}")
+            message("Identity: saved snapshot metadata; no live verification")
+        else:
+            message(f"Profile: {profile or 'SDK default chain (unverified)'}")
+            message(f"Source role: {role or 'none'}")
+            message(f"Expected account: {expect_account or 'not supplied'} (unverified)")
+            message("Identity and credential availability: unverified")
+            message(f"Regions: {', '.join(selected_regions) if selected_regions else region or 'SDK default (unverified)'}")
+            if organization:
+                message(f"Target role: {role_name or 'AWSherlockAuditRole'}")
+                message(f"Requested accounts: {', '.join(selected_accounts) if selected_accounts else 'all discovered accounts (unknown)'}")
+                message(f"Requested OUs: {', '.join(selected_ous) if selected_ous else 'none'}")
+                message("Organization membership and target identities: not discovered")
+        message(f"Services: {', '.join(selected) if services is not None or not offline else ', '.join(saved.services)}")
+        message(f"Checks for evaluation: {', '.join(selected_checks) if selected_checks else 'all available for selected services'}")
+        message(f"Resources for evaluation: {', '.join(selected_resources) if selected_resources else 'all collected resources'}")
+        message("Checks and resources restrict evaluation; collection scope is unchanged.")
+        message(f"Report: {output or 'console'}" + (f" -> {report_destination}" if report_destination else " -> terminal"))
+        message(f"Snapshot destination: {save_snapshot or 'none'} (no file created)")
+        if identity_governance:
+            message("Identity governance: selected; evidence availability unverified")
+        if any(value is not None for value in (connect_timeout, read_timeout, timeout)):
+            message("Request timeouts: configured per SDK request; no overall scan deadline")
+        if external_id is not None:
+            message("External ID: supplied, value hidden")
+        return
+    sink = snapshot_saver(save_snapshot, bundle=organization or selected_regions is not None) if save_snapshot is not None else None
     work_total = (sum(len(names) for _, names in collection_scopes(selected, selected_regions))
                   if selected_regions is not None else len(selected)) + 2
     try:

@@ -144,6 +144,11 @@ def smoke(dist: Path) -> None:
             raise ValueError(f"CLI smoke failed: {args}; exit={result.exit_code}; output={result.output!r}")
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
+        planned = work / "preview.html"
+        result = runner.invoke(app, ["scan", "--preview", "--profile", "synthetic-profile",
+                                     "--output", "html", "--report-file", str(planned)])
+        if result.exit_code != 0 or "Identity and credential availability: unverified" not in result.output or planned.exists():
+            raise ValueError("Local preview smoke failed or created an output file")
         metadata = ScanMetadata(scan_id="release-smoke", started_at=datetime(2026, 9, 17, tzinfo=timezone.utc),
                                 account_id="123456789012", region="us-east-1", version=version)
         bucket = Resource(service="s3", resource_type="bucket", account_id=metadata.account_id,
@@ -153,7 +158,7 @@ def smoke(dist: Path) -> None:
         path = work / "snapshot.json"
         write_snapshot(snapshot, path)
         result = runner.invoke(app, ["scan", str(path), "--output", "json"])
-        if result.exit_code != 1 or not json.loads(result.output)["findings"] or "AccessDenied" not in result.output:
+        if result.exit_code != 1 or not json.loads(result.stdout)["findings"] or "AccessDenied" not in result.stdout:
             raise ValueError("Offline JSON/denial smoke failed")
         output = work / "report.html"
         result = runner.invoke(app, ["scan", str(path), "--output", "html", "--report-file", str(output)])
@@ -161,6 +166,19 @@ def smoke(dist: Path) -> None:
         if result.exit_code != 1 or "Incomplete scan coverage" not in html or "AccessDenied" not in html:
             raise ValueError("Offline HTML/denial smoke failed")
         OfflineAssets().feed(html)
+        trail = Resource(service="cloudtrail", resource_type="trail", account_id=metadata.account_id,
+                         region=metadata.region, resource_id="synthetic-trail", resource_arn=None,
+                         data={"management_events": True})
+        trail_snapshot = Snapshot(metadata, {"cloudtrail": CollectionResult([trail], [])})
+        trail_path = work / "cloudtrail.json"
+        write_snapshot(trail_snapshot, trail_path)
+        result = runner.invoke(app, ["scan", str(trail_path), "--output", "json"])
+        if result.exit_code != 1 or not any(
+            issue["operation"] == "RequiredFact" and
+            "AWSH-CT-004 requires management_excluded_sources" in issue["message"]
+            for entry in json.loads(result.stdout)["coverage"] for issue in entry["issues"]
+        ):
+            raise ValueError("Offline CloudTrail missing-fact smoke failed")
     print(f"PASS: installed {version} CLI, offline JSON/HTML and visible denial coverage")
 
 
