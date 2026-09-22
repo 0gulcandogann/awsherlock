@@ -363,6 +363,10 @@ including `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`, are respected.
 
 Omit `snapshot_path` for a live account scan, use `organization` for discovered
 member accounts, or pass a normalized JSON file for offline evaluation.
+`awsherlock scan --help` groups options by target, selection, identity evidence,
+reports and execution. It works locally without contacting AWS.
+On narrow terminals, Typer may shorten long labels; the table below lists every
+option name in full.
 
 | Option | Default | Usage |
 | --- | --- | --- |

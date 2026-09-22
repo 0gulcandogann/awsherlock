@@ -31,6 +31,7 @@ DEV-TOOL-002.
 | DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Included in released 0.1.15. |
 | DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Included in released 0.1.15. |
 | DEV-TOOL-002 | Opt-in SDK measurement file | COMPLETE | `NOW.md` 2026-09-22 contract; five focused CLI integration tests and 860 full local tests passed. Next larger release batch; no tag assigned. |
+| DEV-CLI-002 | Grouped `scan --help` | COMPLETE | `NOW.md` 2026-09-22 contract; two focused help tests and 862 full local tests passed. Presentation only; does not count toward four substantive features. |
 | STRAT-S-01..04 | Second idea group's strategic themes | PROPOSED | See `AWSHERLOCK_IDEAS.md`; split into bounded contracts before development. |
 
 ## Release tag ledger

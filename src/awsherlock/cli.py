@@ -244,7 +244,7 @@ def main(
     "Use --region OR --regions. --summary-only requires console output. "
     "--report-file requires JSON/HTML. --timeout sets both request limits; "
     "do not combine with separate timeout flags. Offline scans reject AWS "
-    "authentication, regions, request timeouts and --save-snapshot. "
+    "authentication, regions, request timeouts, --save-snapshot and --measurements-file. "
     "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
     "--preview validates a local plan without AWS calls or output files; identity and organization membership remain unverified. "
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
@@ -255,50 +255,50 @@ def main(
 def scan(
     snapshot_path: Annotated[Path | None, typer.Argument(help="Offline snapshot JSON, or 'organization' for multi-account scanning.")] = None,
     profile: Annotated[
-        str | None, typer.Option("--profile", help="Use a named AWS SDK profile.")
+        str | None, typer.Option("--profile", help="Use a named AWS SDK profile.", rich_help_panel="Targets and credentials")
     ] = None,
     role: Annotated[
-        str | None, typer.Option("--role", help="Assume this IAM role before resolving identity.")
+        str | None, typer.Option("--role", help="Assume this IAM role before resolving identity.", rich_help_panel="Targets and credentials")
     ] = None,
     role_session_name: Annotated[
-        str | None, typer.Option("--role-session-name", help="Role session name (default: AWSherlock).")
+        str | None, typer.Option("--role-session-name", help="Role session name (default: AWSherlock).", rich_help_panel="Targets and credentials")
     ] = None,
     external_id: Annotated[
-        str | None, typer.Option("--external-id", help="External ID required by the role trust policy.")
+        str | None, typer.Option("--external-id", help="External ID required by the role trust policy.", rich_help_panel="Targets and credentials")
     ] = None,
     services: Annotated[
-        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms.")
+        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms.", rich_help_panel="Scope and selection")
     ] = None,
-    output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, or html.")] = None,
-    report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.")] = None,
-    role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).")] = None,
-    no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.")] = False,
-    no_banner: Annotated[bool, typer.Option("--no-banner", help="Hide the startup banner while keeping the progress bar.")] = False,
-    verbose: Annotated[bool, typer.Option("--verbose", help="Show sanitized scan stages on stderr; no SDK payloads.")] = False,
-    summary_only: Annotated[bool, typer.Option("--summary-only", help="Console counts and coverage without finding cards.")] = False,
-    region: Annotated[str | None, typer.Option("--region", help="Override the SDK region for live regional services.")] = None,
-    regions: Annotated[str | None, typer.Option("--regions", help="Comma-separated live regions; IAM/S3 run once.")] = None,
-    expect_account: Annotated[str | None, typer.Option("--expect-account", help="Stop if resolved account differs from this 12-digit ID.")] = None,
-    save_snapshot: Annotated[Path | None, typer.Option("--save-snapshot", help="Save a new normalized file, or a new directory for organization/multi-region scans.")] = None,
-    connect_timeout: Annotated[float | None, typer.Option("--connect-timeout", help="Socket connection timeout in seconds, greater than 0 and at most 3600.")] = None,
-    read_timeout: Annotated[float | None, typer.Option("--read-timeout", help="Socket read timeout in seconds, greater than 0 and at most 3600.")] = None,
-    timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts; not an overall scan deadline.")] = None,
-    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
-    stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.")] = False,
-    measurements_file: Annotated[Path | None, typer.Option("--measurements-file", help="Write opt-in SDK invocation and collection timing JSON to a new file; live scans only.")] = None,
-    checks: Annotated[str | None, typer.Option("--checks", help="Evaluate comma-separated check IDs; collection is unchanged and exclusions remain visible.")] = None,
-    accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.")] = None,
-    ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.")] = None,
-    resources: Annotated[str | None, typer.Option("--resources", help="Evaluate exact comma-separated resource IDs/ARNs; collection is unchanged. Exclusions and unmatched IDs remain visible.")] = None,
-    preview: Annotated[bool, typer.Option("--preview", help="Show the locally validated scan plan without contacting AWS or creating reports.")] = False,
-    identity_governance: Annotated[bool, typer.Option("--identity-governance", help="Collect/evaluate IAM role and user governance evidence, including workload role bindings.")] = False,
-    identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.")] = None,
-    identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.")] = False,
-    identity_ai_services: Annotated[bool, typer.Option("--identity-ai-services", help="Read Bedrock/AgentCore execution-role metadata; requires live --identity-governance.")] = False,
-    identity_analyzers: Annotated[bool, typer.Option("--identity-analyzers", help="Read existing Access Analyzer findings; never creates analyzers. Requires live --identity-governance.")] = False,
-    identity_days: Annotated[int, typer.Option("--identity-days", min=1, max=90, help="CloudTrail lookback days (1–90); requires --identity-events.")] = 30,
-    identity_max_pages: Annotated[int, typer.Option("--identity-max-pages", min=1, max=1000, help="Page/read budget per optional evidence collector, across requested regions.")] = 20,
-    identity_max_seconds: Annotated[int, typer.Option("--identity-max-seconds", min=1, max=3600, help="Time budget between evidence requests; in-flight SDK retries/timeouts may exceed it.")] = 60,
+    output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, or html.", rich_help_panel="Reports and measurements")] = None,
+    report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.", rich_help_panel="Reports and measurements")] = None,
+    role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).", rich_help_panel="Targets and credentials")] = None,
+    no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.", rich_help_panel="Execution and display")] = False,
+    no_banner: Annotated[bool, typer.Option("--no-banner", help="Hide the startup banner while keeping the progress bar.", rich_help_panel="Execution and display")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Show sanitized scan stages on stderr; no SDK payloads.", rich_help_panel="Execution and display")] = False,
+    summary_only: Annotated[bool, typer.Option("--summary-only", help="Console counts and coverage without finding cards.", rich_help_panel="Execution and display")] = False,
+    region: Annotated[str | None, typer.Option("--region", help="Override the SDK region for live regional services.", rich_help_panel="Targets and credentials")] = None,
+    regions: Annotated[str | None, typer.Option("--regions", help="Comma-separated live regions; IAM/S3 run once.", rich_help_panel="Targets and credentials")] = None,
+    expect_account: Annotated[str | None, typer.Option("--expect-account", help="Stop if resolved account differs from this 12-digit ID.", rich_help_panel="Targets and credentials")] = None,
+    save_snapshot: Annotated[Path | None, typer.Option("--save-snapshot", help="Save a new normalized file, or a new directory for organization/multi-region scans.", rich_help_panel="Reports and measurements")] = None,
+    connect_timeout: Annotated[float | None, typer.Option("--connect-timeout", help="Socket connection timeout in seconds, greater than 0 and at most 3600.", rich_help_panel="Execution and display")] = None,
+    read_timeout: Annotated[float | None, typer.Option("--read-timeout", help="Socket read timeout in seconds, greater than 0 and at most 3600.", rich_help_panel="Execution and display")] = None,
+    timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts; not an overall scan deadline.", rich_help_panel="Execution and display")] = None,
+    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.", rich_help_panel="Execution and display")] = None,
+    stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.", rich_help_panel="Execution and display")] = False,
+    measurements_file: Annotated[Path | None, typer.Option("--measurements-file", help="Write opt-in SDK invocation and collection timing JSON to a new file; live scans only.", rich_help_panel="Reports and measurements")] = None,
+    checks: Annotated[str | None, typer.Option("--checks", help="Evaluate comma-separated check IDs; collection is unchanged and exclusions remain visible.", rich_help_panel="Scope and selection")] = None,
+    accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.", rich_help_panel="Targets and credentials")] = None,
+    ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.", rich_help_panel="Targets and credentials")] = None,
+    resources: Annotated[str | None, typer.Option("--resources", help="Evaluate exact comma-separated resource IDs/ARNs; collection is unchanged. Exclusions and unmatched IDs remain visible.", rich_help_panel="Scope and selection")] = None,
+    preview: Annotated[bool, typer.Option("--preview", help="Show the locally validated scan plan without contacting AWS or creating reports.", rich_help_panel="Scope and selection")] = False,
+    identity_governance: Annotated[bool, typer.Option("--identity-governance", help="Collect/evaluate IAM role and user governance evidence, including workload role bindings.", rich_help_panel="Identity evidence")] = False,
+    identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.", rich_help_panel="Identity evidence")] = None,
+    identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.", rich_help_panel="Identity evidence")] = False,
+    identity_ai_services: Annotated[bool, typer.Option("--identity-ai-services", help="Read Bedrock/AgentCore execution-role metadata; requires live --identity-governance.", rich_help_panel="Identity evidence")] = False,
+    identity_analyzers: Annotated[bool, typer.Option("--identity-analyzers", help="Read existing Access Analyzer findings; never creates analyzers. Requires live --identity-governance.", rich_help_panel="Identity evidence")] = False,
+    identity_days: Annotated[int, typer.Option("--identity-days", min=1, max=90, help="CloudTrail lookback days (1–90); requires --identity-events.", rich_help_panel="Identity evidence")] = 30,
+    identity_max_pages: Annotated[int, typer.Option("--identity-max-pages", min=1, max=1000, help="Page/read budget per optional evidence collector, across requested regions.", rich_help_panel="Identity evidence")] = 20,
+    identity_max_seconds: Annotated[int, typer.Option("--identity-max-seconds", min=1, max=3600, help="Time budget between evidence requests; in-flight SDK retries/timeouts may exceed it.", rich_help_panel="Identity evidence")] = 60,
 ) -> None:
     """Identify the AWS account, scan selected services, or evaluate an offline snapshot."""
     if output not in {None, "console", "json", "html"}:
