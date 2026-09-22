@@ -22,6 +22,7 @@ work in progress.
 | --- | --- | --- | --- |
 | DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Included in released 0.1.15. |
 | DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Included in released 0.1.15. |
+| DEV-TOOL-002 | Opt-in SDK measurement file | COMPLETE | `NOW.md` 2026-09-22 contract; five focused CLI integration tests and 860 full local tests passed. Next larger release batch; no tag assigned. |
 | STRAT-S-01..04 | Second idea group's strategic themes | PROPOSED | See `AWSHERLOCK_IDEAS.md`; split into bounded contracts before development. |
 
 ## Release tag ledger
@@ -30,6 +31,7 @@ work in progress.
 | --- | --- | --- | --- |
 | `v0.1.0`, `v0.1.5`, `v0.1.10` | RELEASED | Historical releases | Existing tags stay unchanged. |
 | `v0.1.15` | RELEASED | DEV-CLI-001 and DEV-TOOL-001 only | Owner authorized tag/push; Trusted Publisher workflow and both index verifications passed. |
+| Next larger release (tag TBD) | PROPOSED | Multiple completed development labels; scope to be selected one contract at a time | A single completed label or documentation fix does not trigger a tag. Complete and verify the cohesive batch, then obtain separate owner release authorization. |
 
 ### v0.1.15 local evidence (2026-09-22)
 

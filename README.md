@@ -220,6 +220,15 @@ and `--color`.
 
 `--stats` writes measured elapsed time and resource/check/finding totals to stderr;
 it does not claim to count AWS API calls or alter JSON data.
+For live scans, `--measurements-file measurements.json` writes a separate, new
+JSON file with SDK invocation counts and collection timing samples by account,
+opaque identity scope, region and service. The schema starts at version 1.
+An invocation is one SDK operation call, including denied calls, not an HTTP
+attempt or retry. Authentication calls are excluded. The file contains no
+request/response payloads, credentials or caller ARNs. It is written after
+collection even when coverage is incomplete; offline replay and `--preview`
+reject the flag. Reports and snapshots keep their existing schemas.
+
 `--color auto|always|never` is available at the top level and on scan/snapshot.
 Place it before `--help` or `--version` to style eager output. `auto` detects the
 terminal; `always` explicitly allows ANSI colors even when redirected; `never`
@@ -392,11 +401,13 @@ member accounts, or pass a normalized JSON file for offline evaluation.
 | `--timeout SECONDS` | SDK defaults | Set both request timeouts; cannot be combined with either separate timeout flag. Not an overall scan deadline. |
 | `--color MODE` | `auto` / inherited top-level preference | Override terminal colors with `auto`, `always` or `never`. JSON payloads remain unstyled. |
 | `--stats` | Off | Write measured elapsed time and resource/check/finding counts to stderr; no API-call count claims. |
+| `--measurements-file PATH` | Off | Live scans only: write version-1 SDK invocation counts and collection timing samples to a new JSON file, separate from reports and snapshots. Authentication calls and HTTP retries are excluded. |
 
 Offline scans reject authentication options (`--profile`, `--role`,
 `--role-session-name`, `--external-id`), regional selection, request timeouts and
-`--save-snapshot`. They support service selection, account verification, report
-formats and display/statistics options. `--role-name` is organization-only.
+`--save-snapshot` and `--measurements-file`. They support service selection,
+account verification, report formats and display/statistics options.
+`--role-name` is organization-only.
 
 ```bash
 # Live: verify account, select regions, retain facts and write an HTML report

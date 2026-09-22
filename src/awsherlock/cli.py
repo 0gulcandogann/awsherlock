@@ -2,7 +2,9 @@
 
 from typing import Annotated
 from pathlib import Path
+from contextlib import nullcontext
 import importlib.util
+import json
 import shutil
 import subprocess
 import sys
@@ -33,6 +35,7 @@ from awsherlock.identity_config import IdentityOptions, read_inventory
 from awsherlock.identity_display import show_identity, show_offline_identity, show_profiles
 from awsherlock.aws.profiles import list_profiles
 from awsherlock.aws.context import ScanContext
+from awsherlock.measurement import ScanMeasurements
 
 configure_typer_styles()
 
@@ -282,6 +285,7 @@ def scan(
     timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts; not an overall scan deadline.")] = None,
     color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
     stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.")] = False,
+    measurements_file: Annotated[Path | None, typer.Option("--measurements-file", help="Write opt-in SDK invocation and collection timing JSON to a new file; live scans only.")] = None,
     checks: Annotated[str | None, typer.Option("--checks", help="Evaluate comma-separated check IDs; collection is unchanged and exclusions remain visible.")] = None,
     accounts: Annotated[str | None, typer.Option("--accounts", help="Scan only these comma-separated 12-digit organization account IDs; discovery still lists all accounts.")] = None,
     ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.")] = None,
@@ -305,6 +309,8 @@ def scan(
         raise typer.BadParameter("--summary-only requires console output.")
     organization = snapshot_path == Path("organization")
     offline = snapshot_path is not None and not organization
+    if measurements_file is not None and (offline or preview):
+        raise typer.BadParameter("--measurements-file requires a live scan without --preview.")
     identity_extra = identity_inventory is not None or identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60
     if identity_extra and not identity_governance:
         raise typer.BadParameter("Identity evidence options require --identity-governance.")
@@ -352,6 +358,14 @@ def scan(
     if snapshot_path is not None and not organization and any(value is not None for value in (connect_timeout, read_timeout, timeout, save_snapshot)):
         raise typer.BadParameter("Request timeouts and --save-snapshot require a live scan.")
     report_destination = report_file or (Path("awsherlock-report.html") if output == "html" else None)
+    if measurements_file is not None:
+        invalid_destination = (
+            not measurements_file.parent.is_dir() or measurements_file.exists() or
+            (report_destination is not None and measurements_file.resolve() == report_destination.resolve()) or
+            (save_snapshot is not None and measurements_file.resolve() == save_snapshot.resolve())
+        )
+        if invalid_destination:
+            raise typer.BadParameter("Measurement destination needs an existing directory and a new path different from report and snapshot destinations.")
     if save_snapshot is not None and (save_snapshot.exists() or
                                      (report_destination is not None and save_snapshot.resolve() == report_destination.resolve())):
         raise typer.BadParameter("Snapshot destination must be new and different from --report-file.")
@@ -429,10 +443,14 @@ def scan(
     sink = snapshot_saver(save_snapshot, bundle=organization or selected_regions is not None) if save_snapshot is not None else None
     work_total = (sum(len(names) for _, names in collection_scopes(selected, selected_regions))
                   if selected_regions is not None else len(selected)) + 2
+    measurements = ScanMeasurements() if measurements_file is not None else None
     try:
-        with scan_activity(enabled=not no_progress, show_banner=not no_banner, verbose=verbose) as activity:
+        measurement_scope = measurements if measurements is not None else nullcontext()
+        with measurement_scope, scan_activity(enabled=not no_progress, show_banner=not no_banner, verbose=verbose) as activity:
             if organization:
                 context = create_scan_context(profile=profile, role=role, **region_options, **extra_options)
+                if measurements is not None:
+                    context = replace(context, measurements=measurements)
                 if identity_options is not None:
                     context = replace(context, identity_options=identity_options)
                 activity("Discovering accounts", 0, 1)
@@ -467,6 +485,8 @@ def scan(
             else:
                 activity("Connecting to AWS", 0, work_total)
                 context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id, **region_options, **extra_options)
+                if measurements is not None:
+                    context = replace(context, measurements=measurements)
                 if identity_options is not None:
                     context = replace(context, identity_options=identity_options)
                 show_identity(context, err=True, regions=selected_regions, services=selected)
@@ -507,6 +527,9 @@ def scan(
                 message(f"Snapshots saved: {terminal_text(str(save_snapshot))}", style=GREEN, err=True)
             else:
                 message("No snapshots saved: no account collection completed.", style=YELLOW, err=True)
+        if measurements_file is not None and measurements is not None:
+            write_report(json.dumps(measurements.to_dict(), indent=2, allow_nan=False) + "\n", measurements_file)
+            message(f"Measurements saved: {terminal_text(str(measurements_file))}", style=GREEN, err=True)
         if stats:
             summary = report.to_dict()["summary"]
             message(f"Stats: {perf_counter() - started:.3f}s elapsed / {summary['resources']} resources / "

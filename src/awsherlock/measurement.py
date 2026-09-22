@@ -88,6 +88,7 @@ class ScanMeasurements:
                     "region": scope.region, "service": service}
 
         return {
+            "schema_version": 1,
             "call_unit": "SDK invocation (not HTTP attempts or retries)",
             "client_unit": "distinct instrumented SDK client",
             "authentication_calls_included": False,
