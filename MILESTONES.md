@@ -20,8 +20,8 @@ work in progress.
 
 | Label | Work | Status | Evidence / remaining work |
 | --- | --- | --- | --- |
-| DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Included in prepared 0.1.15 source; no Git tag. |
-| DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Included in prepared 0.1.15 source; no Git tag. |
+| DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Included in released 0.1.15. |
+| DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Included in released 0.1.15. |
 | STRAT-S-01..04 | Second idea group's strategic themes | PROPOSED | See `AWSHERLOCK_IDEAS.md`; split into bounded contracts before development. |
 
 ## Release tag ledger
@@ -29,7 +29,7 @@ work in progress.
 | Git tag | Status | Included scope | Gate |
 | --- | --- | --- | --- |
 | `v0.1.0`, `v0.1.5`, `v0.1.10` | RELEASED | Historical releases | Existing tags stay unchanged. |
-| `v0.1.15` | COMPLETE | DEV-CLI-001 and DEV-TOOL-001 only | Local and remote pre-tag gates passed. **Owner release authorization is still required before creating or pushing the Git tag.** |
+| `v0.1.15` | RELEASED | DEV-CLI-001 and DEV-TOOL-001 only | Owner authorized tag/push; Trusted Publisher workflow and both index verifications passed. |
 
 ### v0.1.15 local evidence (2026-09-22)
 
@@ -60,6 +60,23 @@ work in progress.
 - Actual OIDC upload, published hashes and index installation remain untested
   until an explicitly authorized tag push. This milestone's COMPLETE status
   records pre-tag readiness only, not a release.
+
+### v0.1.15 publication evidence (2026-09-22)
+
+- Owner explicitly authorized release after successful tests. Annotated tag
+  `v0.1.15` points to `c89ce0a` and was pushed without moving an older tag.
+- [Tag-triggered workflow run](https://github.com/0gulcandogann/awsherlock/actions/runs/35753275008)
+  completed successfully: build, all four fresh-install jobs, Trusted Publisher
+  uploads to TestPyPI and PyPI, downloaded hash checks and installed smoke on
+  both indices.
+- The workflow's own wheel and sdist were downloaded and separately checked
+  against both published indices. Wheel SHA256:
+  `30070631828d8baf23926feabe4c1707afa66f5327a993d8f610b242f9a28e14`;
+  sdist SHA256:
+  `152c98724ac8dbc20b06dde2c9ecff969f6f9492c3ffe0af0662d9c7165396bb`.
+- The earlier local pre-tag build has different byte hashes. It passed its own
+  checks but is not the published artifact; use the workflow artifact hashes
+  above for release verification.
 
 Before any new Git tag:
 

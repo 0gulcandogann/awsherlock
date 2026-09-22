@@ -2,7 +2,7 @@
 
 # AWSherlock
 
-[![Release v0.1.10](https://img.shields.io/badge/release-v0.1.10-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.1.10)
+[![Release v0.1.15](https://img.shields.io/badge/release-v0.1.15-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.1.15/)
 [![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
@@ -1019,12 +1019,10 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
-Version 0.1.15 is prepared locally and has not been tagged or published. It
-adds `scan --preview` for an unverified local plan without AWS calls or output
-files, plus per-check CloudTrail missing-fact explanations in coverage issues.
-The published release badge above continues to point to v0.1.10 until the new
-version is verified remotely. No new AWS reads, checks or report format were
-added in this candidate.
+Version 0.1.15 is published on PyPI and TestPyPI. It adds `scan --preview` for
+an unverified local plan without AWS calls or output files, plus per-check
+CloudTrail missing-fact explanations in coverage issues. No new AWS reads,
+checks or report format were added in this version.
 
 Version 0.1.10 adds opt-in NHI/AI identity governance, declarations/approvals,
 bounded audit attribution across five connection branches, metadata-only native
