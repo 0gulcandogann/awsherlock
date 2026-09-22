@@ -20,8 +20,8 @@ work in progress.
 
 | Label | Work | Status | Evidence / remaining work |
 | --- | --- | --- | --- |
-| DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Work is local and unreleased. Full local suite has one unrelated ignored demo HTML fixture mismatch (852 passed, 1 failed). |
-| DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Full local suite: 854 passed, one pre-existing ignored demo HTML fixture mismatch. Work is local and unreleased; no Git tag. |
+| DEV-CLI-001 | Local `scan --preview` | COMPLETE | `NOW.md` 2026-09-22 contract; 168 relevant tests passed, README/help updated. Included in prepared 0.1.15 source; no Git tag. |
+| DEV-TOOL-001 | Explain incomplete CloudTrail facts | COMPLETE | `NOW.md` 2026-09-22 contract; 127 focused tests passed. Included in prepared 0.1.15 source; no Git tag. |
 | STRAT-S-01..04 | Second idea group's strategic themes | PROPOSED | See `AWSHERLOCK_IDEAS.md`; split into bounded contracts before development. |
 
 ## Release tag ledger
@@ -29,7 +29,7 @@ work in progress.
 | Git tag | Status | Included scope | Gate |
 | --- | --- | --- | --- |
 | `v0.1.0`, `v0.1.5`, `v0.1.10` | RELEASED | Historical releases | Existing tags stay unchanged. |
-| `v0.1.15` | IN_PROGRESS | DEV-CLI-001 and DEV-TOOL-001 only | Local checks passed; committed-source remote host matrix and final commit review pending. **Do not create or push this tag.** |
+| `v0.1.15` | COMPLETE | DEV-CLI-001 and DEV-TOOL-001 only | Local and remote pre-tag gates passed. **Owner release authorization is still required before creating or pushing the Git tag.** |
 
 ### v0.1.15 local evidence (2026-09-22)
 
@@ -45,7 +45,21 @@ work in progress.
   dependencies; `pip check` and installed CLI/offline JSON/HTML smoke passed.
   Smoke blocks AWS/network and covers preview plus CloudTrail missing facts.
 - README shows candidate 0.1.15 while the published badge still links 0.1.10.
-  These are local checks, not remote host-matrix or OIDC publication evidence.
+  Local evidence does not exercise OIDC publication.
+
+### v0.1.15 remote pre-tag evidence (2026-09-22)
+
+- Preparation commit `f320db7` was pushed to `main`. The
+  [validation-only workflow run](https://github.com/0gulcandogann/awsherlock/actions/runs/35752595756)
+  passed build, Linux 3.11/3.13, macOS 3.13 and Windows 3.13 fresh-install
+  smoke. TestPyPI/PyPI publish and index-verification jobs correctly skipped.
+- PyPI and TestPyPI 0.1.15 JSON endpoints both returned HTTP 404 at the
+  pre-tag check. Version availability must be rechecked when tagging.
+- The final milestone-status commit changes this ledger only; the validated
+  package source, version, workflow and README stay at `f320db7` content.
+- Actual OIDC upload, published hashes and index installation remain untested
+  until an explicitly authorized tag push. This milestone's COMPLETE status
+  records pre-tag readiness only, not a release.
 
 Before any new Git tag:
 
