@@ -6,6 +6,14 @@ Done when; `SPEC.md` defines product boundaries. A Git `vX.Y.Z` tag is reserved
 for a completed, separately authorized release and must never be used to mark
 work in progress.
 
+Release cadence: push completed development to `main` without creating a Git
+tag for each package. After `v0.1.15`, wait for at least **four distinct,
+substantive feature labels** to be `COMPLETE`; five is preferred when they form
+one coherent release. Documentation-only changes and routine fixes do not count
+toward this minimum. Full release validation and separate owner authorization
+are still required before any tag/push. The current batch has **1 of 4**:
+DEV-TOOL-002.
+
 ## Status meanings
 
 | Status | Meaning |
@@ -31,7 +39,7 @@ work in progress.
 | --- | --- | --- | --- |
 | `v0.1.0`, `v0.1.5`, `v0.1.10` | RELEASED | Historical releases | Existing tags stay unchanged. |
 | `v0.1.15` | RELEASED | DEV-CLI-001 and DEV-TOOL-001 only | Owner authorized tag/push; Trusted Publisher workflow and both index verifications passed. |
-| Next larger release (tag TBD) | PROPOSED | Multiple completed development labels; scope to be selected one contract at a time | A single completed label or documentation fix does not trigger a tag. Complete and verify the cohesive batch, then obtain separate owner release authorization. |
+| Next larger release (tag TBD) | PROPOSED | At least four completed feature labels after v0.1.15; DEV-TOOL-002 is 1/4 | Prefer five coherent features. Complete and verify the batch, then obtain separate owner release authorization. |
 
 ### v0.1.15 local evidence (2026-09-22)
 
