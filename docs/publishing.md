@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.1.15 is published on [PyPI](https://pypi.org/project/awsherlock/0.1.15/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.1.15/). Preserve these immutable files. Before any future tag, complete the `MILESTONES.md` gate and obtain owner release authorization.
+AWSherlock 0.1.15 is published on [PyPI](https://pypi.org/project/awsherlock/0.1.15/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.1.15/). Preserve these immutable files. Before any future tag, complete the local release milestone and obtain owner release authorization.
 
 ## One-time Trusted Publishing setup
 
