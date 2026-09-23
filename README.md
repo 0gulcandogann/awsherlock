@@ -52,6 +52,16 @@ Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/aw
 Contributors: see [Contributing](docs/contributing.md) and
 [Writing a security check](docs/writing-checks.md).
 
+### Scanner CI
+
+Pull requests and pushes to `main` run the separate scanner CI workflow. It
+builds a wheel/source archive, installs the wheel in a fresh Python environment
+on Linux, Windows and macOS, then runs synthetic EC2 secure/insecure/denied
+checks and the installed offline CLI/JSON/HTML smoke. The checks use no AWS
+credentials or real AWS calls. The larger local test suite remains local;
+this CI gate is a focused public smoke, not a replacement for full local
+regression. Tag-triggered package publishing remains a separate workflow.
+
 ### Windows
 
 Open PowerShell:

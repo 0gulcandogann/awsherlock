@@ -1,0 +1,52 @@
+name: Scanner CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scanner-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, python: '3.11'}
+          - {os: ubuntu-latest, python: '3.13'}
+          - {os: windows-latest, python: '3.13'}
+          - {os: macos-latest, python: '3.13'}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build and validate package
+        shell: bash
+        run: |
+          python -m pip install build
+          python -m build
+          python .github/scripts/release.py artifacts
+      - name: Install and test without AWS credentials
+        shell: bash
+        run: |
+          python -m venv .ci-venv
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            installed_python=.ci-venv/Scripts/python.exe
+          else
+            installed_python=.ci-venv/bin/python
+          fi
+          "$installed_python" -m pip install --index-url https://pypi.org/simple/ dist/*.whl
+          "$installed_python" -m pip check
+          "$installed_python" .github/scripts/ci_checks.py
+          "$installed_python" .github/scripts/release.py smoke
