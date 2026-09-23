@@ -26,6 +26,7 @@ from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
 from awsherlock.sarif import render_sarif
+from awsherlock.diff import compare_snapshots, render_diff_json
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.diagnostics import runtime_diagnostics
@@ -48,6 +49,39 @@ app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
 )
+
+
+@app.command("diff")
+def diff_command(
+    before: Annotated[Path, typer.Argument(help="Earlier normalized snapshot JSON.")],
+    after: Annotated[Path, typer.Argument(help="Later normalized snapshot JSON.")],
+    output: Annotated[str, typer.Option("--output", help="Comparison format: console or json.")] = "console",
+) -> None:
+    """Compare two saved snapshots without AWS calls."""
+    if output not in {"console", "json"}:
+        raise typer.BadParameter("Use console or json.", param_hint="--output")
+    try:
+        comparison = compare_snapshots(read_snapshot(before), read_snapshot(after))
+    except SnapshotError as error:
+        message(f"Error: {error}", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    except OSError:
+        message("Error: Could not read a snapshot file. Check both paths.", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    if output == "json":
+        typer.echo(render_diff_json(comparison), nl=False)
+    else:
+        summary = comparison["summary"]
+        message("Snapshot comparison: " + ", ".join(f"{status} {count}" for status, count in summary.items()))
+        if not comparison["same_scope"]:
+            message("Account or region scope differs; unmatched findings are UNKNOWN.", style=YELLOW)
+        for service in sorted(set(comparison["coverage"]["before"]) | set(comparison["coverage"]["after"])):
+            message(f"Coverage {service}: before {comparison['coverage']['before'].get(service, 'NOT_SCANNED')}, "
+                    f"after {comparison['coverage']['after'].get(service, 'NOT_SCANNED')}")
+        for change in comparison["changes"]:
+            message(f"{change['status']} {change['check_id']} {terminal_text(change['account_id'])} "
+                    f"{terminal_text(change['resource_id'])}")
+        message("UNKNOWN means coverage or scope cannot establish a change.")
 
 REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
 

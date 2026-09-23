@@ -349,6 +349,7 @@ awsherlock whoami --help
 awsherlock profiles list --help
 awsherlock guide --help
 awsherlock identities --help
+awsherlock diff --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -407,6 +408,31 @@ including `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`, are respected.
 
 The guide requires an interactive terminal. It prints a local scan preview and
 an equivalent command, then exits without scanning.
+
+### Compare saved snapshots: `awsherlock diff BEFORE AFTER [OPTIONS]`
+
+Compare two normalized snapshot JSON files locally:
+
+```bash
+awsherlock diff before.json after.json
+awsherlock diff before.json after.json --output json
+```
+
+`NEW` means a finding appears in the later snapshot and the earlier service
+coverage was complete. `RESOLVED` means a finding is absent later and that
+service's later coverage was complete. A finding seen in both is `UNCHANGED`.
+Missing/denied service coverage or changed account/region scope makes an
+unmatched finding `UNKNOWN`, never `RESOLVED`. These statuses describe observed
+scanner findings, not verified remediation or effective AWS access. The
+comparison is intentionally conservative: a partial service can make an
+unrelated resource change unknown. No AWS calls or output files occur.
+
+`--output json` emits a version-1 `snapshot-diff` document with snapshot IDs,
+scope, service coverage, status counts and changes. It omits raw finding
+evidence and credentials. Exit 0 means both files were compared, including
+comparisons with unknown coverage; invalid options exit 2 and unreadable or
+invalid snapshots exit 1. This command does not apply suppression or CI
+thresholds.
 
 ### Offline identity view: `awsherlock identities SNAPSHOT [OPTIONS]`
 
