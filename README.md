@@ -875,6 +875,10 @@ runtimes. Custom/inline role policies require IAM review; URL resource policies
 and effective access are not evaluated. Container images and unknown runtimes
 produce incomplete coverage. The runtime catalogue is dated 2026-09-15 and must
 be maintained against [AWS runtime dates](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html).
+Missing URL, attached-role-policy or managed-runtime facts name the affected
+`AWSH-LAMBDA` check in coverage. A matching per-function collection issue is
+reported separately; otherwise the fact is absent from the snapshot. Missing
+facts, including unsupported image runtimes, are never treated as passing checks.
 
 Secrets Manager checks rotation, broad Allow principals (including conditional
 statements, requiring review), and non-enabled custom KMS keys. Default

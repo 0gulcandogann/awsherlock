@@ -21,6 +21,7 @@ _EC2_REMEDIATION = "Restrict ingress and public addressing; require IMDSv2 and u
 _SCOPES = {
     "iam": "Global IAM policy indicators and opt-in role/user governance; declarations and observed callers are separate evidence. Effective permissions are not simulated.",
     "s3": "Bucket configuration with known account Block Public Access context; missing bucket facts appear in coverage issues. Effective anonymous access is not evaluated.",
+    "lambda": "Regional function metadata indicators; missing URL, role-policy or runtime facts appear in coverage issues. Function code and environment values are not read.",
     "secretsmanager": "Regional secret metadata indicators; missing rotation, policy or encryption facts appear in coverage issues. Secret values are never read.",
     "cloudtrail": "Regional trail indicators; missing facts appear in coverage issues. CT-004 needs source and read/write context. Full API logging, delivery and retention are unverified.",
     "ec2": "Regional configuration; network routes, NACLs and application controls are not evaluated.",

@@ -70,6 +70,19 @@ def secret_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
+def lambda_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                              collection_issues: list[CollectionIssue]) -> dict:
+    """Explain absent function facts without exposing code or environment values."""
+    operation = {"urls": "ListFunctionUrlConfigs", "role_policies": "ListAttachedRolePolicies",
+                 "runtime": "ManagedRuntime (images/unknown runtimes not scanned)"}[fact]
+    failed = any(issue.operation == operation and issue.resource_id == resource.resource_id
+                 for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
 def finalize_resource_selection(report: Report) -> None:
     """Unmatched selectors are assessed once across all account/region scopes."""
     selected = report.metadata.get("selected_resources", [])
@@ -150,6 +163,8 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(s3_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "secretsmanager":
                         issues.append(secret_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "lambda":
+                        issues.append(lambda_missing_fact_issue(resource, identifier, fact, collection.issues))
                     continue
                 if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True:
                     missing_context = [name for name in ("management_excluded_sources", "management_event_types")
