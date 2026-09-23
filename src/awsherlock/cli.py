@@ -57,10 +57,13 @@ def diff_command(
     before: Annotated[Path, typer.Argument(help="Earlier normalized snapshot JSON.")],
     after: Annotated[Path, typer.Argument(help="Later normalized snapshot JSON.")],
     output: Annotated[str, typer.Option("--output", help="Comparison format: console or json.")] = "console",
+    fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for confidently NEW findings; UNKNOWN coverage exits 1.")] = None,
 ) -> None:
     """Compare two saved snapshots without AWS calls."""
     if output not in {"console", "json"}:
         raise typer.BadParameter("Use console or json.", param_hint="--output")
+    if fail_on not in {None, "new"}:
+        raise typer.BadParameter("Use new.", param_hint="--fail-on")
     try:
         comparison = compare_snapshots(read_snapshot(before), read_snapshot(after))
     except SnapshotError as error:
@@ -83,6 +86,14 @@ def diff_command(
             message(f"{change['status']} {change['check_id']} {terminal_text(change['account_id'])} "
                     f"{terminal_text(change['resource_id'])}")
         message("UNKNOWN means coverage or scope cannot establish a change.")
+    if fail_on == "new":
+        uncertain = (not comparison["same_scope"] or comparison["summary"]["UNKNOWN"] > 0 or
+                     any(status != "COMPLETE" for side in comparison["coverage"].values() for status in side.values()) or
+                     set(comparison["coverage"]["before"]) != set(comparison["coverage"]["after"]))
+        if uncertain:
+            raise typer.Exit(code=1)
+        if comparison["summary"]["NEW"]:
+            raise typer.Exit(code=3)
 
 REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
 
@@ -288,7 +299,7 @@ def main(
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
     "Identity evidence is opt-in; live governance requires IAM and regions for workload/audit reads. "
     "Saved identity facts replay offline. Missing approvals or evidence remain incomplete. "
-    "Incomplete coverage exits 1; findings alone do not change exit 0.[/]"
+    "Incomplete coverage exits 1; --fail-on exits 3 for selected unsuppressed findings when coverage is complete.[/]"
 ))
 def scan(
     snapshot_path: Annotated[Path | None, typer.Argument(help="Offline snapshot JSON, or 'organization' for multi-account scanning.")] = None,
@@ -308,6 +319,7 @@ def scan(
         str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms.", rich_help_panel="Scope and selection")
     ] = None,
     output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
+    fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for unsuppressed high/critical findings; incomplete coverage still exits 1.", rich_help_panel="Execution and display")] = None,
     report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.", rich_help_panel="Reports and measurements")] = None,
     suppressions_file: Annotated[Path | None, typer.Option("--suppressions-file", help="Apply exact, expiring local finding annotations; findings remain visible.", rich_help_panel="Reports and measurements")] = None,
     role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).", rich_help_panel="Targets and credentials")] = None,
@@ -347,6 +359,8 @@ def scan(
         raise typer.BadParameter("--preview-format requires --preview.")
     if output not in {None, "console", "json", "html", "sarif"}:
         raise typer.BadParameter("Use console, json, html or sarif.", param_hint="--output")
+    if fail_on not in {None, "high", "critical"}:
+        raise typer.BadParameter("Use high or critical.", param_hint="--fail-on")
     if report_file is not None and output not in {"json", "html", "sarif"}:
         raise typer.BadParameter("--report-file requires --output json, html or sarif.")
     if summary_only and output in {"json", "html", "sarif"}:
@@ -483,7 +497,8 @@ def scan(
                 },
                 "collection": {"services": selected if services is not None or not offline else list(saved.services)},
                 "evaluation": {"checks": selected_checks, "resources": selected_resources,
-                               "selectors_affect_collection": False},
+                               "selectors_affect_collection": False,
+                               **({"fail_on": fail_on} if fail_on is not None else {})},
                 "destinations": {"report_format": output or "console",
                                  "report_file": str(report_destination) if report_destination else None,
                                  "snapshot": str(save_snapshot) if save_snapshot else None},
@@ -517,6 +532,7 @@ def scan(
         message(f"Resources for evaluation: {', '.join(selected_resources) if selected_resources else 'all collected resources'}")
         message("Checks and resources restrict evaluation; collection scope is unchanged.")
         message(f"Report: {output or 'console'}" + (f" -> {report_destination}" if report_destination else " -> terminal"))
+        message(f"Finding threshold: {fail_on or 'off'}")
         message(f"Snapshot destination: {save_snapshot or 'none'} (no file created)")
         if identity_governance:
             message("Identity governance: selected; evidence availability unverified")
@@ -623,6 +639,11 @@ def scan(
                     f"{summary['checks_evaluated']} checks evaluated / {summary['findings']} findings", err=True)
         if report.incomplete:
             raise typer.Exit(code=1)
+        if fail_on is not None:
+            selected_severities = {"CRITICAL", "HIGH"} if fail_on == "high" else {"CRITICAL"}
+            if any(finding.severity.value in selected_severities and index not in report.suppression_matches
+                   for index, finding in enumerate(report.findings)):
+                raise typer.Exit(code=3)
     except (SessionError, SnapshotError) as error:
         if isinstance(error, SessionError):
             show_session_error(error, profile)

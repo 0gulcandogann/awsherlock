@@ -162,7 +162,7 @@ The top-level fields are `schema_version` (integer `1`), `kind` (`scan-preview`)
 | `verification` | `identity` is `unverified` or `snapshot_metadata`; `organization_membership` is `not_discovered` for organization plans, otherwise `null`. |
 | `target` | `profile`, `source_role`, `expected_account`, `snapshot_path`, `snapshot_account`, `snapshot_region`, `regions`, `region_source`, `organization_role_name`, `accounts`, `ous`. Snapshot account/region come from saved metadata, not live verification. `region_source` is `explicit`, `sdk_default` or `snapshot_metadata`. |
 | `collection` | `services` is the selected list, or the snapshot's saved services offline. |
-| `evaluation` | `checks` and `resources` are selected lists or `null` for all; `selectors_affect_collection` is always `false`. |
+| `evaluation` | `checks` and `resources` are selected lists or `null` for all; `selectors_affect_collection` is always `false`; `fail_on` appears as `high` or `critical` only when requested. |
 | `destinations` | `report_format`, intended `report_file` and `snapshot` paths. Paths are not created. |
 | `options` | Booleans `external_id_supplied`, `identity_governance_requested` and `request_timeouts_configured`. External ID and inventory contents are never printed. |
 
@@ -434,6 +434,11 @@ comparisons with unknown coverage; invalid options exit 2 and unreadable or
 invalid snapshots exit 1. This command does not apply suppression or CI
 thresholds.
 
+Use `diff BEFORE AFTER --fail-on new` for automation: confidently new findings
+exit 3. Changed scope, missing service or incomplete coverage exits 1 first;
+no new findings with complete coverage exits 0. The option does not alter JSON
+or console results.
+
 ### Record expiring suppressions
 
 Pass `--suppressions-file exceptions.json` to a live or offline `scan` when a
@@ -522,6 +527,7 @@ option name in full.
 | `--output FORMAT` | `console` | `console`, `json`, `html` or `sarif`. JSON/SARIF goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
 | `--report-file PATH` | Not supplied | Write a new JSON/HTML/SARIF report; requires `--output json`, `--output html` or `--output sarif`. Existing files are not overwritten. |
 | `--suppressions-file PATH` | Off | Read an exact, expiring local suppression JSON file for console/JSON/HTML. Findings and coverage remain visible; unavailable with SARIF. |
+| `--fail-on LEVEL` | Off | `high` or `critical`: exit 3 if any unsuppressed finding meets the level. Incomplete coverage still exits 1 first. |
 | `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
 | `--no-progress` | Off | Hide the banner and progress bar; explicit `--verbose` messages still appear. |
 | `--no-banner` | Off | Hide the banner while retaining interactive progress. |
@@ -681,7 +687,7 @@ is fabricated. The run's `properties.coverage` and `properties.incomplete` retai
 all coverage states, even when results are empty. This is a report conversion,
 not GitHub code-scanning integration, and it omits raw finding evidence. The
 existing incomplete-scan exit code remains `1`; complete scans exit `0` even
-when findings exist.
+when findings exist, unless `--fail-on high|critical` is requested and met.
 
 ## Scan another account
 
