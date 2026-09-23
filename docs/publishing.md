@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.2.0 is published on [PyPI](https://pypi.org/project/awsherlock/0.2.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.2.0/). The tagged release completed its build, fresh-install matrix, Trusted Publishing uploads, and downloaded hash and installation checks on both indices in [GitHub Actions run 35895588709](https://github.com/0gulcandogann/awsherlock/actions/runs/35895588709). Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
+AWSherlock 0.2.0 is published on [GitHub Releases](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0), [PyPI](https://pypi.org/project/awsherlock/0.2.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.2.0/). The tagged release completed its build, fresh-install matrix, Trusted Publishing uploads, and downloaded hash and installation checks on both indices in [GitHub Actions run 35895588709](https://github.com/0gulcandogann/awsherlock/actions/runs/35895588709). Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
 
 ## One-time Trusted Publishing setup
 
@@ -31,12 +31,13 @@ CI runs committed package smoke checks, not the ignored local full scanner test 
 2. Push that commit to `main`.
 3. Create and push its matching stable tag, for example `v0.2.1` for package version `0.2.1`, only after the release gate and owner authorization.
 4. Check that all **Publish Python package** jobs pass.
+5. Check that the matching public GitHub Release exists, is published (not a draft or prerelease), and links the intended tag. For future tags, the workflow creates it after PyPI verification; if that job fails, inspect the run and finish the GitHub Release before closing the release milestone.
 
-Tag pushes matching `v*` trigger the workflow; only exact `vX.Y.Z` tags matching the source version pass validation. Prerelease tags are intentionally unsupported. Package source is checked out at the event's tagged commit. Pushing a normal `main` commit does not publish.
+Tag pushes matching `v*` trigger the workflow; only exact `vX.Y.Z` tags matching the source version pass validation. Prerelease tags are intentionally unsupported. Package source is checked out at the event's tagged commit. Pushing a normal `main` commit does not publish. A validation-only branch run skips the GitHub Release job.
 
-The sequence is: build wheel/source once -> metadata checks -> installation matrix -> TestPyPI upload -> download/hash checks and fresh TestPyPI-wheel install -> PyPI upload -> download/hash checks and fresh production-wheel install. Both indices receive the same original build artifacts. OIDC permission is limited to the two publishing jobs, which only download artifacts and invoke the official PyPA publisher; they do not check out or execute scanner code.
+The sequence is: build wheel/source once -> metadata checks -> installation matrix -> TestPyPI upload -> download/hash checks and fresh TestPyPI-wheel install -> PyPI upload -> download/hash checks and fresh production-wheel install -> GitHub Release. Both indices receive the same original build artifacts. OIDC permission is limited to the two publishing jobs, which only download artifacts and invoke the official PyPA publisher; they do not check out or execute scanner code. The final GitHub Release job has `contents: write` only after production verification and uses the existing tag with generated notes; it does not replace an existing Release.
 
-The publisher can skip already uploaded filenames on a retry. Subsequent verification must match their published and downloaded SHA256 values to the original build, so differing existing files fail the run. Retry failed jobs from the same workflow run to retain its original artifacts. Do not rebuild or move a published tag to replace an existing version; make a new version instead. Production verification can fail after an upload has succeeded: check the index before deciding whether a new upload is needed. GitHub releases are not automatically created or changed.
+The publisher can skip already uploaded filenames on a retry. Subsequent verification must match their published and downloaded SHA256 values to the original build, so differing existing files fail the run. Retry failed jobs from the same workflow run to retain its original artifacts. Do not rebuild or move a published tag to replace an existing version; make a new version instead. Production verification can fail after an upload has succeeded: check the index before deciding whether a new upload is needed. Review generated GitHub Release notes and edit them if release-specific context is needed.
 
 ## Installation and update channels
 

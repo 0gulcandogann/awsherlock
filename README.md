@@ -2,7 +2,7 @@
 
 # AWSherlock
 
-[![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.2.0/)
+[![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0)
 [![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
@@ -48,7 +48,7 @@ python -m pip install awsherlock
 
 Git is not required for an index installation. Upgrade an index-based pipx installation with `pipx upgrade awsherlock`; use `python -m pip install --upgrade awsherlock` in a virtual environment. The built-in `awsherlock --update` installs the GitHub `main` source and can include changes beyond the latest PyPI release.
 
-Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/publishing.md) for validation and first-publication steps.
+Maintainers: see the [publishing guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/publishing.md) for package validation and GitHub Release steps.
 Contributors: see [Contributing](docs/contributing.md) and
 [Writing a security check](docs/writing-checks.md).
 
@@ -1282,7 +1282,7 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
-Version 0.2.0 adds offline `diff`, observed `history` and bounded investigation
+Version [0.2.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0) is published on GitHub, PyPI and TestPyPI. It adds offline `diff`, observed `history` and bounded investigation
 `leads`; exact expiring suppression records; opt-in automation exit thresholds;
 and a separate scanner CI workflow. Existing findings can also be exported as
 SARIF. Identity inventory/review views, guided scan setup, JSON scan preview,

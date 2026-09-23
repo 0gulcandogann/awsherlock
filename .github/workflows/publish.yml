@@ -156,3 +156,23 @@ jobs:
           .release-venv/bin/python -m pip install --index-url https://pypi.org/simple/ downloaded/*.whl
           .release-venv/bin/python -m pip check
           .release-venv/bin/python .github/scripts/release.py smoke
+
+  github-release:
+    needs: verify-pypi
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == '0gulcandogann/awsherlock'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish GitHub Release after package verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub Release already exists for $RELEASE_TAG"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "AWSherlock $RELEASE_TAG"
+          fi
