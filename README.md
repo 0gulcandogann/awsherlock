@@ -49,6 +49,8 @@ python -m pip install awsherlock
 Git is not required for an index installation. Upgrade an index-based pipx installation with `pipx upgrade awsherlock`; use `python -m pip install --upgrade awsherlock` in a virtual environment. The built-in `awsherlock --update` installs the GitHub `main` source and can include changes beyond the latest PyPI release.
 
 Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/publishing.md) for validation and first-publication steps.
+Contributors: see [Contributing](docs/contributing.md) and
+[Writing a security check](docs/writing-checks.md).
 
 ### Windows
 
