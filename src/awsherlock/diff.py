@@ -11,7 +11,7 @@ from awsherlock.snapshot import Snapshot
 SCHEMA_VERSION = 1
 
 
-def _key(finding: Finding) -> tuple[str, str, str, str, str]:
+def finding_key(finding: Finding) -> tuple[str, str, str, str, str]:
     return (finding.id, finding.service, finding.account_id,
             finding.region or "", finding.resource_id)
 
@@ -20,9 +20,9 @@ def compare_snapshots(before: Snapshot, after: Snapshot) -> dict:
     """Compare observed findings; unresolved coverage always produces UNKNOWN."""
     previous = evaluate_snapshot(before)
     current = evaluate_snapshot(after)
-    old = Counter(_key(finding) for finding in previous.findings)
-    new = Counter(_key(finding) for finding in current.findings)
-    details = {_key(finding): finding for finding in (*previous.findings, *current.findings)}
+    old = Counter(finding_key(finding) for finding in previous.findings)
+    new = Counter(finding_key(finding) for finding in current.findings)
+    details = {finding_key(finding): finding for finding in (*previous.findings, *current.findings)}
     old_coverage = {row["service"]: row["status"] for row in previous.coverage}
     new_coverage = {row["service"]: row["status"] for row in current.coverage}
     same_scope = (before.metadata.account_id == after.metadata.account_id and

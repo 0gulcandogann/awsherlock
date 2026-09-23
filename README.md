@@ -360,6 +360,7 @@ awsherlock profiles list --help
 awsherlock guide --help
 awsherlock identities --help
 awsherlock diff --help
+awsherlock history --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -448,6 +449,22 @@ Use `diff BEFORE AFTER --fail-on new` for automation: confidently new findings
 exit 3. Changed scope, missing service or incomplete coverage exits 1 first;
 no new findings with complete coverage exits 0. The option does not alter JSON
 or console results.
+
+### Review observed finding history
+
+`awsherlock history first.json later.json [more.json...]` reads two or more
+saved normalized snapshots in increasing collection-time order. All inputs
+must describe the same account and region scope and have distinct scan IDs.
+Use `--output json` for a version-1 `finding-history` document. Console and
+JSON show per-snapshot service coverage plus the first and last timestamps
+where each stable check/resource finding was **observed**. No AWS calls or
+output files occur. Raw evidence is omitted.
+
+The timestamps are bounded by the supplied snapshots. A finding absent from
+a later input is not reported as remediated or continuously present; missing
+permissions and skipped services remain visible in coverage. Valid history
+exits 0 even with incomplete coverage; invalid options exit 2 and invalid or
+unreadable snapshots exit 1.
 
 ### Record expiring suppressions
 
