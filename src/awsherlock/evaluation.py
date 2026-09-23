@@ -108,6 +108,21 @@ def ec2_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
+def iam_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                           collection_issues: list[CollectionIssue]) -> dict:
+    """Explain absent core IAM facts without exposing credential or policy data."""
+    operation = {"attached": "PolicyNormalization", "statements": "PolicyNormalization",
+                 "console_mfa": "ConsoleMFA", "key_stale": "GetAccessKeyLastUsed"}.get(fact)
+    failed = operation is not None and any(
+        issue.operation == operation and issue.resource_id == resource.resource_id
+        for issue in collection_issues
+    )
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
 def finalize_resource_selection(report: Report) -> None:
     """Unmatched selectors are assessed once across all account/region scopes."""
     selected = report.metadata.get("selected_resources", [])
@@ -194,6 +209,8 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(kms_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "ec2":
                         issues.append(ec2_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "iam" and rule.number <= 6:
+                        issues.append(iam_missing_fact_issue(resource, identifier, fact, collection.issues))
                     continue
                 if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True:
                     missing_context = [name for name in ("management_excluded_sources", "management_event_types")

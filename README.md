@@ -739,6 +739,11 @@ are necessary for some actions. Stale passwords/root credentials are not checked
 
 Required reads: `iam:GetAccountAuthorizationDetails`, `iam:GetLoginProfile`,
 `iam:ListMFADevices`, `iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`.
+For the six core checks, a missing normalized fact names its check ID in
+coverage. A matching per-resource policy, console-MFA or key-last-used failure
+is reported separately; otherwise the fact is absent from the snapshot.
+Inactive keys are excluded from the stale-key check. Key IDs and raw policy
+documents are not included in these explanations.
 
 ### Identity governance and AI attribution
 
