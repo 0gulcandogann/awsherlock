@@ -139,6 +139,7 @@ awsherlock guide
 awsherlock scan --preview --profile production --services iam,s3
 awsherlock scan organization --preview --accounts 123456789012
 awsherlock scan facts.json --preview
+awsherlock scan --preview --preview-format json --services iam,s3
 ```
 
 The preview validates local options and shows targets, services, evaluation-only
@@ -147,6 +148,26 @@ credentials and organization membership remain unverified; no AWS calls, resourc
 collection, rule evaluation or output files occur. Offline preview reads snapshot
 metadata and checks requested services/checks locally. Preview prints a text plan
 even when `--output json` or `html` is selected; it never writes those reports.
+
+For a script that checks scan scope before execution, add `--preview-format json`.
+It writes one version-1 JSON object to stdout and no output file. This plan is
+separate from findings JSON: `--output` still names the intended report format.
+The top-level fields are `schema_version` (integer `1`), `kind` (`scan-preview`),
+`mode` (`single-account`, `organization`, or `offline`), and these objects:
+
+| Object | Fields and meaning |
+| --- | --- |
+| `verification` | `identity` is `unverified` or `snapshot_metadata`; `organization_membership` is `not_discovered` for organization plans, otherwise `null`. |
+| `target` | `profile`, `source_role`, `expected_account`, `snapshot_path`, `snapshot_account`, `snapshot_region`, `regions`, `region_source`, `organization_role_name`, `accounts`, `ous`. Snapshot account/region come from saved metadata, not live verification. `region_source` is `explicit`, `sdk_default` or `snapshot_metadata`. |
+| `collection` | `services` is the selected list, or the snapshot's saved services offline. |
+| `evaluation` | `checks` and `resources` are selected lists or `null` for all; `selectors_affect_collection` is always `false`. |
+| `destinations` | `report_format`, intended `report_file` and `snapshot` paths. Paths are not created. |
+| `options` | Booleans `external_id_supplied`, `identity_governance_requested` and `request_timeouts_configured`. External ID and inventory contents are never printed. |
+
+`null` means no explicit value or not applicable; it does not confirm an AWS
+default. An invalid option exits 2, unreadable/invalid offline snapshot exits 1,
+and a valid local plan exits 0. `--preview-format` requires `--preview`; `text`
+is the default. JSON output stays uncolored even with `--color always`.
 
 ### Choose services
 
@@ -406,6 +427,7 @@ option name in full.
 | `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
 | `--resources LIST` | All discovered resources | Evaluate exact comma-separated resource IDs or ARNs, case-sensitive; collection/saved snapshots remain unchanged. No wildcards or tags. Exclusions and unmatched selectors remain visible; works offline. |
 | `--preview` | Off | Validate and print a local scan plan without AWS calls, rule evaluation or output files. Offline mode reads snapshot metadata. Identity and organization membership remain unverified. |
+| `--preview-format FORMAT` | `text` with `--preview` | `text` or version-1 `json`; requires `--preview`. Independent of `--output`, which still describes the intended findings report. |
 | `--identity-governance` | Off | Collect IAM role/user ownership, purpose, trust, usage and joined policy evidence, plus regional Lambda/EC2 role bindings. Live scans require IAM in `--services`; offline scans expose missing facts. Saved governance evidence is evaluated automatically. |
 | `--identity-inventory FILE` | Not supplied | Version-1 exact ARN declarations/approvals; requires `--identity-governance`. Works live/offline. Missing, partial or out-of-scope approval evidence remains unknown. |
 | `--identity-events` | Off | Live opt-in regional CloudTrail management-event attribution, including role chains. Requires `--identity-governance`. No raw events or credential identifiers are exported. |

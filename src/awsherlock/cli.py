@@ -233,6 +233,7 @@ def main(
     "[bold #ff7e55]Examples[/]\n\n"
     "[#5bfcfc]awsherlock scan --services iam,s3 --summary-only[/]\n\n"
     "[#5bfcfc]awsherlock scan --preview --profile production[/]\n\n"
+    "[#5bfcfc]awsherlock scan --preview --preview-format json[/]\n\n"
     "[#5bfcfc]awsherlock scan --regions eu-central-1,eu-west-1[/]\n\n"
     "[#5bfcfc]awsherlock scan --save-snapshot facts.json --stats[/]\n\n"
     "[#5bfcfc]awsherlock scan organization --role-name audit/Reader[/]\n\n"
@@ -246,7 +247,7 @@ def main(
     "do not combine with separate timeout flags. Offline scans reject AWS "
     "authentication, regions, request timeouts, --save-snapshot and --measurements-file. "
     "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
-    "--preview validates a local plan without AWS calls or output files; identity and organization membership remain unverified. "
+    "--preview validates a local plan without AWS calls or output files; --preview-format json prints a version-1 plan separate from --output. Identity and organization membership remain unverified. "
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
     "Identity evidence is opt-in; live governance requires IAM and regions for workload/audit reads. "
     "Saved identity facts replay offline. Missing approvals or evidence remain incomplete. "
@@ -291,6 +292,7 @@ def scan(
     ous: Annotated[str | None, typer.Option("--ous", help="Organization-only OU IDs including descendants; intersects --accounts. Exclusions remain visible.", rich_help_panel="Targets and credentials")] = None,
     resources: Annotated[str | None, typer.Option("--resources", help="Evaluate exact comma-separated resource IDs/ARNs; collection is unchanged. Exclusions and unmatched IDs remain visible.", rich_help_panel="Scope and selection")] = None,
     preview: Annotated[bool, typer.Option("--preview", help="Show the locally validated scan plan without contacting AWS or creating reports.", rich_help_panel="Scope and selection")] = False,
+    preview_format: Annotated[str | None, typer.Option("--preview-format", help="Preview text (default) or version-1 JSON; requires --preview and is separate from --output.", rich_help_panel="Scope and selection")] = None,
     identity_governance: Annotated[bool, typer.Option("--identity-governance", help="Collect/evaluate IAM role and user governance evidence, including workload role bindings.", rich_help_panel="Identity evidence")] = False,
     identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.", rich_help_panel="Identity evidence")] = None,
     identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.", rich_help_panel="Identity evidence")] = False,
@@ -301,6 +303,10 @@ def scan(
     identity_max_seconds: Annotated[int, typer.Option("--identity-max-seconds", min=1, max=3600, help="Time budget between evidence requests; in-flight SDK retries/timeouts may exceed it.", rich_help_panel="Identity evidence")] = 60,
 ) -> None:
     """Identify the AWS account, scan selected services, or evaluate an offline snapshot."""
+    if preview_format not in {None, "text", "json"}:
+        raise typer.BadParameter("Use text or json.", param_hint="--preview-format")
+    if preview_format is not None and not preview:
+        raise typer.BadParameter("--preview-format requires --preview.")
     if output not in {None, "console", "json", "html"}:
         raise typer.BadParameter("Use console, json, or html.", param_hint="--output")
     if report_file is not None and output not in {"json", "html"}:
@@ -409,6 +415,41 @@ def scan(
             except OSError:
                 message("Error: Could not read the snapshot file. Check the path.", style=RED, err=True)
                 raise typer.Exit(code=1) from None
+        if preview_format == "json":
+            plan = {
+                "schema_version": 1, "kind": "scan-preview",
+                "mode": "organization" if organization else "offline" if offline else "single-account",
+                "verification": {
+                    "identity": "snapshot_metadata" if offline else "unverified",
+                    "organization_membership": "not_discovered" if organization else None,
+                },
+                "target": {
+                    "profile": None if offline else profile,
+                    "source_role": None if offline else role,
+                    "expected_account": expect_account,
+                    "snapshot_path": str(snapshot_path) if offline else None,
+                    "snapshot_account": snapshot_metadata.account_id if offline else None,
+                    "snapshot_region": snapshot_metadata.region if offline else None,
+                    "regions": ([snapshot_metadata.region] if snapshot_metadata.region else None) if offline else
+                               selected_regions if selected_regions is not None else [region] if region else None,
+                    "region_source": "snapshot_metadata" if offline else "explicit" if selected_regions is not None or region else "sdk_default",
+                    "organization_role_name": (role_name or "AWSherlockAuditRole") if organization else None,
+                    "accounts": selected_accounts if organization else None,
+                    "ous": selected_ous if organization else None,
+                },
+                "collection": {"services": selected if services is not None or not offline else list(saved.services)},
+                "evaluation": {"checks": selected_checks, "resources": selected_resources,
+                               "selectors_affect_collection": False},
+                "destinations": {"report_format": output or "console",
+                                 "report_file": str(report_destination) if report_destination else None,
+                                 "snapshot": str(save_snapshot) if save_snapshot else None},
+                "options": {"external_id_supplied": external_id is not None,
+                            "identity_governance_requested": identity_governance,
+                            "request_timeouts_configured": any(value is not None for value in
+                                                               (connect_timeout, read_timeout, timeout))},
+            }
+            typer.echo(json.dumps(plan, indent=2, ensure_ascii=True, allow_nan=False))
+            return
         message("Scan preview: no AWS calls or output files")
         message(f"Mode: {'organization' if organization else 'offline snapshot' if offline else 'single account'}")
         if offline:
