@@ -346,6 +346,7 @@ awsherlock --help
 awsherlock whoami --help
 awsherlock profiles list --help
 awsherlock guide --help
+awsherlock identities --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -404,6 +405,18 @@ including `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`, are respected.
 
 The guide requires an interactive terminal. It prints a local scan preview and
 an equivalent command, then exits without scanning.
+
+### Offline identity view: `awsherlock identities SNAPSHOT [OPTIONS]`
+
+Read IAM role/user summaries from an existing normalized snapshot without AWS
+calls or file writes. Example: `awsherlock identities identity-facts.json`.
+Console output includes identities and collection coverage; an empty IAM
+inventory is stated explicitly. `--output json` prints a separate version-1
+identity-view document with `schema_version`, `kind`, `account_id`, `coverage`
+and `identities`. It is not the scan report schema. `--color` accepts `auto`,
+`always` or `never`. The command exits 0 for complete coverage and 1 for
+incomplete coverage or input errors. The snapshot must contain IAM; old
+snapshots lacking governance facts remain incomplete, not empty proof of safety.
 
 ### Scan options: `awsherlock scan [OPTIONS] [snapshot_path]`
 
@@ -761,6 +774,8 @@ the normalized trust, policy source, usage, workload and event evidence. Exclude
 identities remain visible with `NOT_SCANNED` evaluation scope. Saved evidence is
 replayed offline without AWS calls; requesting governance on old snapshots exposes
 missing facts. Governance capture uses `scan --save-snapshot`.
+Use `awsherlock identities SNAPSHOT` for the same normalized identity inventory
+as a dedicated offline console or JSON view. It does not resolve credentials.
 Missing owner/profile, role usage/trust or approval facts name the affected
 governance check in coverage. If a managed-policy or group join is incomplete,
 IAM-002/003 remain incomplete even when no broad grant was found in known

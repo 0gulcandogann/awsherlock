@@ -653,6 +653,41 @@ def guide(
     typer.echo(terminal_text(command))
 
 
+@app.command("identities")
+def identities(
+    snapshot_path: Annotated[Path, typer.Argument(help="Saved normalized snapshot containing IAM collection.")],
+    output: Annotated[str, typer.Option("--output", help="Identity view format: console (default) or json.")] = "console",
+    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True,
+                                              help="Terminal colors: auto, always or never.")] = None,
+) -> None:
+    """Inspect saved IAM role/user identity summaries without AWS calls."""
+    if output not in {"console", "json"}:
+        raise typer.BadParameter("Use console or json.", param_hint="--output")
+    try:
+        snapshot = read_snapshot(snapshot_path)
+        if "iam" not in snapshot.services:
+            message("Error: Snapshot has no IAM collection.", style=RED, err=True)
+            raise typer.Exit(code=1)
+        report = evaluate_snapshot(snapshot, identity_governance=True)
+    except SnapshotError as error:
+        message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    except OSError:
+        message("Error: Could not read the snapshot file.", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    if output == "json":
+        typer.echo(json.dumps({"schema_version": 1, "kind": "identity-view",
+                               "account_id": snapshot.metadata.account_id,
+                               "coverage": report.coverage, "identities": report.identities},
+                              indent=2, ensure_ascii=False, allow_nan=False))
+    else:
+        if not report.identities:
+            message("No IAM role/user identities were discovered. Review collection coverage.", style=YELLOW)
+        render_console(report, summary_only=True)
+    if report.incomplete:
+        raise typer.Exit(code=1)
+
+
 @app.command("snapshot", epilog=(
     "[bold #ff7e55]Examples[/]\n\n"
     "[#5bfcfc]awsherlock snapshot --output facts.json[/]\n\n"
