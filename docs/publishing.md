@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.1.15 is published on [PyPI](https://pypi.org/project/awsherlock/0.1.15/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.1.15/). Version 0.2.0 is the current release candidate; the tag and publication outcome are recorded in the local milestone ledger. Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
+AWSherlock 0.2.0 is published on [PyPI](https://pypi.org/project/awsherlock/0.2.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.2.0/). The tagged release completed its build, fresh-install matrix, Trusted Publishing uploads, and downloaded hash and installation checks on both indices in [GitHub Actions run 35895588709](https://github.com/0gulcandogann/awsherlock/actions/runs/35895588709). Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
 
 ## One-time Trusted Publishing setup
 
@@ -29,7 +29,7 @@ CI runs committed package smoke checks, not the ignored local full scanner test 
 
 1. Update `__version__` in `src/awsherlock/__init__.py`, update release documentation, and commit the exact source intended for release. Run relevant local tests.
 2. Push that commit to `main`.
-3. Create and push its matching stable tag, for example `v0.2.0` for package version `0.2.0`, only after the release gate and owner authorization.
+3. Create and push its matching stable tag, for example `v0.2.1` for package version `0.2.1`, only after the release gate and owner authorization.
 4. Check that all **Publish Python package** jobs pass.
 
 Tag pushes matching `v*` trigger the workflow; only exact `vX.Y.Z` tags matching the source version pass validation. Prerelease tags are intentionally unsupported. Package source is checked out at the event's tagged commit. Pushing a normal `main` commit does not publish.
@@ -44,6 +44,6 @@ Users install released packages with `pipx install awsherlock` or `python -m pip
 
 **`awsherlock --update` intentionally installs GitHub `main`** so users can test unreleased fixes and features, including changes without a version bump. It requires Git and internet access. This task preserves the existing updater behavior.
 
-The 0.1.15 archives embed the README as it stood at tag time, including a preparation-time publication note. The repository README records the verified publication status.
+The 0.2.0 archives embed the README as it stood at tag time. This page records the verified publication status; its update after publication does not change the tagged archives.
 
 References: [Adding a Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [Publishing with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/), [official PyPA publish action](https://github.com/pypa/gh-action-pypi-publish).
