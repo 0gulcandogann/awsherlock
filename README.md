@@ -691,6 +691,10 @@ access are not evaluated. AWS applies the
 
 Missing configuration is distinct from AccessDenied. Failed or malformed reads
 are shown as errors; other checks on the same bucket and remaining buckets continue.
+If a bucket fact is unavailable, its coverage issue names the affected S3 check
+and fact. It points to a matching bucket read failure when one is recorded;
+otherwise the fact is absent from the snapshot. Confirmed absent configurations
+remain evaluable. Account Block Public Access context has its own separate issue.
 Only checks with successfully collected facts run. Coverage is COMPLETE, PARTIAL,
 ACCESS_DENIED, ERROR or NOT_SCANNED; the evaluated check count is displayed.
 Errors exit with code 1; completed evaluations exit with code 0 even when findings
