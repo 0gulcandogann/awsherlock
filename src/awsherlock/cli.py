@@ -25,6 +25,7 @@ from awsherlock.scanner import parse_services
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
+from awsherlock.sarif import render_sarif
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.diagnostics import runtime_diagnostics
@@ -244,7 +245,7 @@ def main(
     "[#5bfcfc]awsherlock scan --services iam --identity-governance --identity-inventory identities.json --identity-events[/]\n\n"
     "[#ffd369]Default: all seven services, console output, SDK-configured region. "
     "Use --region OR --regions. --summary-only requires console output. "
-    "--report-file requires JSON/HTML. --timeout sets both request limits; "
+    "--report-file requires JSON/HTML/SARIF. --timeout sets both request limits; "
     "do not combine with separate timeout flags. Offline scans reject AWS "
     "authentication, regions, request timeouts, --save-snapshot and --measurements-file. "
     "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
@@ -271,7 +272,7 @@ def scan(
     services: Annotated[
         str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms.", rich_help_panel="Scope and selection")
     ] = None,
-    output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, or html.", rich_help_panel="Reports and measurements")] = None,
+    output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
     report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.", rich_help_panel="Reports and measurements")] = None,
     role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).", rich_help_panel="Targets and credentials")] = None,
     no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.", rich_help_panel="Execution and display")] = False,
@@ -308,11 +309,11 @@ def scan(
         raise typer.BadParameter("Use text or json.", param_hint="--preview-format")
     if preview_format is not None and not preview:
         raise typer.BadParameter("--preview-format requires --preview.")
-    if output not in {None, "console", "json", "html"}:
-        raise typer.BadParameter("Use console, json, or html.", param_hint="--output")
-    if report_file is not None and output not in {"json", "html"}:
-        raise typer.BadParameter("--report-file requires --output json or html.")
-    if summary_only and output in {"json", "html"}:
+    if output not in {None, "console", "json", "html", "sarif"}:
+        raise typer.BadParameter("Use console, json, html or sarif.", param_hint="--output")
+    if report_file is not None and output not in {"json", "html", "sarif"}:
+        raise typer.BadParameter("--report-file requires --output json, html or sarif.")
+    if summary_only and output in {"json", "html", "sarif"}:
         raise typer.BadParameter("--summary-only requires console output.")
     organization = snapshot_path == Path("organization")
     offline = snapshot_path is not None and not organization
@@ -552,11 +553,11 @@ def scan(
             destination = report_file or Path("awsherlock-report.html")
             write_report(render_html(report), destination)
             message(f"HTML report saved: {terminal_text(str(destination))}", style=GREEN)
-        elif output == "json":
-            content = render_json(report)
+        elif output in {"json", "sarif"}:
+            content = render_sarif(report) if output == "sarif" else render_json(report)
             if report_file is not None:
                 write_report(content, report_file)
-                message(f"JSON report saved: {terminal_text(str(report_file))}", style=GREEN)
+                message(f"{output.upper()} report saved: {terminal_text(str(report_file))}", style=GREEN)
             else:
                 typer.echo(content, nl=False)
         else:

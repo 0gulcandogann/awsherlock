@@ -42,7 +42,7 @@ Before proposing the check, verify these synthetic cases locally:
    not PASS; an unrelated valid fact can still be evaluated.
 4. Pagination and partial collection do not hide resources or failures.
 5. Saved snapshot replay yields the same findings/coverage without AWS calls.
-6. Console, JSON and standalone HTML do not leak credentials, raw policies or
+6. Console, JSON, SARIF and standalone HTML do not leak credentials, raw policies or
    unescaped terminal/HTML control text.
 
 Project regression fixtures currently stay local rather than being committed.

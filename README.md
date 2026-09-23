@@ -233,7 +233,7 @@ code 1; malformed IDs fail as usage errors before AWS work.
 `--regions` scans explicit, comma-separated regions sequentially using the shared
 authenticated session. Repeated regions are removed in order. It cannot be combined
 with `--region` or an offline snapshot. IAM and S3 run once per account; regional
-coverage is labeled in console, JSON and HTML, including denied/skipped accounts.
+coverage is labeled in console, JSON, HTML and SARIF, including denied/skipped accounts.
 Identical repeated findings (such as CloudTrail shadow trails) are shown once;
 different evidence is retained. Resource/check counts represent collection and
 evaluation observations across the selected scopes. Other regions remain outside
@@ -462,8 +462,8 @@ option name in full.
 | `--identity-days N` | 30 | CloudTrail lookback, 1–90 days; a non-default value requires `--identity-events`. |
 | `--identity-max-pages N` | 20 | Evidence page/read budget, 1–1000, shared across regions within each supplemental collector. Requires live `--identity-governance`. |
 | `--identity-max-seconds N` | 60 | Evidence time budget between requests, 1–3600 seconds, within each supplemental collector. In-flight SDK timeouts/retries may exceed it. Requires live `--identity-governance`. |
-| `--output FORMAT` | `console` | `console`, `json` or `html`. JSON goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
-| `--report-file PATH` | Not supplied | Write a new JSON/HTML report; requires `--output json` or `--output html`. Existing files are not overwritten. |
+| `--output FORMAT` | `console` | `console`, `json`, `html` or `sarif`. JSON/SARIF goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
+| `--report-file PATH` | Not supplied | Write a new JSON/HTML/SARIF report; requires `--output json`, `--output html` or `--output sarif`. Existing files are not overwritten. |
 | `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
 | `--no-progress` | Off | Hide the banner and progress bar; explicit `--verbose` messages still appear. |
 | `--no-banner` | Off | Hide the banner while retaining interactive progress. |
@@ -569,11 +569,11 @@ A failed resource listing can hide resources the scanner never learned about. Th
 
 ## Reports
 
-| Terminal | HTML | JSON |
-| --- | --- | --- |
-| Review findings while scanning | Explore findings in your browser | Process structured scan data |
-| Severity-ordered cards and coverage | Search, filters, evidence and remediation | Metadata, findings and collection issues |
-| Default output | `--output html` | `--output json` |
+| Terminal | HTML | JSON | SARIF |
+| --- | --- | --- | --- |
+| Review findings while scanning | Explore findings in your browser | Process structured scan data | Exchange findings with SARIF readers |
+| Severity-ordered cards and coverage | Search, filters, evidence and remediation | Metadata, findings and collection issues | Logical AWS resource locations and full coverage properties |
+| Default output | `--output html` | `--output json` | `--output sarif` |
 
 ### HTML
 
@@ -607,7 +607,23 @@ Or save it directly:
 awsherlock scan --profile production --output json --report-file findings.json
 ```
 
-JSON includes metadata, summary counts, normalized findings, coverage, and collection issues. `--report-file` is supported for JSON and HTML output. Existing report files are never overwritten; choose a new name or move the earlier report.
+JSON includes metadata, summary counts, normalized findings, coverage, and collection issues. `--report-file` is supported for JSON, HTML and SARIF output. Existing report files are never overwritten; choose a new name or move the earlier report.
+
+### SARIF
+
+Export existing findings as [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html):
+
+```bash
+awsherlock scan facts.json --output sarif --report-file findings.sarif
+```
+
+Each finding becomes a result with its check ID and a logical AWS resource
+location. AWS resources are not source files, so no physical file/line location
+is fabricated. The run's `properties.coverage` and `properties.incomplete` retain
+all coverage states, even when results are empty. This is a report conversion,
+not GitHub code-scanning integration, and it omits raw finding evidence. The
+existing incomplete-scan exit code remains `1`; complete scans exit `0` even
+when findings exist.
 
 ## Scan another account
 
