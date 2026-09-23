@@ -1,5 +1,6 @@
 """Kiro PostFileSave hook: run focused local tests without shell interpolation."""
 
+import argparse
 import json
 import os
 import subprocess
@@ -15,6 +16,11 @@ TESTS = {
     "serverless.py": ("tests/test_serverless.py", "tests/test_secrets.py"),
     "audit.py": ("tests/test_audit.py",),
     "identity.py": ("tests/test_identity.py",),
+    "lambda_service.py": ("tests/test_serverless.py",),
+    "secrets.py": ("tests/test_secrets.py",),
+    "cloudtrail.py": ("tests/test_audit.py",),
+    "kms.py": ("tests/test_audit.py",),
+    "rds.py": ("tests/test_rds.py",),
 }
 
 
@@ -35,7 +41,7 @@ def commands_for(event: object) -> list[str]:
     if path is None:
         return [".github/scripts/ci_checks.py"]
     parts = Path(path.replace("\\", "/")).parts
-    if len(parts) < 4 or tuple(parts[-4:-1]) != ("src", "awsherlock", "rules"):
+    if len(parts) < 4 or tuple(parts[-4:-2]) != ("src", "awsherlock") or parts[-2] not in {"rules", "collectors"}:
         return [".github/scripts/ci_checks.py"]
     candidates = TESTS.get(parts[-1], ())
     existing = [name for name in candidates if (ROOT / name).is_file()]
@@ -43,8 +49,11 @@ def commands_for(event: object) -> list[str]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run focused local scanner tests for a saved file")
+    parser.add_argument("--path", help="Scanner collector or rule path; use this in Kiro CLI")
+    args = parser.parse_args()
     try:
-        event = json.loads(sys.stdin.read(65536))
+        event = {"filePath": args.path} if args.path else json.loads(sys.stdin.read(65536))
     except (ValueError, OSError):
         event = {}
     targets = commands_for(event)
@@ -53,6 +62,7 @@ def main() -> int:
     if targets[0].startswith("tests/"):
         command = [sys.executable, "-m", "pytest", *targets, "-q"]
     else:
+        print("WARNING: no focused local test found; synthetic scanner smoke does not validate the changed file.", flush=True)
         command = [sys.executable, targets[0]]
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 

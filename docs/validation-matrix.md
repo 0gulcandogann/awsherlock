@@ -3,9 +3,9 @@
 [README](../README.md) · [Pilot procedure](pilot.md) · [Checks and permissions](../README.md#checks-and-permissions)
 
 Prepared 2026-09-17 from the local collectors, rules, snapshot fact allowlist and
-evaluation pipeline. There are 35 registered checks: 29 default and six opt-in
-IAM governance checks. This is a validation contract, not live validation evidence.
-All 35 checks currently have real-AWS status **UNTESTED**. Mocked tests and the
+evaluation pipeline. There are 36 registered checks: 29 default, six opt-in
+IAM governance checks and one opt-in RDS check. This is a validation contract, not live validation evidence.
+All 36 checks currently have real-AWS status **UNTESTED**. Mocked tests and the
 historical LocalStack exercise do not change that status.
 
 In the tables, positive means the named check produces a finding on the selected
@@ -32,6 +32,7 @@ still block reads. Check selection restricts evaluation, not collection, so
 | Secrets | `secretsmanager:ListSecrets` |
 | CloudTrail | `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`, `cloudtrail:GetEventSelectors`; detail reads use the trail home region |
 | KMS | `kms:ListKeys`, `kms:DescribeKey` |
+| RDS (opt-in) | `rds:DescribeDBSnapshots`, `rds:DescribeDBSnapshotAttributes`, `rds:DescribeDBClusterSnapshots`, `rds:DescribeDBClusterSnapshotAttributes` |
 | Governance | IAM bundle; `iam:ListRoleTags`, `iam:ListUserTags` when tags are absent from authorization details; `iam:GetPolicy`, `iam:GetPolicyVersion` for unresolved managed-policy joins; workload context uses `lambda:ListFunctions`, `ec2:DescribeInstances`, `iam:GetInstanceProfile` |
 
 Single-account authentication resolves `sts:GetCallerIdentity`; cross-account
@@ -93,6 +94,14 @@ access requires `sts:AssumeRole` and role trust. Organization discovery uses
 | AWSH-KMS-001 | Eligible `rotation` has enabled false | `kms:GetKeyRotationStatus` + KMS bundle | Enabled customer-managed symmetric AWS_KMS encryption key with rotation off / rotation on | AWS-managed/imported/asymmetric/disabled keys outside automatic-rotation scope; absence of finding on excluded keys is not a tested negative |
 | AWSH-KMS-002 | Customer-key Allow `policy` contains broad principal | `kms:GetKeyPolicy` + KMS bundle | Broad Allow principal / restricted principal or standard account-root delegation | Resource * alone does not trigger. Conditions/denies not simulated; AWS-managed policies skipped |
 
+## RDS — opt-in public manual snapshot restore
+
+Select `--services rds` and a region. This check reads account-owned manual DB-instance and Aurora/DB-cluster snapshots only. A public restore attribute is a configuration finding; no copy or data access is observed.
+
+| Check ID | Positive | Reads | Positive / negative fixture | Limits |
+| --- | --- | --- | --- | --- |
+| AWSH-RDS-001 | `restore` attribute includes `all` | RDS bundle | Manual DB and cluster snapshot with `all` / each with private restore values | Missing attributes and denied reads are incomplete coverage, never PASS; automated/shared snapshots and general DB public access are outside scope |
+
 ## IAM — opt-in governance
 
 Use `--identity-governance`; the last two checks require approval evidence from
@@ -149,7 +158,7 @@ those absence values. Exit 0 means completed evaluation even with findings; exit
 
 ## Pilot result ledger
 
-Copy this record for each matrix ID and scenario, keeping all 35 IDs represented.
+Copy this record for each matrix ID and scenario, keeping all 36 IDs represented.
 Initial status for every ID is UNTESTED; unavailable positive/negative scenarios
 stay untested even if another scenario for that ID succeeds.
 

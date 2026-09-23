@@ -26,6 +26,7 @@ _SCOPES = {
     "cloudtrail": "Regional trail indicators; missing facts appear in coverage issues. CT-004 needs source and read/write context. Full API logging, delivery and retention are unverified.",
     "kms": "Regional key configuration indicators; missing rotation or policy facts appear in coverage issues for discovered keys. AWS-managed key policies are excluded.",
     "ec2": "Regional configuration; identified resources retain valid facts when another fact is invalid, with missing facts in coverage issues. Routes, NACLs and application controls are not evaluated.",
+    "rds": "Opt-in regional manual DB and Aurora/DB-cluster snapshot restore permissions. Public sharing is a configuration indicator; an observed copy or data read is not verified.",
 }
 
 

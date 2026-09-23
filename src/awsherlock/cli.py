@@ -21,7 +21,7 @@ from awsherlock.activity import scan_activity
 from awsherlock.help import RootHelpGroup
 from awsherlock.aws.session import SessionError, create_scan_context, validate_region, validate_account_id, verify_account_id
 from awsherlock.snapshot import SnapshotError, capture_snapshot, read_snapshot, write_snapshot, snapshot_saver
-from awsherlock.scanner import parse_services
+from awsherlock.scanner import SERVICES, parse_services
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
@@ -330,7 +330,7 @@ def main(
         raise typer.Exit()
     if list_services:
         checks = check_catalog()
-        for service in parse_services(None):
+        for service in SERVICES:
             count = sum(entry[1] == service for entry in checks)
             message(f"{service:<14} {count} checks", style=GREEN)
         raise typer.Exit()
@@ -381,7 +381,7 @@ def scan(
         str | None, typer.Option("--external-id", help="External ID required by the role trust policy.", rich_help_panel="Targets and credentials")
     ] = None,
     services: Annotated[
-        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms.", rich_help_panel="Scope and selection")
+        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms,rds. RDS is opt-in.", rich_help_panel="Scope and selection")
     ] = None,
     output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
     fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for unsuppressed high/critical findings; incomplete coverage still exits 1.", rich_help_panel="Execution and display")] = None,
@@ -767,11 +767,11 @@ def guide(
                 validate_region(region)
             except SessionError as error:
                 raise typer.BadParameter(str(error), param_hint="region") from None
-        supported_services = parse_services(None)
+        supported_services = SERVICES
         for index, service in enumerate(supported_services, 1):
             message(f"{index}. {service}")
-        choice = typer.prompt("Services (all or comma-separated numbers)", default="all").strip().lower()
-        services = None if choice == "all" else ",".join(supported_services[index - 1]
+        choice = typer.prompt("Services (7 default, or numbers)", default="default").strip().lower()
+        services = None if choice in {"default", "all"} else ",".join(supported_services[index - 1]
                                                      for index in _guide_selection(choice, len(supported_services), multiple=True))
     except (KeyboardInterrupt, EOFError, typer.Abort):
         message("Guide cancelled.", style=YELLOW, err=True)

@@ -117,6 +117,18 @@ def ec2_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
+def rds_missing_fact_issue(resource: Resource, identifier: str,
+                           collection_issues: list[CollectionIssue]) -> dict:
+    operation = ("DescribeDBSnapshotAttributes" if resource.resource_type == "db-snapshot"
+                 else "DescribeDBClusterSnapshotAttributes")
+    failed = any(issue.operation == operation and issue.resource_id == resource.resource_id
+                 for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires restore_public; {reason}."))
+
+
 def iam_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                            collection_issues: list[CollectionIssue]) -> dict:
     """Explain absent core IAM facts without exposing credential or policy data."""
@@ -244,6 +256,8 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(kms_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "ec2":
                         issues.append(ec2_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "rds":
+                        issues.append(rds_missing_fact_issue(resource, identifier, collection.issues))
                     elif service == "iam" and rule.number <= 6:
                         issues.append(iam_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "iam":

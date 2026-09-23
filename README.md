@@ -5,11 +5,11 @@
 [![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0)
 [![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-[![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
+[![36 security checks](https://img.shields.io/badge/security_checks-36-7C3AED?style=flat-square)](#checks)
 [![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE)
 
-AWSherlock is a command-line scanner for AWS security configuration. It has 35 registered checks across seven core services: 29 default configuration checks and six opt-in IAM identity governance checks. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
+AWSherlock is a command-line scanner for AWS security configuration. It has 36 registered checks across eight supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks and one opt-in RDS manual snapshot check. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
 
 > [!TIP]
 > **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
@@ -57,15 +57,19 @@ Contributors: see [Contributing](docs/contributing.md) and
 Kiro users can load `.kiro/steering/check-authoring.md` when changing checks,
 copy the [new-check specification template](docs/check-spec-template.md), and
 select the read-only `awsherlock-security-reviewer` agent for a security review.
-The repository hook runs focused local rule tests after a rule file save; when
-the local ignored test suite is absent, it runs the small public synthetic
-scanner check. It does not contact or modify AWS. The steering complements
-the public contributor guides; maintainer-only planning files are not part of
+The IDE hook runs focused local tests after a rule or collector file save. In
+Kiro CLI, run `python .kiro/scripts/check_rule_tests.py --path src/awsherlock/rules/rds.py`
+explicitly for a changed file. When the local ignored test module is absent,
+the script reports that only the public synthetic scanner smoke ran; this is
+not validation of the changed rule. It does not contact or modify AWS. The
+steering complements the public contributor guides; maintainer-only planning
+files are not part of
 the published repository.
 
-The standalone `.kiro/hooks/*.json` format requires Kiro IDE 1.0 or CLI 3.0
-(or a CLI build running its v3 engine); CLI 2.x classic mode uses an older hook
-format. See Kiro's [steering](https://kiro.dev/docs/steering/),
+Kiro's `PostFileSave` event is currently IDE-only; CLI users run the focused
+script manually. For a larger new check, use Kiro's requirements/design/tasks
+Spec flow as a local planning aid, then follow the approved project scope.
+See Kiro's [specs](https://kiro.dev/docs/specs/), [steering](https://kiro.dev/docs/steering/),
 [hooks](https://kiro.dev/docs/hooks/) and
 [custom agents](https://kiro.dev/docs/cli/custom-agents/creating/) documentation.
 
@@ -200,11 +204,12 @@ is the default. JSON output stays uncolored even with `--color always`.
 
 ### Choose services
 
-A plain scan selects all seven supported services. To limit the scan, pass a comma-separated list:
+A plain scan selects the seven default services. To limit the scan or opt in to RDS, pass a comma-separated list:
 
 ```bash
 awsherlock scan --profile production --services iam,s3
 awsherlock scan --profile production --services ec2,lambda,kms
+awsherlock scan --profile production --services rds --region eu-west-1
 ```
 
 Accepted names are `iam`, `s3`, `ec2`, `lambda`, `secretsmanager`, `cloudtrail`, and `kms`.
@@ -391,7 +396,7 @@ awsherlock snapshot --help
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
-| `--list-checks` | Off | List all 35 registered check IDs and titles; no AWS calls. Six identity governance checks are opt-in. |
+| `--list-checks` | Off | List all 36 registered check IDs and titles; no AWS calls. Six identity governance checks and the RDS check are opt-in. |
 | `--list-services` | Off | List supported services and their check counts; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
@@ -568,7 +573,7 @@ option name in full.
 | `--role ARN` | No assumed role | Assume an IAM role for a single-account scan, or for organization discovery/source authentication. |
 | `--role-session-name NAME` | `AWSherlock` | Name the assumed-role session; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
 | `--external-id ID` | Not supplied | External ID for the assumed role; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
-| `--services LIST` | All seven services | Comma-separated supported service names. Offline selection must exist in the snapshot. |
+| `--services LIST` | Seven default services | Comma-separated supported service names; RDS is opt-in. Offline selection must exist in the snapshot. |
 | `--checks LIST` | All checks | Evaluate comma-separated registered IDs, such as `AWSH-S3-001,AWSH-S3-003`. Collection is unchanged; IDs must belong to the selected services/snapshot. Excluded checks remain visible in coverage. |
 | `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
 | `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
@@ -643,7 +648,7 @@ it is different from scan's `--output FORMAT`.
 | --- | --- | --- |
 | `--help` | Off | Show snapshot help without contacting AWS. |
 | `--output PATH` | Required | Write a new normalized JSON snapshot file; existing files are not overwritten. |
-| `--services LIST` | All seven services | Select supported services using a comma-separated list. |
+| `--services LIST` | Seven default services | Select supported services using a comma-separated list; RDS is opt-in. |
 | `--profile NAME` | SDK credential chain | Authenticate with a named AWS profile. |
 | `--role ARN` | No assumed role | Assume this IAM role before collecting facts. |
 | `--role-session-name NAME` | `AWSherlock` | Set the role session name; requires `--role`. |
@@ -1119,6 +1124,21 @@ separately; otherwise the fact is absent from the snapshot. Keys that cannot
 be described remain collection issues, not passing checks. AWS-managed keys
 remain outside the key-policy check.
 
+### RDS manual snapshot sharing (opt-in)
+
+Run `awsherlock scan --services rds --region eu-west-1` to check account-owned
+manual DB-instance and Aurora/DB-cluster snapshots. `AWSH-RDS-001` is HIGH when
+the snapshot's `restore` attribute includes `all`. It means public restore is
+configured; the scan does not observe a copy, restore, or data read. Automatic
+and shared snapshots, DB-instance network access, and storage encryption are
+outside this check. RDS is not part of the seven-service default scan.
+
+Required reads: `rds:DescribeDBSnapshots`, `rds:DescribeDBSnapshotAttributes`,
+`rds:DescribeDBClusterSnapshots`, and `rds:DescribeDBClusterSnapshotAttributes`.
+The collector requests manual snapshots with pagination. A denied or missing
+attribute produces incomplete coverage, never a passing check. The normalized
+snapshot stores only the resource identity and a `restore_public` boolean.
+
 
 ### Check IDs for the remaining services
 
@@ -1148,10 +1168,11 @@ remain outside the key-policy check.
 | AWSH-CT-004 | Management read/write events or supported KMS/RDS Data API sources are excluded | MEDIUM |
 | AWSH-KMS-001 | Eligible customer key has automatic rotation disabled | MEDIUM |
 | AWSH-KMS-002 | Customer key policy allows a broad principal | MEDIUM |
+| AWSH-RDS-001 | Manual DB or DB-cluster snapshot permits public restore | HIGH |
 
 ### Validation and limits
 
-The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [35-check validation matrix](https://github.com/0gulcandogann/awsherlock/blob/main/docs/validation-matrix.md) and [pilot guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
+The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [36-check validation matrix](https://github.com/0gulcandogann/awsherlock/blob/main/docs/validation-matrix.md) and [pilot guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
 
 A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
@@ -1287,7 +1308,7 @@ Version [0.2.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0)
 and a separate scanner CI workflow. Existing findings can also be exported as
 SARIF. Identity inventory/review views, guided scan setup, JSON scan preview,
 CloudTrail read/write coverage and explicit missing-fact explanations improve
-the existing 35-check catalog. Console findings now show normalized evidence,
+the existing 36-check catalog. Console findings now show normalized evidence,
 risk and remediation. Optional Kiro contributor aids are included. Missing
 permission coverage remains visible; no S-03 service expansion or attack-path
 engine is included.
@@ -1299,7 +1320,7 @@ checks or report format were added in this version.
 
 Version 0.1.10 adds opt-in NHI/AI identity governance, declarations/approvals,
 bounded audit attribution across five connection branches, metadata-only native
-AI role bindings and existing Access Analyzer evidence. The catalog has 35 checks
+AI role bindings and existing Access Analyzer evidence. The catalog has 36 checks
 (29 default and six opt-in governance checks). It also includes explicit check,
 account, OU and resource selectors, S3 account safeguard context, CloudTrail
 management/source exclusions, scan-local collection measurements, successful

@@ -2,10 +2,10 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "Run focused AWSherlock rule tests",
-      "description": "Run local focused tests after a scanner rule file is saved; no AWS calls",
+      "name": "Run focused AWSherlock scanner tests",
+      "description": "Run local focused tests after a scanner collector or rule file is saved; no AWS calls",
       "trigger": "PostFileSave",
-      "matcher": "(^|[\\\\/])src[\\\\/]awsherlock[\\\\/]rules[\\\\/][^\\\\/]+\\.py$",
+      "matcher": "(^|[\\\\/])src[\\\\/]awsherlock[\\\\/](rules|collectors)[\\\\/][^\\\\/]+\\.py$",
       "action": {
         "type": "command",
         "command": "python .kiro/scripts/check_rule_tests.py"

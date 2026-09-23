@@ -29,6 +29,8 @@ FACTS = {
     ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events", "management_excluded_sources", "management_event_types"},
     ("cloudtrail", "regional_summary"): {"usable_trail"},
     ("kms", "key"): {"rotation", "policy"},
+    ("rds", "db-snapshot"): {"restore_public"},
+    ("rds", "db-cluster-snapshot"): {"restore_public"},
 }
 IDENTITY_COMMON = {"identity_requested", "identity_profile", "identity_approval", "identity_policy_context",
                    "identity_bindings", "identity_activity", "identity_analyzer_findings"}

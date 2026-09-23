@@ -22,6 +22,7 @@ SCHEMAS = {
     ("cloudtrail", "trail_settings"): {"IsMultiRegionTrail": bool, "IncludeGlobalServiceEvents": bool, "LogFileValidationEnabled": bool, "IsOrganizationTrail": bool},
     ("cloudtrail", "trail_status"): {"logging": bool, "destination": str, "delivery_error": bool},
     ("kms", "policy"): [RESOURCE_STATEMENT],
+    ("rds", "restore_public"): bool,
 }
 
 
