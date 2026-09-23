@@ -618,7 +618,7 @@ Snapshot does not accept scan-only `--regions`, `--save-snapshot`, `--role-name`
 
 ## Reading the results
 
-Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource, explains the configuration issue, and gives a remediation suggestion. Scan issues, including collection errors, appear in a separate section.
+Terminal output starts with finding totals, severity counts, and a coverage table. Findings follow in order of severity. Each card identifies the resource and shows its exact normalized evidence, risk, remediation and configuration-only verification limit. Scan issues, including collection errors, appear in a separate section.
 
 Severity describes the reported configuration risk. Coverage tells you whether the scanner had enough information to evaluate the selected checks. Read both before drawing a conclusion from the results.
 
@@ -637,6 +637,7 @@ A failed resource listing can hide resources the scanner never learned about. Th
 | `0` | Evaluation completed. Findings may still exist. |
 | `1` | Coverage was incomplete, or an operational error occurred. |
 | `2` | The command or its arguments were invalid. |
+| `3` | A requested `--fail-on` threshold was met with complete coverage. |
 
 > [!IMPORTANT]
 > Exit code `0` does not mean there are no security findings. If a scan is partial, AWSherlock still writes the available report before returning `1`.

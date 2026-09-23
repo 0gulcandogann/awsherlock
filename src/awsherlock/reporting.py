@@ -121,6 +121,11 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
         body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style=CYAN)
         body.append(f"Resource: {terminal_text(finding.resource_id)}\n", style=CYAN)
         body.append(f"{terminal_text(finding.description, multiline=True)}\n\n", style=YELLOW)
+        body.append("Normalized evidence:\n", style=f"bold {CYAN}")
+        body.append(terminal_text(json.dumps(finding.evidence, indent=2, ensure_ascii=False, allow_nan=False),
+                                  multiline=True) + "\n\n", style=CYAN)
+        body.append("Risk: ", style=f"bold {YELLOW}")
+        body.append(terminal_text(finding.risk, multiline=True) + "\n\n", style=YELLOW)
         if index - 1 in report.suppression_matches:
             suppression = report.suppression_matches[index - 1]
             body.append("Suppressed until " + terminal_text(suppression["expires_on"]) +
@@ -128,6 +133,7 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
                         terminal_text(suppression["reason"], multiline=True) + "\n\n", style=YELLOW)
         body.append("Remediation: ", style=f"bold {GREEN}")
         body.append(terminal_text(finding.remediation, multiline=True), style=GREEN)
+        body.append("\n\nVerification limit: observed configuration only; effective access was not tested.", style=YELLOW)
         console.print(Panel(body, title=title, title_align="left", border_style=PURPLE, padding=(1, 2)))
     if not findings:
         console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
