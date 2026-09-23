@@ -65,6 +65,7 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                         if cache is not None:
                             cache[key] = cached
                     resource.data["management_excluded_sources"] = list(cached["management_excluded_sources"])
+                    resource.data["management_event_types"] = dict(cached["management_event_types"])
                     return cached["management_events"]
                 collect_fact(result, resource, "management_events", "GetEventSelectors", selectors)
                 if all(fact in resource.data for fact in ("trail_status", "trail_settings", "management_events")):

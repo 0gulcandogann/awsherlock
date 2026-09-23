@@ -23,10 +23,14 @@ class AuditRule:
             if self.number == 1:
                 matches = {"usable": False} if value is False else []
             elif self.number == 4:
-                if value is True and "management_excluded_sources" not in resource.data:
-                    raise ValueError("Management source context was not collected")
+                if value is True and any(fact not in resource.data for fact in
+                                         ("management_excluded_sources", "management_event_types")):
+                    raise ValueError("Management selector context was not collected")
                 excluded = resource.data.get("management_excluded_sources", [])
-                matches = {"management_events": value, "excluded_sources": excluded} if value is False or excluded else []
+                event_types = resource.data.get("management_event_types", {"read": False, "write": False})
+                matches = {"management_events": value, "excluded_sources": excluded,
+                           "read_events": event_types["read"], "write_events": event_types["write"]} if (
+                               value is False or excluded or not all(event_types.values())) else []
             elif self.number == 2:
                 matches = value if not value["IsMultiRegionTrail"] or not value["IncludeGlobalServiceEvents"] else []
             else:
@@ -52,7 +56,7 @@ CLOUDTRAIL_RULES = (
     AuditRule("cloudtrail", 1, "usable_trail", "No usable CloudTrail trail visible in scanned region", "Review logging state, S3 destination and delivery errors; configure an appropriate trail."),
     AuditRule("cloudtrail", 2, "trail_settings", "CloudTrail multi-region or global event logging is incomplete", "Review regional coverage and global service event logging."),
     AuditRule("cloudtrail", 3, "trail_settings", "CloudTrail log file validation is disabled", "Enable log file validation and validate delivered log integrity."),
-    AuditRule("cloudtrail", 4, "management_events", "CloudTrail management-event logging is excluded", "Review basic or advanced event selectors and included sources (KMS/RDS Data API); read/write filters may still limit coverage."),
+    AuditRule("cloudtrail", 4, "management_events", "CloudTrail management-event logging is incomplete", "Review basic or advanced selectors; include both read and write management events and intended KMS/RDS Data API sources."),
 )
 KMS_RULES = (
     AuditRule("kms", 1, "rotation", "Eligible KMS key automatic rotation is disabled", "Review your rotation policy and enable automatic rotation when appropriate."),

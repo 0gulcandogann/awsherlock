@@ -136,12 +136,14 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                     elif service == "s3":
                         issues.append(s3_missing_fact_issue(resource, identifier, fact, collection.issues))
                     continue
-                if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True and \
-                        "management_excluded_sources" not in resource.data:
-                    missing += 1
-                    issues.append(cloudtrail_missing_fact_issue(resource, identifier,
-                                                                "management_excluded_sources", collection.issues))
-                    continue
+                if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True:
+                    missing_context = [name for name in ("management_excluded_sources", "management_event_types")
+                                       if name not in resource.data]
+                    if missing_context:
+                        missing += 1
+                        issues.extend(cloudtrail_missing_fact_issue(resource, identifier, name, collection.issues)
+                                      for name in missing_context)
+                        continue
                 try:
                     result = evaluate_rules([resource], [rule])
                     findings.extend(result)

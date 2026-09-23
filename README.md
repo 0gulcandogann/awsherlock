@@ -625,7 +625,7 @@ Snapshots reflect the time of collection. They contain account IDs, resource nam
 | EC2 | 6 | Internet-wide SSH, RDP and database ingress; IMDSv1; public addresses; EBS encryption |
 | Lambda | 3 | Public function URLs, broad managed execution-role policies, deprecated runtimes |
 | Secrets Manager | 3 | Rotation, broad resource-policy principals, custom encryption key state |
-| CloudTrail | 4 | Usable trail, multi-region/global logging, log validation and management-event exclusions |
+| CloudTrail | 4 | Usable trail, multi-region/global logging, log validation and management-event read/write or source gaps |
 | KMS | 2 | Eligible key rotation, broad key-policy principals |
 
 [Checks and permissions](#checks-and-permissions) lists the check IDs, finding triggers, required AWS actions, and service-specific limits.
@@ -870,15 +870,16 @@ reads status in the home region, and checks for a usable trail visible in the
 configured region, multi-region/global-event settings, log file validation and
 management-event selectors (`AWSH-CT-004`). Usability requires applicable regional
 coverage and management events in addition to logging and no reported delivery error.
-Basic selectors and advanced eventCategory/readOnly selectors are supported, along
+Basic ReadWriteType and advanced eventCategory/readOnly selectors are supported, along
 with documented trail eventSource NotEquals exclusions for `kms.amazonaws.com`
 and `rdsdata.amazonaws.com`. Unsupported source/name/resource filters remain
-unknown/partial. Facts preserve inclusion plus source exclusions common to every
-management-enabled selector; `AWSH-CT-004` reports those exclusions even when other
-management events are included. Per-selector read/write gaps are not simulated;
+unknown/partial. Facts preserve whether read and write management events are
+selected by any supported selector, plus source exclusions common to every
+management-enabled selector. `AWSH-CT-004` reports a missing read/write class or
+known source exclusion. Per-source read/write combinations are not simulated;
 a positive indicator does not prove all API events are logged.
 Old snapshots remain readable; absent selector facts count as NOT_SCANNED.
-Snapshots with a positive management indicator but no source-exclusion context
+Snapshots with a positive management indicator but no source or read/write context
 cannot complete `AWSH-CT-004`; coverage remains partial.
 For selected CloudTrail checks, coverage issues name the check ID and missing
 fact. If a related collection issue exists, inspect that operation for denial or
@@ -926,7 +927,7 @@ or decrypted data is requested.
 | AWSH-CT-001 | No usable CloudTrail trail is visible in the scanned region | HIGH |
 | AWSH-CT-002 | Multi-region or global service event logging is disabled | MEDIUM |
 | AWSH-CT-003 | Log file validation is disabled | MEDIUM |
-| AWSH-CT-004 | Management events or supported KMS/RDS Data API sources are excluded | MEDIUM |
+| AWSH-CT-004 | Management read/write events or supported KMS/RDS Data API sources are excluded | MEDIUM |
 | AWSH-KMS-001 | Eligible customer key has automatic rotation disabled | MEDIUM |
 | AWSH-KMS-002 | Customer key policy allows a broad principal | MEDIUM |
 

@@ -20,7 +20,8 @@ def management_events(response: object) -> bool:
         if not isinstance(selector, dict):
             raise InvalidResponse()
         value = selector.get("IncludeManagementEvents", True)
-        if type(value) is not bool or selector.get("ReadWriteType", "All") not in {"All", "ReadOnly", "WriteOnly"}:
+        read_write_type = selector.get("ReadWriteType", "All")
+        if type(value) is not bool or not isinstance(read_write_type, str) or read_write_type not in {"All", "ReadOnly", "WriteOnly"}:
             raise InvalidResponse()
         included.append(value)
     for selector in advanced:
@@ -68,22 +69,30 @@ def management_events(response: object) -> bool:
 
 
 def management_context(response: object) -> dict:
-    """Known trail exclusions common to every management-enabled selector.
+    """Known source exclusions and read/write selection for management events.
 
     A source excluded in only one selector may still be included by another.
-    This context does not establish full read/write or API coverage.
+    This context does not establish complete per-source or API coverage.
     """
     enabled = management_events(response)
     exclusions = []
+    event_types = {"read": False, "write": False}
     for selector in response.get("EventSelectors", []):
         if selector.get("IncludeManagementEvents", True):
             sources = selector.get("ExcludeManagementEventSources", [])
             if not isinstance(sources, list) or any(not isinstance(s, str) or s not in MANAGEMENT_SOURCES for s in sources):
                 raise InvalidResponse()
             exclusions.append(set(sources))
+            read_write_type = selector.get("ReadWriteType", "All")
+            event_types["read"] |= read_write_type in {"All", "ReadOnly"}
+            event_types["write"] |= read_write_type in {"All", "WriteOnly"}
     for selector in response.get("AdvancedEventSelectors", []):
         fields = selector["FieldSelectors"]
         if any(isinstance(field, dict) and field.get("Field") == "eventCategory" and "Management" in field.get("Equals", []) for field in fields):
             exclusions.append({source for field in fields if field["Field"] == "eventSource" for source in field["NotEquals"]})
+            read_only = next((field["Equals"] for field in fields if field["Field"] == "readOnly"), ["true", "false"])
+            event_types["read"] |= "true" in read_only
+            event_types["write"] |= "false" in read_only
     common = set.intersection(*exclusions) if exclusions else set()
-    return {"management_events": enabled, "management_excluded_sources": sorted(common)}
+    return {"management_events": enabled, "management_excluded_sources": sorted(common),
+            "management_event_types": event_types}

@@ -26,7 +26,7 @@ FACTS = {
     ("ec2", "security-group"): {"ingress"}, ("ec2", "instance"): {"metadata", "addresses"}, ("ec2", "volume"): {"encrypted"},
     ("lambda", "function"): {"urls", "runtime", "role_policies"},
     ("secretsmanager", "secret"): {"rotation", "policy", "encryption"},
-    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events", "management_excluded_sources"},
+    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events", "management_excluded_sources", "management_event_types"},
     ("cloudtrail", "regional_summary"): {"usable_trail"},
     ("kms", "key"): {"rotation", "policy"},
 }

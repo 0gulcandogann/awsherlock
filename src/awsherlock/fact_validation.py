@@ -18,6 +18,7 @@ SCHEMAS = {
     ("cloudtrail", "usable_trail"): bool,
     ("cloudtrail", "management_events"): bool,
     ("cloudtrail", "management_excluded_sources"): [str],
+    ("cloudtrail", "management_event_types"): {"read": bool, "write": bool},
     ("cloudtrail", "trail_settings"): {"IsMultiRegionTrail": bool, "IncludeGlobalServiceEvents": bool, "LogFileValidationEnabled": bool, "IsOrganizationTrail": bool},
     ("cloudtrail", "trail_status"): {"logging": bool, "destination": str, "delivery_error": bool},
     ("kms", "policy"): [RESOURCE_STATEMENT],
@@ -80,3 +81,6 @@ def validate_resource_facts(resource: Resource) -> None:
                 raise ValueError("Invalid metadata options")
         if resource.service == "lambda" and fact == "urls" and any(url["auth"] not in {"NONE", "AWS_IAM"} for url in value):
             raise ValueError("Invalid URL authentication")
+    if resource.service == "cloudtrail" and "management_events" in resource.data and "management_event_types" in resource.data:
+        if resource.data["management_events"] != any(resource.data["management_event_types"].values()):
+            raise ValueError("Inconsistent management event selector facts")
