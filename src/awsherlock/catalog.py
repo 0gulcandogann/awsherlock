@@ -24,6 +24,7 @@ _SCOPES = {
     "lambda": "Regional function metadata indicators; missing URL, role-policy or runtime facts appear in coverage issues. Function code and environment values are not read.",
     "secretsmanager": "Regional secret metadata indicators; missing rotation, policy or encryption facts appear in coverage issues. Secret values are never read.",
     "cloudtrail": "Regional trail indicators; missing facts appear in coverage issues. CT-004 needs source and read/write context. Full API logging, delivery and retention are unverified.",
+    "kms": "Regional key configuration indicators; missing rotation or policy facts appear in coverage issues for discovered keys. AWS-managed key policies are excluded.",
     "ec2": "Regional configuration; network routes, NACLs and application controls are not evaluated.",
 }
 

@@ -930,6 +930,11 @@ scope. Standard root delegation and `Resource: "*"` alone do not trigger the pol
 check. Conditions/denies may restrict broad statements. Requires `kms:ListKeys`,
 `kms:DescribeKey`, `kms:GetKeyRotationStatus`, `kms:GetKeyPolicy`. No key material
 or decrypted data is requested.
+For a discovered key, missing rotation or policy facts name the affected
+`AWSH-KMS` check in coverage. A matching per-key read failure is reported
+separately; otherwise the fact is absent from the snapshot. Keys that cannot
+be described remain collection issues, not passing checks. AWS-managed keys
+remain outside the key-policy check.
 
 
 ### Check IDs for the remaining services
