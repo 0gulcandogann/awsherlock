@@ -418,6 +418,17 @@ and `identities`. It is not the scan report schema. `--color` accepts `auto`,
 incomplete coverage or input errors. The snapshot must contain IAM; old
 snapshots lacking governance facts remain incomplete, not empty proof of safety.
 
+`--view ai|unowned|stale|shared` filters displayed identities while keeping full
+IAM coverage. `ai` matches explicit AI declarations or native Bedrock/AgentCore
+bindings, never identity names or User-Agent guesses; `unowned` and `stale`
+match existing IAM-007 and IAM-009 review findings; `shared` matches an
+explicit shared declaration. For example,
+`awsherlock identities identity-facts.json --view stale --output json` emits a
+version-2 identity-view document with `view`, `total_identities` and
+`matched_identities` in addition to the version-1 fields. The default `all`
+view keeps version 1. No match is not proof that no such identities exist:
+missing facts, limited usage windows and incomplete coverage still matter.
+
 ### Scan options: `awsherlock scan [OPTIONS] [snapshot_path]`
 
 Omit `snapshot_path` for a live account scan, use `organization` for discovered

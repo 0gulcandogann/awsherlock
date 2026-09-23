@@ -33,6 +33,7 @@ from awsherlock.regional import collection_scopes, parse_regions, scan_regions
 from awsherlock.selection import parse_check_selection, parse_account_selection, parse_ou_selection, parse_resource_selection
 from awsherlock.identity_config import IdentityOptions, read_inventory
 from awsherlock.identity_display import show_identity, show_offline_identity, show_profiles
+from awsherlock.identity_reporting import select_identity_summaries
 from awsherlock.aws.profiles import list_profiles
 from awsherlock.aws.context import ScanContext
 from awsherlock.measurement import ScanMeasurements
@@ -657,12 +658,15 @@ def guide(
 def identities(
     snapshot_path: Annotated[Path, typer.Argument(help="Saved normalized snapshot containing IAM collection.")],
     output: Annotated[str, typer.Option("--output", help="Identity view format: console (default) or json.")] = "console",
+    view: Annotated[str, typer.Option("--view", help="Review view: all (default), ai, unowned, stale or shared.")] = "all",
     color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True,
                                               help="Terminal colors: auto, always or never.")] = None,
 ) -> None:
     """Inspect saved IAM role/user identity summaries without AWS calls."""
     if output not in {"console", "json"}:
         raise typer.BadParameter("Use console or json.", param_hint="--output")
+    if view not in {"all", "ai", "unowned", "stale", "shared"}:
+        raise typer.BadParameter("Use all, ai, unowned, stale or shared.", param_hint="--view")
     try:
         snapshot = read_snapshot(snapshot_path)
         if "iam" not in snapshot.services:
@@ -675,15 +679,23 @@ def identities(
     except OSError:
         message("Error: Could not read the snapshot file.", style=RED, err=True)
         raise typer.Exit(code=1) from None
+    selected = select_identity_summaries(report, view)
     if output == "json":
-        typer.echo(json.dumps({"schema_version": 1, "kind": "identity-view",
-                               "account_id": snapshot.metadata.account_id,
-                               "coverage": report.coverage, "identities": report.identities},
+        document = {"schema_version": 1 if view == "all" else 2, "kind": "identity-view",
+                    "account_id": snapshot.metadata.account_id,
+                    "coverage": report.coverage, "identities": selected}
+        if view != "all":
+            document.update({"view": view, "total_identities": len(report.identities),
+                             "matched_identities": len(selected)})
+        typer.echo(json.dumps(document,
                               indent=2, ensure_ascii=False, allow_nan=False))
     else:
-        if not report.identities:
+        if view != "all":
+            message(f"{view} review view: {len(selected)} of {len(report.identities)} identities matched. "
+                    "No match does not prove absence; review coverage.", style=YELLOW)
+        elif not report.identities:
             message("No IAM role/user identities were discovered. Review collection coverage.", style=YELLOW)
-        render_console(report, summary_only=True)
+        render_console(replace(report, identities=selected), summary_only=True)
     if report.incomplete:
         raise typer.Exit(code=1)
 

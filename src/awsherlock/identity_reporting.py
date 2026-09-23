@@ -34,3 +34,16 @@ def identity_summary(resource, excluded: bool = False) -> dict:
             "evidence": {key: value for key, value in data.items() if key.startswith("identity_") and key != "identity_requested"},
             "missing_facts": [key for key in ("identity_profile", "identity_approval", "identity_policy_context",
                                               *(("identity_trust", "identity_usage") if resource.resource_type == "role" else ())) if key not in data]}
+
+
+def select_identity_summaries(report, view: str) -> list[dict]:
+    """Select evidence-backed review candidates without changing scan coverage."""
+    if view == "all":
+        return report.identities
+    if view == "ai":
+        return [item for item in report.identities if item["ai_attribution"] in {"declared_ai", "verified_ai_binding"}]
+    if view == "shared":
+        return [item for item in report.identities if item["shared_declared"] is True]
+    finding_id = {"unowned": "AWSH-IAM-007", "stale": "AWSH-IAM-009"}[view]
+    matched = {(finding.account_id, finding.resource_arn) for finding in report.findings if finding.id == finding_id}
+    return [item for item in report.identities if (item["account_id"], item["arn"]) in matched]
