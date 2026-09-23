@@ -761,6 +761,11 @@ the normalized trust, policy source, usage, workload and event evidence. Exclude
 identities remain visible with `NOT_SCANNED` evaluation scope. Saved evidence is
 replayed offline without AWS calls; requesting governance on old snapshots exposes
 missing facts. Governance capture uses `scan --save-snapshot`.
+Missing owner/profile, role usage/trust or approval facts name the affected
+governance check in coverage. If a managed-policy or group join is incomplete,
+IAM-002/003 remain incomplete even when no broad grant was found in known
+statements. Confirmed broad grants are still reported; incomplete joins never
+establish that no other broad grants exist.
 
 | Check | Finding trigger | Severity |
 | --- | --- | --- |

@@ -19,7 +19,7 @@ _S3_REMEDIATION = {
 }
 _EC2_REMEDIATION = "Restrict ingress and public addressing; require IMDSv2 and use encrypted EBS volumes as applicable."
 _SCOPES = {
-    "iam": "Global IAM policy indicators and opt-in role/user governance; missing core check facts appear in coverage issues. Declarations and observed callers are separate evidence; effective permissions are not simulated.",
+    "iam": "Global IAM policy indicators and opt-in role/user governance; missing facts and incomplete policy joins appear in coverage issues. Declarations and observed callers are separate evidence; effective permissions are not simulated.",
     "s3": "Bucket configuration with known account Block Public Access context; missing bucket facts appear in coverage issues. Effective anonymous access is not evaluated.",
     "lambda": "Regional function metadata indicators; missing URL, role-policy or runtime facts appear in coverage issues. Function code and environment values are not read.",
     "secretsmanager": "Regional secret metadata indicators; missing rotation, policy or encryption facts appear in coverage issues. Secret values are never read.",

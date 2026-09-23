@@ -123,6 +123,32 @@ def iam_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
+def iam_governance_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                                      collection_issues: list[CollectionIssue]) -> dict:
+    """Explain absent opt-in identity evidence without exporting raw data."""
+    operation = {"identity_profile": "IdentityProfile", "identity_trust": "RoleTrust",
+                 "identity_usage": "RoleLastUsed"}.get(fact)
+    failed = operation is not None and any(
+        issue.operation == operation and issue.resource_id == resource.resource_id
+        for issue in collection_issues
+    )
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
+def iam_policy_context_issue(resource: Resource, identifier: str,
+                             collection_issues: list[CollectionIssue]) -> dict:
+    """Known grants remain findings, but incomplete joins cannot be a PASS."""
+    failed = any(issue.operation == "IdentityPolicyContext" and issue.resource_id == resource.resource_id
+                 for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent or incomplete in this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires complete identity_policy_context; {reason}."))
+
+
 def finalize_resource_selection(report: Report) -> None:
     """Unmatched selectors are assessed once across all account/region scopes."""
     selected = report.metadata.get("selected_resources", [])
@@ -211,6 +237,20 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(ec2_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "iam" and rule.number <= 6:
                         issues.append(iam_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "iam":
+                        issues.append(iam_governance_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    continue
+                if (service == "iam" and governance and resource.resource_type in {"role", "user"}
+                        and rule.number in {2, 3}
+                        and resource.data.get("identity_policy_context", {}).get("complete") is not True):
+                    try:
+                        known_findings = evaluate_rules([resource], [rule])
+                        findings.extend(known_findings)
+                        found += len(known_findings)
+                    except (ValueError, TypeError, KeyError, AttributeError):
+                        issues.append(asdict(CollectionIssue(resource.resource_id, "RuleEvaluation", "Invalid rule facts")))
+                    missing += 1
+                    issues.append(iam_policy_context_issue(resource, identifier, collection.issues))
                     continue
                 if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True:
                     missing_context = [name for name in ("management_excluded_sources", "management_event_types")
