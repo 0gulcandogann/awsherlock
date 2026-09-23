@@ -121,6 +121,20 @@ Your identity needs permission to read the configuration being inspected. See [c
 
 ### Preview a scan
 
+For a terminal-guided live single-account plan, run `awsherlock guide`. It
+lists locally configured profiles, lets you choose a profile, a region override
+and supported services, then prints the validated preview and an equivalent
+`awsherlock scan` command to run. The guide does not authenticate, scan, contact
+AWS, create files or change your AWS configuration. It requires an interactive
+terminal; scripts should use `scan --preview` with explicit options. Profile
+names and configured regions are local metadata, not verified credentials.
+The printed command uses PowerShell quoting on Windows and POSIX shell quoting
+elsewhere.
+
+```bash
+awsherlock guide
+```
+
 ```bash
 awsherlock scan --preview --profile production --services iam,s3
 awsherlock scan organization --preview --accounts 123456789012
@@ -304,12 +318,13 @@ subcommand.
 
 Every supported option is listed below, including `--help`. Options belong to the
 command shown in each table; for example, use `awsherlock --doctor` and
-`awsherlock scan --stats`. `--color` is also available on `whoami` and `profiles list`.
+`awsherlock scan --stats`. `--color` is also available on `whoami`, `profiles list` and `guide`.
 
 ```bash
 awsherlock --help
 awsherlock whoami --help
 awsherlock profiles list --help
+awsherlock guide --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -358,6 +373,16 @@ This command produces human-readable diagnostics, not a findings report.
 Missing config files or an empty profile list are normal (exit 0); unreadable or
 malformed configuration exits 1 with a sanitized error. SDK configuration paths,
 including `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE`, are respected.
+
+### Guided setup options: `awsherlock guide [OPTIONS]`
+
+| Option | Default | Usage |
+| --- | --- | --- |
+| `--color MODE` | `auto` | `auto`, `always` or `never`. |
+| `--help` | Off | Show guide help without reading profiles. |
+
+The guide requires an interactive terminal. It prints a local scan preview and
+an equivalent command, then exits without scanning.
 
 ### Scan options: `awsherlock scan [OPTIONS] [snapshot_path]`
 

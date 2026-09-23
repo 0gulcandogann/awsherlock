@@ -547,6 +547,71 @@ def scan(
         raise typer.Exit(code=1) from None
 
 
+def _interactive_terminal() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _guide_selection(value: str, count: int, *, multiple: bool = False) -> list[int]:
+    parts = [part.strip() for part in value.split(",")]
+    if not parts or any(len(part) > 6 or not part.isascii() or not part.isdecimal() or
+                        int(part) < (1 if multiple else 0) or int(part) > count for part in parts):
+        raise typer.BadParameter("Choose a displayed number" + (" or comma-separated numbers." if multiple else "."))
+    if not multiple and len(parts) != 1:
+        raise typer.BadParameter("Choose one profile number.")
+    return list(dict.fromkeys(int(part) for part in parts))
+
+
+def _shell_argument(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'" if sys.platform == "win32" else shlex.quote(value)
+
+
+@app.command("guide")
+def guide(
+    color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True,
+                                              help="Terminal colors: auto, always or never.")] = None,
+) -> None:
+    """Choose a live scan scope locally and print a command to run."""
+    if not _interactive_terminal():
+        message("Guide needs an interactive terminal. Use awsherlock scan --preview with explicit options.",
+                style=RED, err=True)
+        raise typer.Exit(code=2)
+    try:
+        profiles = list_profiles()
+    except SessionError as error:
+        show_session_error(error, None)
+        raise typer.Exit(code=1) from None
+    message("0. SDK default credential chain")
+    for index, item in enumerate(profiles, 1):
+        message(f"{index}. {item.name} (configured region: {item.region or 'unknown'})")
+    try:
+        profile_number = _guide_selection(typer.prompt("Profile number", default="0"), len(profiles))[0]
+        profile = profiles[profile_number - 1].name if profile_number else None
+        if profile is not None and terminal_text(profile) != profile:
+            raise typer.BadParameter("Selected profile contains terminal control characters.")
+        region = typer.prompt("Region override (blank uses SDK configuration)", default="", show_default=False).strip()
+        if region:
+            try:
+                validate_region(region)
+            except SessionError as error:
+                raise typer.BadParameter(str(error), param_hint="region") from None
+        supported_services = parse_services(None)
+        for index, service in enumerate(supported_services, 1):
+            message(f"{index}. {service}")
+        choice = typer.prompt("Services (all or comma-separated numbers)", default="all").strip().lower()
+        services = None if choice == "all" else ",".join(supported_services[index - 1]
+                                                     for index in _guide_selection(choice, len(supported_services), multiple=True))
+    except (KeyboardInterrupt, EOFError, typer.Abort):
+        message("Guide cancelled.", style=YELLOW, err=True)
+        raise typer.Exit(code=130) from None
+    scan(profile=profile, region=region or None, services=services, preview=True)
+    command = "awsherlock scan"
+    for flag, value in (("--profile", profile), ("--region", region or None), ("--services", services)):
+        if value is not None:
+            command += f" {flag} {_shell_argument(value)}"
+    message("Run this command to scan:")
+    typer.echo(terminal_text(command))
+
+
 @app.command("snapshot", epilog=(
     "[bold #ff7e55]Examples[/]\n\n"
     "[#5bfcfc]awsherlock snapshot --output facts.json[/]\n\n"

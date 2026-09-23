@@ -19,6 +19,7 @@ class RootHelpGroup(TyperGroup):
         table.add_column(style=CYAN, ratio=1)
         for command, description in (
             ("awsherlock profiles list", "List local profiles; no AWS calls."),
+            ("awsherlock guide", "Choose profile, region and services locally."),
             ("awsherlock whoami --profile production", "Verify the effective account and principal live."),
             ("awsherlock scan", "Scan with existing AWS credentials."),
             ("awsherlock scan --profile production", "Use your AWS profile."),
