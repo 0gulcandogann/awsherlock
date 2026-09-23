@@ -52,6 +52,23 @@ Maintainers: see the [PyPI publishing guide](https://github.com/0gulcandogann/aw
 Contributors: see [Contributing](docs/contributing.md) and
 [Writing a security check](docs/writing-checks.md).
 
+### Optional Kiro contributor aids
+
+Kiro users can load `.kiro/steering/check-authoring.md` when changing checks,
+copy the [new-check specification template](docs/check-spec-template.md), and
+select the read-only `awsherlock-security-reviewer` agent for a security review.
+The repository hook runs focused local rule tests after a rule file save; when
+the local ignored test suite is absent, it runs the small public synthetic
+scanner check. It does not contact or modify AWS. The steering complements
+the public contributor guides; maintainer-only planning files are not part of
+the published repository.
+
+The standalone `.kiro/hooks/*.json` format requires Kiro IDE 1.0 or CLI 3.0
+(or a CLI build running its v3 engine); CLI 2.x classic mode uses an older hook
+format. See Kiro's [steering](https://kiro.dev/docs/steering/),
+[hooks](https://kiro.dev/docs/hooks/) and
+[custom agents](https://kiro.dev/docs/cli/custom-agents/creating/) documentation.
+
 ### Scanner CI
 
 Pull requests and pushes to `main` run the separate scanner CI workflow. It

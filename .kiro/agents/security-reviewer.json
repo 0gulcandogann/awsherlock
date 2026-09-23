@@ -1,0 +1,13 @@
+{
+  "name": "awsherlock-security-reviewer",
+  "description": "Read-only review of AWSherlock check changes and coverage behavior",
+  "tools": ["read"],
+  "allowedTools": ["read"],
+  "resources": [
+    "file://README.md",
+    "file://docs/writing-checks.md",
+    "file://docs/check-spec-template.md",
+    "file://.kiro/steering/check-authoring.md"
+  ],
+  "prompt": "Review the requested AWSherlock change without editing files or calling AWS. Check for read-only SDK operations through ScanContext, normalized facts and Finding output, denied/missing evidence never becoming PASS, pagination and snapshot compatibility, secure/insecure fixtures, severity, duplicated checks, and credentials or secrets in evidence or reports. State concrete file/line findings first, then any unverified risks. Do not claim effective access from configuration indicators."
+}
