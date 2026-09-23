@@ -27,6 +27,7 @@ class RootHelpGroup(TyperGroup):
             ("awsherlock scan facts.json", "Evaluate saved facts offline."),
             ("awsherlock diff before.json after.json", "Compare saved findings with coverage checks."),
             ("awsherlock history first.json latest.json", "Review first and last observed findings offline."),
+            ("awsherlock leads facts.json", "Correlate saved Lambda findings as review hints."),
             ("awsherlock identities facts.json", "Inspect saved IAM identities offline."),
             ("awsherlock --describe-check AWSH-CT-001", "Explain a check offline."),
             ("awsherlock --update", "Update from GitHub main; internet required."),

@@ -28,6 +28,7 @@ from awsherlock.reporting import render_console, render_json, render_html, write
 from awsherlock.sarif import render_sarif
 from awsherlock.diff import compare_snapshots, render_diff_json
 from awsherlock.history import HistoryError, finding_history, render_history_json
+from awsherlock.leads import investigation_leads, render_leads_json
 from awsherlock.suppressions import SuppressionError, read_suppressions, apply_suppressions
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
@@ -127,6 +128,37 @@ def history_command(
                 f"{terminal_text(finding['first_observed_at'])}, last observed "
                 f"{terminal_text(finding['last_observed_at'])} ({finding['observed_scan_count']} scan(s))")
     message("Timestamps describe supplied observations only; absence does not prove remediation.")
+
+
+@app.command("leads")
+def leads_command(
+    snapshot_path: Annotated[Path, typer.Argument(help="Normalized snapshot JSON to review offline.")],
+    output: Annotated[str, typer.Option("--output", help="Investigation view: console or json.")] = "console",
+) -> None:
+    """Correlate existing Lambda indicators as review hints, without AWS calls."""
+    if output not in {"console", "json"}:
+        raise typer.BadParameter("Use console or json.", param_hint="--output")
+    try:
+        document = investigation_leads(read_snapshot(snapshot_path))
+    except SnapshotError as error:
+        message(f"Error: {error}", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    except OSError:
+        message("Error: Could not read the snapshot file. Check the path.", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    if output == "json":
+        typer.echo(render_leads_json(document), nl=False)
+    else:
+        message(f"Investigation leads: {document['summary']['leads']}")
+        for entry in document["coverage"]:
+            message(f"Coverage {terminal_text(entry['service'])}: {terminal_text(entry['status'])}")
+        for lead in document["leads"]:
+            message(f"{lead['pattern_id']} / {terminal_text(lead['account_id'])} / {terminal_text(lead['resource_id'])}")
+            message(lead["why_review"])
+            message(lead["next_step"])
+        message("These are review hints, not verified attack paths or effective access.")
+    if document["incomplete"]:
+        raise typer.Exit(code=1)
 
 REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
 

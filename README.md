@@ -361,6 +361,7 @@ awsherlock guide --help
 awsherlock identities --help
 awsherlock diff --help
 awsherlock history --help
+awsherlock leads --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -465,6 +466,20 @@ a later input is not reported as remediated or continuously present; missing
 permissions and skipped services remain visible in coverage. Valid history
 exits 0 even with incomplete coverage; invalid options exit 2 and invalid or
 unreadable snapshots exit 1.
+
+### Review correlated Lambda findings
+
+`awsherlock leads facts.json` reads one normalized snapshot offline and links
+two **existing** findings on the same Lambda function: a Function URL without
+IAM authentication (`AWSH-LAMBDA-001`) and a broad AWS-managed execution-role
+policy (`AWSH-LAMBDA-002`). Use `--output json` for a version-1
+`investigation-leads` document. The output retains scan coverage; incomplete
+coverage exits 1. No match is not proof of safety when facts are missing.
+
+Each lead is a review hint. It does not prove anonymous reachability, effective
+permissions, exploitability or an attack path. It creates no new security
+check, graph or AWS call, and omits raw finding evidence. Invalid options exit
+2; invalid or unreadable snapshots exit 1.
 
 ### Record expiring suppressions
 
