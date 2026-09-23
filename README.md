@@ -865,6 +865,11 @@ TCP; RDP/database checks include TCP/UDP. Database ports: 1433, 1521, 3306, 5432
 6379, 9042, 9200, 27017. Routing, NACLs, and application exposure are not assessed.
 Required reads: `ec2:DescribeSecurityGroups`, `ec2:DescribeInstances`,
 `ec2:DescribeVolumes`. Missing region or permissions are visible errors.
+If a discovered resource has invalid ingress, metadata, address or encryption
+data, its valid facts remain evaluable while the affected `AWSH-EC2` checks
+are marked incomplete with a RequiredFact coverage explanation. An instance's
+metadata and public-address facts are handled independently. Discovery failures
+before a resource ID is known remain collection issues, not passing checks.
 
 ### Lambda and Secrets Manager
 

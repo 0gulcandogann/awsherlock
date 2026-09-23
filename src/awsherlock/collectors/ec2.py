@@ -3,7 +3,7 @@
 from ipaddress import ip_address, ip_network
 
 from awsherlock.aws.context import ScanContext
-from awsherlock.collectors.common import AWS_ERRORS, CollectionIssue, CollectionResult, InvalidResponse, error_message, items, text_field
+from awsherlock.collectors.common import AWS_ERRORS, CollectionIssue, CollectionResult, InvalidResponse, collect_fact, error_message, items, text_field
 from awsherlock.models import Resource
 
 
@@ -31,12 +31,14 @@ def ingress_facts(entry: dict) -> dict:
     return {"ingress": permissions}
 
 
-def instance_facts(entry: dict) -> dict:
-    data = {}
+def instance_metadata_fact(entry: dict) -> dict:
     options = entry.get("MetadataOptions")
     if not isinstance(options, dict) or options.get("HttpEndpoint") not in {"enabled", "disabled"} or options.get("HttpTokens") not in {"optional", "required"}:
         raise InvalidResponse()
-    data["metadata"] = {"endpoint": options["HttpEndpoint"], "tokens": options["HttpTokens"]}
+    return {"endpoint": options["HttpEndpoint"], "tokens": options["HttpTokens"]}
+
+
+def instance_addresses_fact(entry: dict) -> list[str]:
     addresses = []
     if entry.get("PublicIpAddress"):
         addresses.append(entry["PublicIpAddress"])
@@ -54,10 +56,13 @@ def instance_facts(entry: dict) -> dict:
             addresses.append(address.get("Ipv6Address"))
     try:
         parsed = [ip_address(text_field(address)) for address in addresses]
-        data["addresses"] = sorted({str(address) for address in parsed if address.version == 4 or address.is_global})
+        return sorted({str(address) for address in parsed if address.version == 4 or address.is_global})
     except ValueError:
         raise InvalidResponse() from None
-    return data
+
+
+def instance_facts(entry: dict) -> dict:
+    return {"metadata": instance_metadata_fact(entry), "addresses": instance_addresses_fact(entry)}
 
 
 def volume_facts(entry: dict) -> dict:
@@ -98,12 +103,20 @@ def collect_ec2(context: ScanContext) -> CollectionResult:
                         seen.add(resource_id)
                         if kind == "instance" and entry.get("State", {}).get("Name") == "terminated":
                             continue
-                        result.resources.append(Resource(
+                        resource = Resource(
                             service="ec2", resource_type=kind, account_id=context.account_id, region=context.region,
                             resource_id=resource_id,
                             resource_arn=f"arn:{context.partition}:ec2:{context.region}:{context.account_id}:{kind}/{resource_id}",
-                            data=normalize(entry),
-                        ))
+                        )
+                        result.resources.append(resource)
+                        if kind == "instance":
+                            collect_fact(result, resource, "metadata", "describe_instances.metadata",
+                                         lambda: instance_metadata_fact(entry))
+                            collect_fact(result, resource, "addresses", "describe_instances.addresses",
+                                         lambda: instance_addresses_fact(entry))
+                        else:
+                            fact = "ingress" if kind == "security-group" else "encrypted"
+                            collect_fact(result, resource, fact, method, lambda: normalize(entry)[fact])
                     except AWS_ERRORS as error:
                         result.issues.append(CollectionIssue(resource_id, method, error_message(error)))
         except AWS_ERRORS as error:
