@@ -16,18 +16,27 @@ class Report:
     findings: list[Finding]
     coverage: list[dict]
     identities: list[dict] = field(default_factory=list)
+    suppression_audit: list[dict] | None = None
+    suppression_matches: dict[int, dict] = field(default_factory=dict)
 
     @property
     def incomplete(self) -> bool:
         return any(entry["status"] != "COMPLETE" for entry in self.coverage)
 
     def to_dict(self) -> dict:
-        return {**({"identities": self.identities} if self.identities else {}), "metadata": self.metadata, "coverage": self.coverage,
-                "findings": [finding.to_dict() for finding in self.findings],
-                "summary": {"resources": sum(entry["resources"] for entry in self.coverage),
+        findings = [finding.to_dict() for finding in self.findings]
+        for index, suppression in self.suppression_matches.items():
+            findings[index]["suppression"] = suppression
+        summary = {"resources": sum(entry["resources"] for entry in self.coverage),
                             "findings": len(self.findings), "checks_evaluated": sum(entry["evaluated"] for entry in self.coverage),
                             "incomplete": self.incomplete,
-                            "severity": {severity.value: sum(f.severity == severity for f in self.findings) for severity in Severity}}}
+                            "severity": {severity.value: sum(f.severity == severity for f in self.findings) for severity in Severity}}
+        if self.suppression_audit is not None:
+            summary["suppressed"] = len(self.suppression_matches)
+            summary["expired_suppressions"] = sum(entry["status"] == "EXPIRED" for entry in self.suppression_audit)
+        return {**({"identities": self.identities} if self.identities else {}),
+                **({"suppressions": self.suppression_audit} if self.suppression_audit is not None else {}),
+                "metadata": self.metadata, "coverage": self.coverage, "findings": findings, "summary": summary}
 
 
 def cloudtrail_missing_fact_issue(resource: Resource, identifier: str, fact: str,

@@ -71,6 +71,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <div class="stats"><div class="stat"><span class="eyebrow">Resources</span><b>{{ report.summary.resources }}</b></div>
 <div class="stat"><span class="eyebrow">Checks evaluated</span><b>{{ report.summary.checks_evaluated }}</b></div>
 <div class="stat"><span class="eyebrow">Findings</span><b>{{ report.summary.findings }}</b></div></div>
+{% if report.suppressions is defined %}<section class="panel"><h2>Suppression audit</h2><p>{{ report.summary.suppressed }} finding(s) annotated; {{ report.summary.expired_suppressions }} expired record(s). Findings remain visible.</p><div class="table-wrap"><table><thead><tr><th>Status</th><th>Check / resource</th><th>Owner</th><th>Reason</th><th>Expires (UTC)</th></tr></thead><tbody>{% for entry in report.suppressions %}<tr><td>{{ entry.status }}</td><td>{{ entry.check_id }} / {{ entry.account_id }} / {{ entry.resource_id }}</td><td>{{ entry.owner }}</td><td>{{ entry.reason }}</td><td>{{ entry.expires_on }}</td></tr>{% else %}<tr><td colspan="5">No suppression records.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
 <section class="panel"><h2>Severity distribution</h2><div class="severity-grid">
 {% for severity, count in report.summary.severity.items() %}<div><span class="badge {{ severity }}">{{ severity }}</span><b>{{ count }}</b><span class="severity-track"><i class="{{ severity }}" style="--width: {{ (count / report.summary.findings * 100) | round(0) if report.summary.findings else 0 }}%"></i></span></div>{% endfor %}
 </div></section>
@@ -94,6 +95,7 @@ footer{margin-top:24px;color:var(--muted);font-size:11px}.empty{padding:28px;tex
 <details class="finding" data-severity="{{ finding.severity }}" data-service="{{ finding.service }}" data-account="{{ finding.account_id }}" data-id="{{ finding.id }}" data-resource="{{ finding.resource_id }}" data-index="{{ loop.index0 }}">
 <summary><span class="badge {{ finding.severity }}">{{ finding.severity }}</span><span><span class="finding-title">{{ finding.title }}</span><span class="finding-id">{{ finding.id }}</span><span class="resource-line"> · {{ finding.service }} · {{ finding.resource_id }}</span></span></summary>
 <div class="finding-body"><p>{{ finding.description }}</p>
+{% if finding.suppression is defined %}<p><strong>Suppressed until {{ finding.suppression.expires_on }} (UTC)</strong> by {{ finding.suppression.owner }}: {{ finding.suppression.reason }}</p>{% endif %}
 <p class="resource-line">Account <span class="account-value">{{ finding.account_id }}</span> · Region <span class="region-value">{{ finding.region or 'Global' }}</span><br>{{ finding.resource_arn or finding.resource_id }}</p>
 <h3>Evidence</h3><pre>{{ finding.evidence | tojson(indent=2) }}</pre>
 <h3>Risk</h3><p>{{ finding.risk }}</p><h3>Remediation</h3><p>{{ finding.remediation }}</p>

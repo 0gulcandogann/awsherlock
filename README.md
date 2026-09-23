@@ -434,6 +434,37 @@ comparisons with unknown coverage; invalid options exit 2 and unreadable or
 invalid snapshots exit 1. This command does not apply suppression or CI
 thresholds.
 
+### Record expiring suppressions
+
+Pass `--suppressions-file exceptions.json` to a live or offline `scan` when a
+finding has an approved temporary exception. The file is local version-1 JSON:
+
+```json
+{
+  "schema_version": 1,
+  "suppressions": [
+    {
+      "check_id": "AWSH-EC2-006",
+      "account_id": "123456789012",
+      "region": "eu-west-1",
+      "resource_id": "vol-123",
+      "owner": "platform",
+      "reason": "Migration tracked in change ticket",
+      "expires_on": "2026-12-31"
+    }
+  ]
+}
+```
+
+`resource_id` matches a finding's exact resource ID or ARN. The account,
+region (use `null` for a global finding), and check ID must also match.
+Expiry is a UTC calendar date, inclusive. Findings remain in every report;
+matching active entries annotate them, and console/JSON/HTML show applied,
+unmatched and expired entries plus counts. Suppression never changes incomplete
+coverage or the scan exit status. Do not put credentials or secrets in owner or
+reason. SARIF rejects this option because its current export has no suppression
+audit. This file does not create or update a baseline automatically.
+
 ### Offline identity view: `awsherlock identities SNAPSHOT [OPTIONS]`
 
 Read IAM role/user summaries from an existing normalized snapshot without AWS
@@ -490,6 +521,7 @@ option name in full.
 | `--identity-max-seconds N` | 60 | Evidence time budget between requests, 1–3600 seconds, within each supplemental collector. In-flight SDK timeouts/retries may exceed it. Requires live `--identity-governance`. |
 | `--output FORMAT` | `console` | `console`, `json`, `html` or `sarif`. JSON/SARIF goes to stdout unless `--report-file` is supplied. HTML defaults to a new `awsherlock-report.html`. |
 | `--report-file PATH` | Not supplied | Write a new JSON/HTML/SARIF report; requires `--output json`, `--output html` or `--output sarif`. Existing files are not overwritten. |
+| `--suppressions-file PATH` | Off | Read an exact, expiring local suppression JSON file for console/JSON/HTML. Findings and coverage remain visible; unavailable with SARIF. |
 | `--role-name NAME` | `AWSherlockAuditRole` | Member-account role name/path, such as `audit/Reader`; only valid with `scan organization`. |
 | `--no-progress` | Off | Hide the banner and progress bar; explicit `--verbose` messages still appear. |
 | `--no-banner` | Off | Hide the banner while retaining interactive progress. |

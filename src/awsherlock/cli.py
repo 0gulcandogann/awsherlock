@@ -27,6 +27,7 @@ from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
 from awsherlock.sarif import render_sarif
 from awsherlock.diff import compare_snapshots, render_diff_json
+from awsherlock.suppressions import SuppressionError, read_suppressions, apply_suppressions
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.diagnostics import runtime_diagnostics
@@ -308,6 +309,7 @@ def scan(
     ] = None,
     output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
     report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.", rich_help_panel="Reports and measurements")] = None,
+    suppressions_file: Annotated[Path | None, typer.Option("--suppressions-file", help="Apply exact, expiring local finding annotations; findings remain visible.", rich_help_panel="Reports and measurements")] = None,
     role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).", rich_help_panel="Targets and credentials")] = None,
     no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.", rich_help_panel="Execution and display")] = False,
     no_banner: Annotated[bool, typer.Option("--no-banner", help="Hide the startup banner while keeping the progress bar.", rich_help_panel="Execution and display")] = False,
@@ -349,6 +351,12 @@ def scan(
         raise typer.BadParameter("--report-file requires --output json, html or sarif.")
     if summary_only and output in {"json", "html", "sarif"}:
         raise typer.BadParameter("--summary-only requires console output.")
+    try:
+        suppression_entries = read_suppressions(suppressions_file) if suppressions_file is not None else None
+    except SuppressionError as error:
+        raise typer.BadParameter(str(error), param_hint="--suppressions-file") from None
+    if suppression_entries is not None and output == "sarif":
+        raise typer.BadParameter("--suppressions-file supports console, json or html reports; SARIF has no suppression audit.")
     organization = snapshot_path == Path("organization")
     offline = snapshot_path is not None and not organization
     if measurements_file is not None and (offline or preview):
@@ -582,6 +590,8 @@ def scan(
                     activity("Evaluating security checks", len(selected) + 1, len(selected) + 2)
             if not organization and selected_regions is None:
                 report = evaluate_snapshot(snapshot, **selection_options)
+            if suppression_entries is not None:
+                apply_suppressions(report, suppression_entries)
             activity("Scan finished - incomplete coverage" if report.incomplete else "Scan finished", 1, 1)
         if output == "html":
             destination = report_file or Path("awsherlock-report.html")

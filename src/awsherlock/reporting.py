@@ -71,6 +71,9 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     for severity, count in summary["severity"].items():
         severity_line.append(f"{severity} {count}   ", style=SEVERITY_STYLES[severity])
     console.print(severity_line)
+    if report.suppression_audit is not None:
+        console.print(f"Suppressed findings: {summary['suppressed']} / Expired suppression records: {summary['expired_suppressions']}",
+                      style=YELLOW)
     if report.incomplete:
         console.print(Panel("Some checks could not run. Review coverage and collection issues below. "
                             "Zero findings do not mean the account is secure.",
@@ -118,11 +121,23 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
         body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style=CYAN)
         body.append(f"Resource: {terminal_text(finding.resource_id)}\n", style=CYAN)
         body.append(f"{terminal_text(finding.description, multiline=True)}\n\n", style=YELLOW)
+        if index - 1 in report.suppression_matches:
+            suppression = report.suppression_matches[index - 1]
+            body.append("Suppressed until " + terminal_text(suppression["expires_on"]) +
+                        " by " + terminal_text(suppression["owner"]) + ": " +
+                        terminal_text(suppression["reason"], multiline=True) + "\n\n", style=YELLOW)
         body.append("Remediation: ", style=f"bold {GREEN}")
         body.append(terminal_text(finding.remediation, multiline=True), style=GREEN)
         console.print(Panel(body, title=title, title_align="left", border_style=PURPLE, padding=(1, 2)))
     if not findings:
         console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
+    if report.suppression_audit is not None:
+        console.print("Suppression audit", style=f"bold {ORANGE}")
+        for entry in report.suppression_audit:
+            console.print(f"{entry['status']} {terminal_text(entry['check_id'])} / {terminal_text(entry['account_id'])} / "
+                          f"{terminal_text(entry['resource_id'])} / expires {terminal_text(entry['expires_on'])} / "
+                          f"owner {terminal_text(entry['owner'])} / reason {terminal_text(entry['reason'], multiline=True)}",
+                          style=YELLOW, markup=False)
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
         has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection"} for _, issue in issues)
