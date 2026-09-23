@@ -2,7 +2,7 @@
 
 # AWSherlock
 
-[![Release v0.1.15](https://img.shields.io/badge/release-v0.1.15-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.1.15/)
+[![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.2.0/)
 [![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![35 security checks](https://img.shields.io/badge/security_checks-35-7C3AED?style=flat-square)](#checks)
@@ -1281,6 +1281,16 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Version 0.2.0 adds offline `diff`, observed `history` and bounded investigation
+`leads`; exact expiring suppression records; opt-in automation exit thresholds;
+and a separate scanner CI workflow. Existing findings can also be exported as
+SARIF. Identity inventory/review views, guided scan setup, JSON scan preview,
+CloudTrail read/write coverage and explicit missing-fact explanations improve
+the existing 35-check catalog. Console findings now show normalized evidence,
+risk and remediation. Optional Kiro contributor aids are included. Missing
+permission coverage remains visible; no S-03 service expansion or attack-path
+engine is included.
 
 Version 0.1.15 is published on PyPI and TestPyPI. It adds `scan --preview` for
 an unverified local plan without AWS calls or output files, plus per-check

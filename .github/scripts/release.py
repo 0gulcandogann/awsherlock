@@ -1,6 +1,6 @@
 """Package release checks; AWS credentials are never needed."""
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.parser import Parser
 import hashlib
 from html.parser import HTMLParser
@@ -179,7 +179,50 @@ def smoke(dist: Path) -> None:
             for entry in json.loads(result.stdout)["coverage"] for issue in entry["issues"]
         ):
             raise ValueError("Offline CloudTrail missing-fact smoke failed")
-    print(f"PASS: installed {version} CLI, offline JSON/HTML and visible denial coverage")
+        before_meta = ScanMetadata(scan_id="release-before", started_at=metadata.started_at,
+                                   account_id=metadata.account_id, region=metadata.region, version=version)
+        after_meta = ScanMetadata(scan_id="release-after", started_at=metadata.started_at + timedelta(days=1),
+                                  account_id=metadata.account_id, region=metadata.region, version=version)
+        safe_volume = Resource(service="ec2", resource_type="volume", account_id=metadata.account_id,
+                               region=metadata.region, resource_id="vol-smoke", resource_arn=None,
+                               data={"encrypted": True})
+        unsafe_volume = Resource(service="ec2", resource_type="volume", account_id=metadata.account_id,
+                                 region=metadata.region, resource_id="vol-smoke", resource_arn=None,
+                                 data={"encrypted": False})
+        before_path, after_path = work / "before.json", work / "after.json"
+        write_snapshot(Snapshot(before_meta, {"ec2": CollectionResult([safe_volume], [])}), before_path)
+        write_snapshot(Snapshot(after_meta, {"ec2": CollectionResult([unsafe_volume], [])}), after_path)
+        result = runner.invoke(app, ["diff", str(before_path), str(after_path), "--output", "json", "--fail-on", "new"])
+        if result.exit_code != 3 or json.loads(result.stdout)["summary"]["NEW"] != 1:
+            raise ValueError("Installed diff/new-threshold smoke failed")
+        result = runner.invoke(app, ["history", str(before_path), str(after_path), "--output", "json"])
+        if result.exit_code != 0 or json.loads(result.stdout)["findings"][0]["first_scan_id"] != "release-after":
+            raise ValueError("Installed finding-history smoke failed")
+        result = runner.invoke(app, ["scan", str(after_path), "--output", "json", "--fail-on", "high"])
+        if result.exit_code != 3 or json.loads(result.stdout)["summary"]["findings"] != 1:
+            raise ValueError("Installed scan threshold smoke failed")
+        suppressions = work / "suppressions.json"
+        suppressions.write_text(json.dumps({"schema_version": 1, "suppressions": [{
+            "check_id": "AWSH-EC2-006", "account_id": metadata.account_id, "region": metadata.region,
+            "resource_id": "vol-smoke", "owner": "release-smoke", "reason": "Synthetic exception",
+            "expires_on": "2099-12-31"}]}), encoding="utf-8")
+        result = runner.invoke(app, ["scan", str(after_path), "--output", "json", "--fail-on", "high",
+                                     "--suppressions-file", str(suppressions)])
+        if result.exit_code != 0 or json.loads(result.stdout)["summary"]["suppressed"] != 1:
+            raise ValueError("Installed suppression smoke failed")
+        function_arn = f"arn:aws:lambda:{metadata.region}:{metadata.account_id}:function:release-smoke"
+        function = Resource(service="lambda", resource_type="function", account_id=metadata.account_id,
+                            region=metadata.region, resource_id="release-smoke", resource_arn=function_arn,
+                            data={"urls": [{"arn": function_arn, "auth": "NONE"}],
+                                  "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
+                                  "runtime": {"name": "python3.13", "deprecated": False,
+                                              "catalog_date": "2026-09-15", "evaluated_on": "2026-09-17"}})
+        function_path = work / "function.json"
+        write_snapshot(Snapshot(after_meta, {"lambda": CollectionResult([function], [])}), function_path)
+        result = runner.invoke(app, ["leads", str(function_path), "--output", "json"])
+        if result.exit_code != 0 or json.loads(result.stdout)["summary"]["leads"] != 1:
+            raise ValueError("Installed investigation-leads smoke failed")
+    print(f"PASS: installed {version} CLI, offline JSON/HTML, denial, diff/history/leads and thresholds")
 
 
 def main() -> None:
