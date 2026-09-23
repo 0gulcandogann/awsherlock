@@ -57,6 +57,19 @@ def s3_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
+def secret_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                              collection_issues: list[CollectionIssue]) -> dict:
+    """Explain absent secret metadata without exposing policy or key details."""
+    operation = {"rotation": "RotationMetadata", "policy": "GetResourcePolicy",
+                 "encryption": "DescribeKey"}[fact]
+    failed = any(issue.operation == operation and issue.resource_id == resource.resource_id
+                 for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
 def finalize_resource_selection(report: Report) -> None:
     """Unmatched selectors are assessed once across all account/region scopes."""
     selected = report.metadata.get("selected_resources", [])
@@ -135,6 +148,8 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(cloudtrail_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "s3":
                         issues.append(s3_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "secretsmanager":
+                        issues.append(secret_missing_fact_issue(resource, identifier, fact, collection.issues))
                     continue
                 if service == "cloudtrail" and identifier == "AWSH-CT-004" and resource.data[fact] is True:
                     missing_context = [name for name in ("management_excluded_sources", "management_event_types")

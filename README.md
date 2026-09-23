@@ -880,6 +880,10 @@ Secrets Manager checks rotation, broad Allow principals (including conditional
 statements, requiring review), and non-enabled custom KMS keys. Default
 aws/secretsmanager encryption is accepted. Conditions and denies are not simulated.
 No secret values, function code, or environment variable values enter scan data.
+If rotation, policy or encryption metadata is missing, coverage names the affected
+`AWSH-SECRET` check and required fact. A matching per-secret collection failure is
+reported separately; otherwise the fact is absent from the snapshot. Missing
+facts are never treated as passing checks.
 
 Required reads: `lambda:ListFunctions`, `lambda:ListFunctionUrlConfigs`,
 `iam:ListAttachedRolePolicies`, `secretsmanager:ListSecrets`,
