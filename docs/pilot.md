@@ -1,9 +1,13 @@
 # Real-AWS pilot
 
-[README](../README.md) · [35-check matrix](validation-matrix.md)
+[README](../README.md) · [40-check matrix](validation-matrix.md)
 
-This guide prepares a read-only pilot. No real AWS scan has been performed for
-this documentation package. Resource provisioning, role/policy changes and
+This guide prepares a read-only pilot. A bounded v0.3.0 pilot scanned existing
+resources in one account and `eu-central-1`: RDS and DynamoDB had empty listings,
+while the absence of a GuardDuty detector produced `AWSH-GD-001`. All three
+collections were complete, and same-collection snapshot replay matched live
+findings, coverage and summary. Resource-dependent positive/negative cases
+remain untested in real AWS. Resource provisioning, role/policy changes and
 remediation are separate owner-managed work. Start with existing known resources
 in one account and one explicit region; expand to multiple regions/accounts only
 after recording that baseline. Estimates exclude AWS access and reader waiting.
@@ -33,7 +37,7 @@ after recording that baseline. Estimates exclude AWS access and reader waiting.
    by their identities; retain evidence differences. Record explainable metadata
    differences. Check independent AWS read-only configuration observations near
    collection time, not just agreement with another scanner. Complete the matrix
-   ledger for each scenario and retain all 35 IDs, including those not attempted.
+   ledger for each scenario and retain all 40 IDs, including those not attempted.
 4. Exercise available secure/insecure pairs and missing-permission scenarios with
    existing owner-provided roles/resources. Avoid disabling safeguards merely to
    make a test pass. Clock-aged credentials and impossible encryption/runtime

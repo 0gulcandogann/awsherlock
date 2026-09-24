@@ -8,22 +8,27 @@ from awsherlock.collectors.secrets import collect_secrets
 from awsherlock.collectors.cloudtrail import collect_cloudtrail
 from awsherlock.collectors.kms import collect_kms
 from awsherlock.collectors.rds import collect_rds
+from awsherlock.collectors.guardduty import collect_guardduty
+from awsherlock.collectors.dynamodb import collect_dynamodb
 from awsherlock.rules.s3 import S3_RULES
 from awsherlock.rules.iam import IAM_RULES
 from awsherlock.rules.ec2 import EC2_RULES
 from awsherlock.rules.serverless import LAMBDA_RULES, SECRET_RULES
 from awsherlock.rules.audit import CLOUDTRAIL_RULES, KMS_RULES
 from awsherlock.rules.rds import RDS_RULES
+from awsherlock.rules.guardduty import GUARDDUTY_RULES
+from awsherlock.rules.dynamodb import DYNAMODB_RULES
 
 DEFAULT_SERVICES = ("iam", "s3", "ec2", "lambda", "secretsmanager", "cloudtrail", "kms")
-SERVICES = (*DEFAULT_SERVICES, "rds")
+SERVICES = (*DEFAULT_SERVICES, "rds", "guardduty", "dynamodb")
 
 
 def service_components(service: str):
     return {"s3": (collect_s3, S3_RULES), "iam": (collect_iam, IAM_RULES), "ec2": (collect_ec2, EC2_RULES),
             "lambda": (collect_lambda, LAMBDA_RULES), "secretsmanager": (collect_secrets, SECRET_RULES),
             "cloudtrail": (collect_cloudtrail, CLOUDTRAIL_RULES), "kms": (collect_kms, KMS_RULES),
-            "rds": (collect_rds, RDS_RULES)}[service]
+            "rds": (collect_rds, RDS_RULES), "guardduty": (collect_guardduty, GUARDDUTY_RULES),
+            "dynamodb": (collect_dynamodb, DYNAMODB_RULES)}[service]
 
 
 def parse_services(value: str | None) -> list[str]:

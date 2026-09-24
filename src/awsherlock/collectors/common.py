@@ -21,6 +21,7 @@ class CollectionIssue:
 class CollectionResult:
     resources: list[Resource] = field(default_factory=list)
     issues: list[CollectionIssue] = field(default_factory=list)
+    completed_operations: list[str] = field(default_factory=list)
 
 
 class InvalidResponse(ValueError):

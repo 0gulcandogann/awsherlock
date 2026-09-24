@@ -117,16 +117,36 @@ def ec2_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                                   f"{identifier} requires {fact}; {reason}."))
 
 
-def rds_missing_fact_issue(resource: Resource, identifier: str,
+def rds_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                            collection_issues: list[CollectionIssue]) -> dict:
-    operation = ("DescribeDBSnapshotAttributes" if resource.resource_type == "db-snapshot"
-                 else "DescribeDBClusterSnapshotAttributes")
+    operation = ("DescribeDBInstances" if resource.resource_type == "db-instance" else
+                 "DescribeDBSnapshotAttributes" if resource.resource_type == "db-snapshot" else
+                 "DescribeDBClusterSnapshotAttributes")
     failed = any(issue.operation == operation and issue.resource_id == resource.resource_id
                  for issue in collection_issues)
     reason = ("a related collection issue is recorded separately" if failed else
               "the fact is absent from this snapshot")
     return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
-                                  f"{identifier} requires restore_public; {reason}."))
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
+def guardduty_missing_fact_issue(resource: Resource, identifier: str,
+                                 collection_issues: list[CollectionIssue]) -> dict:
+    reason = ("a related collection issue is recorded separately" if any(
+        issue.operation in {"ListDetectors", "GetDetector"} for issue in collection_issues)
+        else "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires enabled_detector_present; {reason}."))
+
+
+def dynamodb_missing_fact_issue(resource: Resource, identifier: str,
+                                collection_issues: list[CollectionIssue]) -> dict:
+    failed = any(issue.operation == "DescribeContinuousBackups" and
+                 issue.resource_id == resource.resource_id for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires pitr_enabled; {reason}."))
 
 
 def iam_missing_fact_issue(resource: Resource, identifier: str, fact: str,
@@ -206,6 +226,12 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
     for service, collection in snapshot.services.items():
         _, rules = service_components(service)
         issues = [asdict(issue) for issue in collection.issues]
+        if (service == "rds" and (selected_checks is None or
+                bool({"AWSH-RDS-002", "AWSH-RDS-003"} & set(selected_checks)))
+                and "DescribeDBInstances" not in collection.completed_operations
+                and not any(issue.operation == "DescribeDBInstances" for issue in collection.issues)):
+            issues.append(asdict(CollectionIssue(None, "RequiredCollection",
+                                                  "AWSH-RDS-002 and AWSH-RDS-003 require completed DescribeDBInstances collection; absent from this snapshot.")))
         excluded = ([identifier for identifier in identifiers[service] if identifier not in selected_checks]
                     if selected_checks is not None else [])
         if excluded:
@@ -257,7 +283,11 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                     elif service == "ec2":
                         issues.append(ec2_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "rds":
-                        issues.append(rds_missing_fact_issue(resource, identifier, collection.issues))
+                        issues.append(rds_missing_fact_issue(resource, identifier, fact, collection.issues))
+                    elif service == "guardduty":
+                        issues.append(guardduty_missing_fact_issue(resource, identifier, collection.issues))
+                    elif service == "dynamodb":
+                        issues.append(dynamodb_missing_fact_issue(resource, identifier, collection.issues))
                     elif service == "iam" and rule.number <= 6:
                         issues.append(iam_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "iam":

@@ -31,6 +31,9 @@ FACTS = {
     ("kms", "key"): {"rotation", "policy"},
     ("rds", "db-snapshot"): {"restore_public"},
     ("rds", "db-cluster-snapshot"): {"restore_public"},
+    ("rds", "db-instance"): {"storage_encrypted", "publicly_accessible"},
+    ("guardduty", "regional-summary"): {"enabled_detector_present"},
+    ("dynamodb", "table"): {"pitr_enabled"},
 }
 IDENTITY_COMMON = {"identity_requested", "identity_profile", "identity_approval", "identity_policy_context",
                    "identity_bindings", "identity_activity", "identity_analyzer_findings"}
@@ -65,7 +68,9 @@ class Snapshot:
         metadata["started_at"] = self.metadata.started_at.isoformat()
         data = {"schema_version": SCHEMA_VERSION, "metadata": metadata,
                 "services": {name: {"resources": [asdict(resource) for resource in result.resources],
-                                    "issues": [asdict(issue) for issue in result.issues]}
+                                    "issues": [asdict(issue) for issue in result.issues],
+                                    **({"completed_operations": result.completed_operations}
+                                       if name == "rds" and result.completed_operations else {})}
                              for name, result in self.services.items()}}
         snapshot_from_dict(data)  # Validate mutable nested facts before writing.
         return data
@@ -85,7 +90,8 @@ def capture_snapshot(context: ScanContext, services: list[str],
                  if context.measurements is not None else nullcontext())
         with timer:
             result = collector(context)
-        results[service] = CollectionResult(result.resources, result.issues)
+        results[service] = CollectionResult(result.resources, result.issues,
+                                            getattr(result, "completed_operations", []))
         if progress is not None:
             progress(f"Collected {service.upper()}", index + 1, len(services))
     return Snapshot(metadata, results)
@@ -105,11 +111,19 @@ def snapshot_from_dict(data: object) -> Snapshot:
             raise ValueError()
         services = {}
         for service, collection in data["services"].items():
-            if service not in SERVICES or not isinstance(collection, dict) or set(collection) != {"resources", "issues"}:
+            if service not in SERVICES or not isinstance(collection, dict) or not {"resources", "issues"} <= set(collection):
+                raise ValueError()
+            if set(collection) - {"resources", "issues"} != ({"completed_operations"} if "completed_operations" in collection else set()):
+                raise ValueError()
+            if "completed_operations" in collection and service != "rds":
                 raise ValueError()
             if not isinstance(collection["resources"], list) or not isinstance(collection["issues"], list):
                 raise ValueError()
             result = CollectionResult()
+            if "completed_operations" in collection:
+                if collection["completed_operations"] != ["DescribeDBInstances"]:
+                    raise ValueError()
+                result.completed_operations = ["DescribeDBInstances"]
             for raw in collection["resources"]:
                 resource = Resource(**raw)
                 if resource.service != service or resource.account_id != metadata.account_id:

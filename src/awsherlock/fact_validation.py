@@ -23,6 +23,10 @@ SCHEMAS = {
     ("cloudtrail", "trail_status"): {"logging": bool, "destination": str, "delivery_error": bool},
     ("kms", "policy"): [RESOURCE_STATEMENT],
     ("rds", "restore_public"): bool,
+    ("rds", "storage_encrypted"): bool,
+    ("rds", "publicly_accessible"): bool,
+    ("guardduty", "enabled_detector_present"): bool,
+    ("dynamodb", "pitr_enabled"): bool,
 }
 
 

@@ -2,14 +2,14 @@
 
 # AWSherlock
 
-[![Release v0.2.0](https://img.shields.io/badge/release-v0.2.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0)
+[![Release v0.3.0](https://img.shields.io/badge/release-v0.3.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0)
 [![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-[![36 security checks](https://img.shields.io/badge/security_checks-36-7C3AED?style=flat-square)](#checks)
-[![7 AWS services](https://img.shields.io/badge/AWS_services-7-FF9900?style=flat-square)](#checks)
+[![40 security checks](https://img.shields.io/badge/security_checks-40-7C3AED?style=flat-square)](#checks)
+[![10 supported AWS services](https://img.shields.io/badge/AWS_services-10_supported-FF9900?style=flat-square)](#checks)
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE)
 
-AWSherlock is a command-line scanner for AWS security configuration. It has 36 registered checks across eight supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks and one opt-in RDS manual snapshot check. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
+AWSherlock is a command-line scanner for AWS security configuration. It has 40 registered checks across ten supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks, three opt-in RDS checks, one opt-in GuardDuty check and one opt-in DynamoDB check. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
 
 > [!TIP]
 > **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
@@ -396,7 +396,7 @@ awsherlock snapshot --help
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
-| `--list-checks` | Off | List all 36 registered check IDs and titles; no AWS calls. Six identity governance checks and the RDS check are opt-in. |
+| `--list-checks` | Off | List all 40 registered check IDs and titles; no AWS calls. Six identity governance checks, three RDS checks, one GuardDuty check and one DynamoDB check are opt-in. |
 | `--list-services` | Off | List supported services and their check counts; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
@@ -573,7 +573,7 @@ option name in full.
 | `--role ARN` | No assumed role | Assume an IAM role for a single-account scan, or for organization discovery/source authentication. |
 | `--role-session-name NAME` | `AWSherlock` | Name the assumed-role session; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
 | `--external-id ID` | Not supplied | External ID for the assumed role; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
-| `--services LIST` | Seven default services | Comma-separated supported service names; RDS is opt-in. Offline selection must exist in the snapshot. |
+| `--services LIST` | Seven default services | Comma-separated supported service names; RDS, GuardDuty and DynamoDB are opt-in. Offline selection must exist in the snapshot. |
 | `--checks LIST` | All checks | Evaluate comma-separated registered IDs, such as `AWSH-S3-001,AWSH-S3-003`. Collection is unchanged; IDs must belong to the selected services/snapshot. Excluded checks remain visible in coverage. |
 | `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
 | `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
@@ -738,6 +738,9 @@ awsherlock scan --profile production --output json --report-file findings.json
 
 JSON includes metadata, summary counts, normalized findings, coverage, and collection issues. `--report-file` is supported for JSON, HTML and SARIF output. Existing report files are never overwritten; choose a new name or move the earlier report.
 
+For current scan/diff exit statuses and machine-readable artifact versions, see
+[Output contracts](https://github.com/0gulcandogann/awsherlock/blob/main/docs/output-contracts.md).
+
 ### SARIF
 
 Export existing findings as [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html):
@@ -820,6 +823,9 @@ Snapshots reflect the time of collection. They contain account IDs, resource nam
 | Secrets Manager | 3 | Rotation, broad resource-policy principals, custom encryption key state |
 | CloudTrail | 4 | Usable trail, multi-region/global logging, log validation and management-event read/write or source gaps |
 | KMS | 2 | Eligible key rotation, broad key-policy principals |
+| RDS (opt-in) | 3 | Public manual snapshot restore, non-cluster DB instance storage encryption and public-access setting |
+| GuardDuty (opt-in) | 1 | Regional detector enabled status |
+| DynamoDB (opt-in) | 1 | Table point-in-time recovery status |
 
 [Checks and permissions](#checks-and-permissions) lists the check IDs, finding triggers, required AWS actions, and service-specific limits.
 
@@ -1124,20 +1130,61 @@ separately; otherwise the fact is absent from the snapshot. Keys that cannot
 be described remain collection issues, not passing checks. AWS-managed keys
 remain outside the key-policy check.
 
-### RDS manual snapshot sharing (opt-in)
+### RDS snapshot sharing and instance posture (opt-in)
 
 Run `awsherlock scan --services rds --region eu-west-1` to check account-owned
 manual DB-instance and Aurora/DB-cluster snapshots. `AWSH-RDS-001` is HIGH when
 the snapshot's `restore` attribute includes `all`. It means public restore is
 configured; the scan does not observe a copy, restore, or data read. Automatic
 and shared snapshots, DB-instance network access, and storage encryption are
-outside this check. RDS is not part of the seven-service default scan.
+outside this snapshot-sharing check. RDS is not part of the seven-service default scan.
 
 Required reads: `rds:DescribeDBSnapshots`, `rds:DescribeDBSnapshotAttributes`,
 `rds:DescribeDBClusterSnapshots`, and `rds:DescribeDBClusterSnapshotAttributes`.
 The collector requests manual snapshots with pagination. A denied or missing
 attribute produces incomplete coverage, never a passing check. The normalized
 snapshot stores only the resource identity and a `restore_public` boolean.
+
+`AWSH-RDS-002` is MEDIUM when a non-cluster RDS DB instance reports
+`StorageEncrypted=false`. It reads paginated `rds:DescribeDBInstances` using the
+same opt-in service. The check covers RDS Db2, MariaDB, MySQL, Oracle,
+PostgreSQL and SQL Server instance families, including RDS Custom. Aurora,
+Multi-AZ DB cluster members, Neptune and DocumentDB are excluded. It does not
+verify key policies, encryption in transit, backups or application access.
+Missing or malformed flags and denied reads leave coverage incomplete. Old RDS
+snapshots without a successful instance-listing marker remain readable but
+cannot establish complete coverage for this new check. An empty successful
+listing is recorded explicitly, so it is distinct from missing evidence.
+
+`AWSH-RDS-003` is MEDIUM when the same instance scope reports
+`PubliclyAccessible=true`. It uses the existing paginated
+`rds:DescribeDBInstances` read. This is a configuration indicator: the check
+does not establish internet reachability because it does not evaluate security
+groups, routes, subnet gateways, DNS or application controls. A missing or
+malformed flag, denied listing, or old instance snapshot without the fact is
+incomplete coverage, never proof of private access.
+
+### GuardDuty detector posture (opt-in)
+
+Run `awsherlock scan --services guardduty --region eu-west-1` to check one
+account and region. `AWSH-GD-001` is MEDIUM when paginated
+`guardduty:ListDetectors` and `guardduty:GetDetector` show no enabled detector.
+An empty detector list and disabled detectors both produce a finding. Denied or
+malformed reads leave coverage incomplete; unknown status does not produce a
+false no-detector finding. An enabled detector is a regional configuration
+observation, not proof that every optional protection plan is enabled or other
+Regions are covered. No GuardDuty setting is changed.
+
+### DynamoDB point-in-time recovery (opt-in)
+
+Run `awsherlock scan --services dynamodb --region eu-west-1` to check tables
+in one account and region. `AWSH-DDB-001` is MEDIUM when PITR is `DISABLED`.
+The scanner uses paginated `dynamodb:ListTables` and per-table
+`dynamodb:DescribeContinuousBackups`; it does not read table items or change
+backup settings. An enabled PITR status produces no finding. Missing, denied or
+unknown status leaves coverage incomplete. The finding does not mean that no
+on-demand backup exists. Enabling PITR is a separate, potentially billable
+owner action, so review recovery needs and pricing before changing a table.
 
 
 ### Check IDs for the remaining services
@@ -1169,10 +1216,14 @@ snapshot stores only the resource identity and a `restore_public` boolean.
 | AWSH-KMS-001 | Eligible customer key has automatic rotation disabled | MEDIUM |
 | AWSH-KMS-002 | Customer key policy allows a broad principal | MEDIUM |
 | AWSH-RDS-001 | Manual DB or DB-cluster snapshot permits public restore | HIGH |
+| AWSH-RDS-002 | Non-cluster RDS DB instance storage encryption is disabled | MEDIUM |
+| AWSH-RDS-003 | Non-cluster RDS DB instance public-access setting is enabled | MEDIUM |
+| AWSH-GD-001 | No enabled GuardDuty detector in scanned region | MEDIUM |
+| AWSH-DDB-001 | DynamoDB table point-in-time recovery is disabled | MEDIUM |
 
 ### Validation and limits
 
-The latest recorded local regression checkpoint passed 794 tests (2026-09-17); this is unit/mocked regression evidence, not real-AWS validation. The [36-check validation matrix](https://github.com/0gulcandogann/awsherlock/blob/main/docs/validation-matrix.md) and [pilot guide](https://github.com/0gulcandogann/awsherlock/blob/main/docs/pilot.md) define the next validation work. All checks remain untested in real AWS for this pilot.
+The full local regression suite passed 1,100 tests (2026-09-24), primarily with mocked AWS responses. A bounded real-AWS read-only pilot in one account and `eu-central-1` exercised empty RDS and DynamoDB listings and the no-detector GuardDuty case. All three service collections had complete coverage; the GuardDuty case produced `AWSH-GD-001`. Live JSON findings, coverage and summary matched offline replay of the same-collection snapshot. Existing-resource positive and negative cases for RDS and DynamoDB, and enabled/disabled GuardDuty detectors, remain untested in real AWS. See the [40-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md).
 
 A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
@@ -1302,6 +1353,8 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Version [0.3.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0) adds five opt-in security checks across RDS, GuardDuty and DynamoDB: public manual RDS snapshot restore access, non-cluster RDS instance storage encryption and public-access settings, regional GuardDuty detector posture, and DynamoDB table point-in-time recovery status. The seven-service default scan remains unchanged. Missing or denied reads remain incomplete coverage. See [validation and limits](#validation-and-limits) for the bounded live pilot and untested resource cases.
 
 Version [0.2.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0) is published on GitHub, PyPI and TestPyPI. It adds offline `diff`, observed `history` and bounded investigation
 `leads`; exact expiring suppression records; opt-in automation exit thresholds;

@@ -381,7 +381,7 @@ def scan(
         str | None, typer.Option("--external-id", help="External ID required by the role trust policy.", rich_help_panel="Targets and credentials")
     ] = None,
     services: Annotated[
-        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms,rds. RDS is opt-in.", rich_help_panel="Scope and selection")
+        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms,rds,guardduty,dynamodb. RDS, GuardDuty and DynamoDB are opt-in.", rich_help_panel="Scope and selection")
     ] = None,
     output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
     fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for unsuppressed high/critical findings; incomplete coverage still exits 1.", rich_help_panel="Execution and display")] = None,
