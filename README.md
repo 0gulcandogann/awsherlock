@@ -3,7 +3,7 @@
 # AWSherlock
 
 [![Release v0.3.0](https://img.shields.io/badge/release-v0.3.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0)
-[![PyPI](https://img.shields.io/pypi/v/awsherlock?style=flat-square&color=FF9900)](https://pypi.org/project/awsherlock/)
+[![PyPI v0.3.0](https://img.shields.io/badge/PyPI-v0.3.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.3.0/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![40 security checks](https://img.shields.io/badge/security_checks-40-7C3AED?style=flat-square)](#checks)
 [![10 supported AWS services](https://img.shields.io/badge/AWS_services-10_supported-FF9900?style=flat-square)](#checks)
