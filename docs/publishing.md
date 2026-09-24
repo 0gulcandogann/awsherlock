@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.2.0 is published on [GitHub Releases](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0), [PyPI](https://pypi.org/project/awsherlock/0.2.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.2.0/). The tagged release completed its build, fresh-install matrix, Trusted Publishing uploads, and downloaded hash and installation checks on both indices in [GitHub Actions run 35895588709](https://github.com/0gulcandogann/awsherlock/actions/runs/35895588709). Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
+AWSherlock 0.3.0 is published on [GitHub Releases](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0), [PyPI](https://pypi.org/project/awsherlock/0.3.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.3.0/). The tagged release completed its build, four-platform fresh-install matrix, Trusted Publishing uploads, downloaded hash checks and installed smoke checks on both indices in [GitHub Actions run 36009629727](https://github.com/0gulcandogann/awsherlock/actions/runs/36009629727). The public Release is the repository's latest. Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
 
 ## One-time Trusted Publishing setup
 
@@ -45,6 +45,6 @@ Users install released packages with `pipx install awsherlock` or `python -m pip
 
 **`awsherlock --update` intentionally installs GitHub `main`** so users can test unreleased fixes and features, including changes without a version bump. It requires Git and internet access. This task preserves the existing updater behavior.
 
-The 0.2.0 archives embed the README as it stood at tag time. This page records the verified publication status; its update after publication does not change the tagged archives.
+The 0.3.0 archives embed the README as it stood at tag time. This page records the verified publication status; its update after publication does not change the tagged archives.
 
 References: [Adding a Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [Publishing with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/), [official PyPA publish action](https://github.com/pypa/gh-action-pypi-publish).
