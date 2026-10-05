@@ -1,4 +1,4 @@
-![AWSherlock](https://github.com/0gulcandogann/awsherlock/awsherlock.png)
+![AWSherlock](awsherlock.png)
 
 # AWSherlock
 
