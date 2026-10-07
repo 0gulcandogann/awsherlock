@@ -28,6 +28,7 @@ from awsherlock.reporting import render_console, render_json, render_html, write
 from awsherlock.sarif import render_sarif
 from awsherlock.diff import compare_snapshots, render_diff_json
 from awsherlock.history import HistoryError, finding_history, render_history_json
+from awsherlock.correlation import CorrelationError
 from awsherlock.leads import investigation_leads, render_leads_json
 from awsherlock.suppressions import SuppressionError, read_suppressions, apply_suppressions
 from awsherlock.branding import terminal_banner, terminal_text
@@ -135,12 +136,12 @@ def leads_command(
     snapshot_path: Annotated[Path, typer.Argument(help="Normalized snapshot JSON to review offline.")],
     output: Annotated[str, typer.Option("--output", help="Investigation view: console or json.")] = "console",
 ) -> None:
-    """Correlate existing Lambda indicators as review hints, without AWS calls."""
+    """Correlate observed security signals as review hints, without AWS calls."""
     if output not in {"console", "json"}:
         raise typer.BadParameter("Use console or json.", param_hint="--output")
     try:
         document = investigation_leads(read_snapshot(snapshot_path))
-    except SnapshotError as error:
+    except (SnapshotError, CorrelationError) as error:
         message(f"Error: {error}", style=RED, err=True)
         raise typer.Exit(code=1) from None
     except OSError:
@@ -153,8 +154,10 @@ def leads_command(
         for entry in document["coverage"]:
             message(f"Coverage {terminal_text(entry['service'])}: {terminal_text(entry['status'])}")
         for lead in document["leads"]:
-            message(f"{lead['pattern_id']} / {terminal_text(lead['account_id'])} / {terminal_text(lead['resource_id'])}")
-            message(lead["why_review"])
+            subject = lead["subjects"][0]
+            message(f"{lead['pattern_id']} / {lead['priority']} / "
+                    f"{terminal_text(subject['account_id'])} / {terminal_text(subject['resource_id'])}")
+            message(lead["why_it_matters"])
             message(lead["next_step"])
         message("These are review hints, not verified attack paths or effective access.")
     if document["incomplete"]:
