@@ -13,32 +13,12 @@ from awsherlock import __version__
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.common import CollectionIssue, CollectionResult
 from awsherlock.models import Resource, ScanMetadata
+from awsherlock.registry import RESOURCE_FACTS, service_spec
 from awsherlock.scanner import SERVICES, service_components
 from awsherlock.fact_validation import validate_resource_facts
 
 SCHEMA_VERSION = 1
-FACTS = {
-    ("s3", "bucket"): {"public_access_block", "account_public_access_block", "encryption", "versioning", "logging", "policy_public"},
-    ("iam", "user"): {"attached", "statements", "console_mfa"},
-    **{("iam", kind): {"attached", "statements"} for kind in ("role", "group")},
-    ("iam", "policy"): {"statements"},
-    ("iam", "access_key"): {"key_age", "key_stale"},
-    ("ec2", "security-group"): {"ingress"}, ("ec2", "instance"): {"metadata", "addresses"}, ("ec2", "volume"): {"encrypted"},
-    ("lambda", "function"): {"urls", "runtime", "role_policies"},
-    ("secretsmanager", "secret"): {"rotation", "policy", "encryption"},
-    ("cloudtrail", "trail"): {"trail_settings", "trail_status", "management_events", "management_excluded_sources", "management_event_types"},
-    ("cloudtrail", "regional_summary"): {"usable_trail"},
-    ("kms", "key"): {"rotation", "policy"},
-    ("rds", "db-snapshot"): {"restore_public"},
-    ("rds", "db-cluster-snapshot"): {"restore_public"},
-    ("rds", "db-instance"): {"storage_encrypted", "publicly_accessible"},
-    ("guardduty", "regional-summary"): {"enabled_detector_present"},
-    ("dynamodb", "table"): {"pitr_enabled"},
-}
-IDENTITY_COMMON = {"identity_requested", "identity_profile", "identity_approval", "identity_policy_context",
-                   "identity_bindings", "identity_activity", "identity_analyzer_findings"}
-FACTS[("iam", "role")] |= IDENTITY_COMMON | {"identity_trust", "identity_usage"}
-FACTS[("iam", "user")] |= IDENTITY_COMMON
+FACTS = RESOURCE_FACTS
 FORBIDDEN = {"session", "credentials", "accesskeyid", "awsaccesskeyid", "secretaccesskey", "awssecretaccesskey",
              "sessiontoken", "awssessiontoken", "secretstring", "secretbinary", "privatekey", "password", "environment", "variables"}
 
@@ -64,13 +44,15 @@ class Snapshot:
     services: dict[str, CollectionResult]
 
     def to_dict(self) -> dict:
+        if any(name not in SERVICES for name in self.services):
+            raise SnapshotError("Invalid normalized snapshot data")
         metadata = asdict(self.metadata)
         metadata["started_at"] = self.metadata.started_at.isoformat()
         data = {"schema_version": SCHEMA_VERSION, "metadata": metadata,
                 "services": {name: {"resources": [asdict(resource) for resource in result.resources],
                                     "issues": [asdict(issue) for issue in result.issues],
                                     **({"completed_operations": result.completed_operations}
-                                       if name == "rds" and result.completed_operations else {})}
+                                       if service_spec(name).completed_operations and result.completed_operations else {})}
                              for name, result in self.services.items()}}
         snapshot_from_dict(data)  # Validate mutable nested facts before writing.
         return data
@@ -115,15 +97,16 @@ def snapshot_from_dict(data: object) -> Snapshot:
                 raise ValueError()
             if set(collection) - {"resources", "issues"} != ({"completed_operations"} if "completed_operations" in collection else set()):
                 raise ValueError()
-            if "completed_operations" in collection and service != "rds":
+            registered_operations = service_spec(service).completed_operations
+            if "completed_operations" in collection and not registered_operations:
                 raise ValueError()
             if not isinstance(collection["resources"], list) or not isinstance(collection["issues"], list):
                 raise ValueError()
             result = CollectionResult()
             if "completed_operations" in collection:
-                if collection["completed_operations"] != ["DescribeDBInstances"]:
+                if collection["completed_operations"] != list(registered_operations):
                     raise ValueError()
-                result.completed_operations = ["DescribeDBInstances"]
+                result.completed_operations = list(registered_operations)
             for raw in collection["resources"]:
                 resource = Resource(**raw)
                 if resource.service != service or resource.account_id != metadata.account_id:

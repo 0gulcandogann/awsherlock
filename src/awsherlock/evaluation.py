@@ -5,9 +5,8 @@ from awsherlock.collectors.common import CollectionIssue
 from awsherlock.engine import evaluate_rules
 from awsherlock.models import Finding, Resource, Severity
 from awsherlock.coverage import coverage_status
-from awsherlock.scanner import service_components
+from awsherlock.registry import service_spec
 from awsherlock.snapshot import FACTS, Snapshot
-from awsherlock.catalog import check_catalog
 
 
 @dataclass
@@ -213,8 +212,9 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
     matched_resources = set()
     if selected_resources is not None:
         metadata["selected_resources"] = list(selected_resources)
-    identifiers = {service: [identifier for identifier, owner, _ in check_catalog() if owner == service]
-                   for service in snapshot.services}
+    specifications = {service: service_spec(service) for service in snapshot.services}
+    identifiers = {service: [check.identifier for check in spec.checks]
+                   for service, spec in specifications.items()}
     if selected_checks is not None:
         known = {identifier for entries in identifiers.values() for identifier in entries}
         if not set(selected_checks) <= known:
@@ -224,7 +224,7 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
     coverage = []
     identities = []
     for service, collection in snapshot.services.items():
-        _, rules = service_components(service)
+        checks = specifications[service].checks
         issues = [asdict(issue) for issue in collection.issues]
         if (service == "rds" and (selected_checks is None or
                 bool({"AWSH-RDS-002", "AWSH-RDS-003"} & set(selected_checks)))
@@ -254,11 +254,13 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                 issues.append(asdict(CollectionIssue(resource.resource_id, "AccountPublicAccessContext",
                                                      "Account public-access facts are missing; context was not scanned")))
             allowed = FACTS[(service, resource.resource_type)]
-            for identifier, rule in zip(identifiers[service], rules, strict=True):
+            for check in checks:
+                identifier = check.identifier
+                rule = check.evaluator
                 if service == "iam" and rule.number >= 7:
                     if not governance or resource.resource_type not in {"role", "user"} or rule.number == 12 and resource.resource_type != "role":
                         continue
-                fact = rule.required_fact
+                fact = check.required_fact
                 if fact not in allowed:
                     continue
                 if service == "iam" and fact == "key_stale" and resource.data.get("key_age", {}).get("active") is False:

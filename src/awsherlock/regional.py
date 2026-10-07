@@ -11,7 +11,7 @@ from awsherlock.aws.context import ScanContext
 from awsherlock.aws.session import validate_region
 from awsherlock.evaluation import Report, evaluate_snapshot, finalize_resource_selection
 from awsherlock.snapshot import Snapshot, SnapshotError, capture_snapshot
-from awsherlock.catalog import check_catalog
+from awsherlock.registry import service_spec
 
 GLOBAL_SERVICES = {"iam", "s3"}
 SnapshotSink = Callable[[Snapshot, str], None]
@@ -67,7 +67,8 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
             if snapshot_sink is not None:
                 snapshot_sink(snapshot, label)
             # A global/regional scope can contain only some requested check services.
-            scope_ids = {identifier for identifier, service, _ in check_catalog() if service in selected}
+            scope_ids = {check.identifier for service in selected
+                         for check in service_spec(service).checks}
             scope_checks = ([identifier for identifier in selected_checks if identifier in scope_ids]
                             if selected_checks is not None else None)
             result = evaluate_snapshot(snapshot, **({"selected_checks": scope_checks} if scope_checks is not None else {}),

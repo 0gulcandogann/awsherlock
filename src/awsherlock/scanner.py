@@ -1,34 +1,38 @@
-"""Explicit service dispatch; collectors share the authenticated context."""
+"""Backward-compatible service dispatch backed by the canonical registry."""
 
-from awsherlock.collectors.s3 import collect_s3
-from awsherlock.collectors.iam import collect_iam
-from awsherlock.collectors.ec2 import collect_ec2
-from awsherlock.collectors.lambda_service import collect_lambda
-from awsherlock.collectors.secrets import collect_secrets
-from awsherlock.collectors.cloudtrail import collect_cloudtrail
-from awsherlock.collectors.kms import collect_kms
-from awsherlock.collectors.rds import collect_rds
-from awsherlock.collectors.guardduty import collect_guardduty
-from awsherlock.collectors.dynamodb import collect_dynamodb
-from awsherlock.rules.s3 import S3_RULES
-from awsherlock.rules.iam import IAM_RULES
-from awsherlock.rules.ec2 import EC2_RULES
-from awsherlock.rules.serverless import LAMBDA_RULES, SECRET_RULES
-from awsherlock.rules.audit import CLOUDTRAIL_RULES, KMS_RULES
-from awsherlock.rules.rds import RDS_RULES
-from awsherlock.rules.guardduty import GUARDDUTY_RULES
-from awsherlock.rules.dynamodb import DYNAMODB_RULES
+from awsherlock.registry import SERVICE_SPECS, service_spec
 
-DEFAULT_SERVICES = ("iam", "s3", "ec2", "lambda", "secretsmanager", "cloudtrail", "kms")
-SERVICES = (*DEFAULT_SERVICES, "rds", "guardduty", "dynamodb")
+DEFAULT_SERVICES = tuple(spec.identifier for spec in SERVICE_SPECS if spec.default_enabled)
+SERVICES = tuple(spec.identifier for spec in SERVICE_SPECS)
+
+# Preserve the module-level names that callers could import before the registry
+# became the canonical dispatch source.
+collect_iam = service_spec("iam").collector
+collect_s3 = service_spec("s3").collector
+collect_ec2 = service_spec("ec2").collector
+collect_lambda = service_spec("lambda").collector
+collect_secrets = service_spec("secretsmanager").collector
+collect_cloudtrail = service_spec("cloudtrail").collector
+collect_kms = service_spec("kms").collector
+collect_rds = service_spec("rds").collector
+collect_guardduty = service_spec("guardduty").collector
+collect_dynamodb = service_spec("dynamodb").collector
+
+IAM_RULES = service_spec("iam").evaluators
+S3_RULES = service_spec("s3").evaluators
+EC2_RULES = service_spec("ec2").evaluators
+LAMBDA_RULES = service_spec("lambda").evaluators
+SECRET_RULES = service_spec("secretsmanager").evaluators
+CLOUDTRAIL_RULES = service_spec("cloudtrail").evaluators
+KMS_RULES = service_spec("kms").evaluators
+RDS_RULES = service_spec("rds").evaluators
+GUARDDUTY_RULES = service_spec("guardduty").evaluators
+DYNAMODB_RULES = service_spec("dynamodb").evaluators
 
 
 def service_components(service: str):
-    return {"s3": (collect_s3, S3_RULES), "iam": (collect_iam, IAM_RULES), "ec2": (collect_ec2, EC2_RULES),
-            "lambda": (collect_lambda, LAMBDA_RULES), "secretsmanager": (collect_secrets, SECRET_RULES),
-            "cloudtrail": (collect_cloudtrail, CLOUDTRAIL_RULES), "kms": (collect_kms, KMS_RULES),
-            "rds": (collect_rds, RDS_RULES), "guardduty": (collect_guardduty, GUARDDUTY_RULES),
-            "dynamodb": (collect_dynamodb, DYNAMODB_RULES)}[service]
+    spec = service_spec(service)
+    return spec.collector, spec.evaluators
 
 
 def parse_services(value: str | None) -> list[str]:

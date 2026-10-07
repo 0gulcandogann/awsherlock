@@ -1,11 +1,14 @@
 """S3 public access safeguards; no assertion of effective anonymous access."""
 
+from dataclasses import dataclass
+
 from awsherlock.models import Finding, JSONValue, Resource, Severity
 from awsherlock.s3_facts import validate_fact
 
 
+@dataclass(frozen=True)
 class S3PublicAccessRule:
-    required_fact = "public_access_block"
+    required_fact: str = "public_access_block"
 
     def evaluate(self, resource: Resource) -> list[Finding]:
         if resource.service != "s3" or resource.resource_type != "bucket":
@@ -60,8 +63,9 @@ def _finding(resource: Resource, number: str, title: str, description: str,
     )]
 
 
+@dataclass(frozen=True)
 class S3EncryptionRule:
-    required_fact = "encryption"
+    required_fact: str = "encryption"
 
     def evaluate(self, resource: Resource) -> list[Finding]:
         if resource.service != "s3" or resource.resource_type != "bucket":
@@ -77,8 +81,9 @@ class S3EncryptionRule:
                         "Review the default encryption configuration and select SSE-S3, SSE-KMS, or DSSE-KMS.", Severity.LOW)
 
 
+@dataclass(frozen=True)
 class S3VersioningRule:
-    required_fact = "versioning"
+    required_fact: str = "versioning"
 
     def evaluate(self, resource: Resource) -> list[Finding]:
         if resource.service != "s3" or resource.resource_type != "bucket":
@@ -91,8 +96,9 @@ class S3VersioningRule:
                         "Enable bucket versioning and review lifecycle retention requirements.")
 
 
+@dataclass(frozen=True)
 class S3LoggingRule:
-    required_fact = "logging"
+    required_fact: str = "logging"
 
     def evaluate(self, resource: Resource) -> list[Finding]:
         if resource.service != "s3" or resource.resource_type != "bucket":
@@ -106,8 +112,9 @@ class S3LoggingRule:
                         "Configure an appropriate server access logging destination.", Severity.LOW)
 
 
+@dataclass(frozen=True)
 class S3BucketPolicyRule:
-    required_fact = "policy_public"
+    required_fact: str = "policy_public"
 
     def evaluate(self, resource: Resource) -> list[Finding]:
         if resource.service != "s3" or resource.resource_type != "bucket":
