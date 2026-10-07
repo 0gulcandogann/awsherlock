@@ -32,6 +32,12 @@ class CoverageStatus(StrEnum):
     PARTIAL = "PARTIAL"
 
 
+class RelationshipType(StrEnum):
+    RUNS_AS = "RUNS_AS"
+    INVOKES = "INVOKES"
+    USES = "USES"
+
+
 def _text(name: str, value: object) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
@@ -42,6 +48,12 @@ def _location(account_id: str, region: str | None) -> None:
         raise ValueError("account_id must contain 12 digits")
     if region is not None:
         _text("region", region)
+
+
+def _identifier(name: str, value: object) -> None:
+    _text(name, value)
+    if len(value) > 64 or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", value) is None:
+        raise ValueError(f"{name} must be a normalized identifier")
 
 
 def _json_value(value: object) -> None:
@@ -97,6 +109,71 @@ class Resource:
         if not isinstance(self.data, dict):
             raise ValueError("data must be a dictionary")
         _json_value(self.data)
+
+
+@dataclass(frozen=True, kw_only=True)
+class ResourceRef:
+    """Stable resource identity; ARN is an optional locator, not identity."""
+
+    service: str
+    resource_type: str
+    account_id: str
+    region: str | None
+    resource_id: str
+    resource_arn: str | None = field(default=None, compare=False)
+
+    def __post_init__(self) -> None:
+        _identifier("service", self.service)
+        _identifier("resource_type", self.resource_type)
+        _location(self.account_id, self.region)
+        _text("resource_id", self.resource_id)
+        if self.resource_arn is not None:
+            _text("resource_arn", self.resource_arn)
+
+    @property
+    def logical_key(self) -> tuple[str, str, str, str, str]:
+        return (
+            self.account_id,
+            self.region or "",
+            self.service,
+            self.resource_type,
+            self.resource_id,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class RelationshipEvidence:
+    service: str
+    fact: str
+    operation: str | None = None
+
+    def __post_init__(self) -> None:
+        _identifier("service", self.service)
+        _identifier("fact", self.fact)
+        if self.operation is not None:
+            _text("operation", self.operation)
+
+    @property
+    def sort_key(self) -> tuple[str, str, str]:
+        return (self.service, self.fact, self.operation or "")
+
+
+@dataclass(frozen=True, kw_only=True)
+class Relationship:
+    source: ResourceRef
+    relationship_type: RelationshipType
+    target: ResourceRef
+    evidence: tuple[RelationshipEvidence, ...] = field(compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source, ResourceRef) or not isinstance(self.target, ResourceRef):
+            raise ValueError("relationship endpoints must be ResourceRef values")
+        if not isinstance(self.relationship_type, RelationshipType):
+            raise ValueError("relationship_type must be a RelationshipType value")
+        if not isinstance(self.evidence, tuple) or not self.evidence:
+            raise ValueError("relationship evidence must be a non-empty tuple")
+        if any(not isinstance(item, RelationshipEvidence) for item in self.evidence):
+            raise ValueError("relationship evidence contains an invalid entry")
 
 
 @dataclass(frozen=True, kw_only=True)

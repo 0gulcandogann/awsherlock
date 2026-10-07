@@ -12,12 +12,19 @@ from uuid import uuid4
 from awsherlock import __version__
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.common import CollectionIssue, CollectionResult
-from awsherlock.models import Resource, ScanMetadata
+from awsherlock.models import Relationship, Resource, ScanMetadata
+from awsherlock.relationships import (
+    normalize_relationships,
+    project_relationships,
+    relationship_from_dict,
+    relationship_to_dict,
+)
 from awsherlock.registry import RESOURCE_FACTS, service_spec
 from awsherlock.scanner import SERVICES, service_components
 from awsherlock.fact_validation import validate_resource_facts
 
-SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = frozenset({1, CURRENT_SCHEMA_VERSION})
 FACTS = RESOURCE_FACTS
 FORBIDDEN = {"session", "credentials", "accesskeyid", "awsaccesskeyid", "secretaccesskey", "awssecretaccesskey",
              "sessiontoken", "awssessiontoken", "secretstring", "secretbinary", "privatekey", "password", "environment", "variables"}
@@ -42,18 +49,32 @@ def _no_secrets(value: object) -> None:
 class Snapshot:
     metadata: ScanMetadata
     services: dict[str, CollectionResult]
+    relationships: tuple[Relationship, ...] = ()
+    schema_version: int = 1
+
+    @property
+    def supports_relationships(self) -> bool:
+        """Whether this schema can represent positive relationship records."""
+        return self.schema_version >= 2
 
     def to_dict(self) -> dict:
+        if type(self.schema_version) is not int or self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise SnapshotError("Unsupported snapshot schema version")
+        if self.schema_version == 1 and self.relationships:
+            raise SnapshotError("Snapshot schema version 1 cannot contain relationships")
         if any(name not in SERVICES for name in self.services):
             raise SnapshotError("Invalid normalized snapshot data")
         metadata = asdict(self.metadata)
         metadata["started_at"] = self.metadata.started_at.isoformat()
-        data = {"schema_version": SCHEMA_VERSION, "metadata": metadata,
+        data = {"schema_version": self.schema_version, "metadata": metadata,
                 "services": {name: {"resources": [asdict(resource) for resource in result.resources],
                                     "issues": [asdict(issue) for issue in result.issues],
                                     **({"completed_operations": result.completed_operations}
                                        if service_spec(name).completed_operations and result.completed_operations else {})}
                              for name, result in self.services.items()}}
+        if self.supports_relationships:
+            relationships = normalize_relationships(self.relationships, self.services)
+            data["relationships"] = [relationship_to_dict(item) for item in relationships]
         snapshot_from_dict(data)  # Validate mutable nested facts before writing.
         return data
 
@@ -76,15 +97,21 @@ def capture_snapshot(context: ScanContext, services: list[str],
                                             getattr(result, "completed_operations", []))
         if progress is not None:
             progress(f"Collected {service.upper()}", index + 1, len(services))
-    return Snapshot(metadata, results)
+    return Snapshot(metadata, results, project_relationships(results), CURRENT_SCHEMA_VERSION)
 
 
 def snapshot_from_dict(data: object) -> Snapshot:
     try:
-        if not isinstance(data, dict) or set(data) != {"schema_version", "metadata", "services"}:
+        if not isinstance(data, dict) or type(data.get("schema_version")) is not int:
             raise ValueError()
-        if type(data["schema_version"]) is not int or data["schema_version"] != SCHEMA_VERSION:
+        schema_version = data["schema_version"]
+        if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise SnapshotError("Unsupported snapshot schema version")
+        expected_keys = {"schema_version", "metadata", "services"}
+        if schema_version == 2:
+            expected_keys.add("relationships")
+        if set(data) != expected_keys:
+            raise ValueError()
         _no_secrets(data)
         metadata_data = dict(data["metadata"])
         metadata_data["started_at"] = datetime.fromisoformat(metadata_data["started_at"])
@@ -124,7 +151,15 @@ def snapshot_from_dict(data: object) -> Snapshot:
                     raise ValueError()
                 result.issues.append(issue)
             services[service] = result
-        return Snapshot(metadata, services)
+        relationships = ()
+        if schema_version == 2:
+            if not isinstance(data["relationships"], list):
+                raise ValueError()
+            relationships = normalize_relationships(
+                (relationship_from_dict(raw) for raw in data["relationships"]),
+                services,
+            )
+        return Snapshot(metadata, services, relationships, schema_version)
     except SnapshotError:
         raise
     except (TypeError, ValueError, KeyError, AttributeError, RecursionError):
