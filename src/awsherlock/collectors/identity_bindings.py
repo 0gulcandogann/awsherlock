@@ -7,6 +7,12 @@ from awsherlock.collectors.common import CollectionResult
 
 from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, CollectionIssue, items, text_field, error_message
 from awsherlock.identity_config import IDENTITY_ARN
+from awsherlock.identity_validation import (
+    agentcore_binding_identity,
+    agentcore_runtime_arn_identity,
+    identity_binding_sort_key,
+    is_agentcore_runtime_version,
+)
 
 
 def collect_identity_bindings(context: ScanContext, result: CollectionResult) -> None:
@@ -35,7 +41,7 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
             if not any(page.get(token) for token in ("NextToken", "nextToken", "NextMarker", "Marker")):
                 return
 
-    def binding(service, region, arn, role):
+    def binding(service, region, arn, role, *, resource_version=None):
         arn, role = text_field(arn), text_field(role)
         match = IDENTITY_ARN.fullmatch(role)
         if match is None or match[2] != context.account_id or match[3] != "role" or match[1] != context.partition:
@@ -45,6 +51,10 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
             result.issues.append(CollectionIssue(arn, "IdentityBinding", "Workload role is absent from the IAM inventory"))
             return
         record = {"service": service, "region": region, "resource_arn": arn, "role_arn": role}
+        if resource_version is not None:
+            record["resource_version"] = resource_version
+            if agentcore_binding_identity(record) is None:
+                raise InvalidResponse()
         if record not in resource.data["identity_bindings"]:
             resource.data["identity_bindings"].append(record)
 
@@ -103,11 +113,31 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
                     for runtime in pages(client, "list_agent_runtimes", "agentRuntimes"):
                         if not isinstance(runtime, dict):
                             raise InvalidResponse()
-                        check()
-                        detail = client.get_agent_runtime(agentRuntimeId=text_field(runtime.get("agentRuntimeId")))
-                        if not isinstance(detail, dict):
+                        runtime_id = text_field(runtime.get("agentRuntimeId"))
+                        runtime_arn = text_field(runtime.get("agentRuntimeArn"))
+                        runtime_version = text_field(runtime.get("agentRuntimeVersion"))
+                        if (
+                            agentcore_runtime_arn_identity(runtime_arn)
+                            != (context.partition, region, context.account_id, runtime_id)
+                            or not is_agentcore_runtime_version(runtime_version)
+                        ):
                             raise InvalidResponse()
-                        binding(service, region, detail.get("agentRuntimeArn"), detail.get("roleArn"))
+                        check()
+                        detail = client.get_agent_runtime(
+                            agentRuntimeId=runtime_id,
+                            agentRuntimeVersion=runtime_version,
+                        )
+                        if (not isinstance(detail, dict)
+                                or detail.get("agentRuntimeId") != runtime_id
+                                or detail.get("agentRuntimeArn") != runtime_arn
+                                or detail.get("agentRuntimeVersion") != runtime_version):
+                            raise InvalidResponse()
+                        binding(
+                            service, region, runtime_arn, detail.get("roleArn"),
+                            resource_version=runtime_version,
+                        )
             except AWS_ERRORS as error:
                 result.issues.append(CollectionIssue(None, "IdentityBindings:" + service + ":" + region,
                                                      "Metadata page/time budget exhausted or invalid AWS response" if isinstance(error, InvalidResponse) else error_message(error)))
+    for resource in identities.values():
+        resource.data["identity_bindings"].sort(key=identity_binding_sort_key)

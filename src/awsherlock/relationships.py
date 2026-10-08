@@ -12,6 +12,7 @@ from awsherlock.models import (
     Resource,
     ResourceRef,
 )
+from awsherlock.identity_validation import agentcore_binding_identity
 
 
 class RelationshipError(ValueError):
@@ -24,6 +25,7 @@ _ARN = re.compile(
 )
 _LAMBDA_RESOURCE = re.compile(r"function:(?P<resource_id>[A-Za-z0-9_-]{1,64})$")
 _EC2_RESOURCE = re.compile(r"instance/(?P<resource_id>i-(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{17}))$")
+_BEDROCK_AGENT_RESOURCE = re.compile(r"agent/(?P<resource_id>[A-Za-z0-9]{10})$")
 _IAM_ROLE_RESOURCE = re.compile(r"role/(?P<path>[^\s]+/)?(?P<resource_id>[^/\s]+)$")
 
 
@@ -122,10 +124,40 @@ def _parse_arn(value: object) -> re.Match[str] | None:
 
 
 def _project_binding(role: Resource, binding: object) -> Relationship | None:
-    if not isinstance(binding, dict) or set(binding) != {"service", "region", "resource_arn", "role_arn"}:
+    if not isinstance(binding, dict):
+        return None
+    legacy_keys = {"service", "region", "resource_arn", "role_arn"}
+    versioned_keys = legacy_keys | {"resource_version"}
+    binding_keys = set(binding)
+    if binding_keys != legacy_keys and binding_keys != versioned_keys:
         return None
     service = binding.get("service")
-    if service not in {"lambda", "ec2"}:
+    if service not in {"lambda", "ec2", "bedrock", "agentcore"}:
+        return None
+    if service == "agentcore":
+        identity = agentcore_binding_identity(binding)
+        if identity is None:
+            return None
+        partition, region, account, runtime_id, role_id, version = identity
+        if (
+            role.account_id != account
+            or role.resource_id != role_id
+            or role.resource_arn != binding["role_arn"]
+        ):
+            return None
+        return Relationship(
+            source=ResourceRef(
+                service="agentcore", resource_type="runtime-version", account_id=account,
+                region=region, resource_id=f"{runtime_id}:{version}", resource_arn=None,
+            ),
+            relationship_type=RelationshipType.RUNS_AS,
+            target=ResourceRef(
+                service="iam", resource_type="role", account_id=account, region=None,
+                resource_id=role_id, resource_arn=binding["role_arn"],
+            ),
+            evidence=(RelationshipEvidence(service="iam", fact="identity_bindings", operation=None),),
+        )
+    elif binding_keys != legacy_keys:
         return None
     region = binding.get("region")
     source_arn = binding.get("resource_arn")
@@ -146,16 +178,25 @@ def _project_binding(role: Resource, binding: object) -> Relationship | None:
     ):
         return None
     role_resource = _IAM_ROLE_RESOURCE.fullmatch(role_match["resource"])
-    source_resource = (_LAMBDA_RESOURCE.fullmatch(source_match["resource"])
-                       if service == "lambda" else _EC2_RESOURCE.fullmatch(source_match["resource"]))
+    source_resource = {
+        "lambda": _LAMBDA_RESOURCE,
+        "ec2": _EC2_RESOURCE,
+        "bedrock": _BEDROCK_AGENT_RESOURCE,
+    }[service].fullmatch(source_match["resource"])
     if role_resource is None or role_resource["resource_id"] != role.resource_id or source_resource is None:
         return None
+    source_type = {
+        "lambda": "function",
+        "ec2": "instance",
+        "bedrock": "agent",
+    }[service]
+    source_id = source_resource["resource_id"]
     source = ResourceRef(
         service=service,
-        resource_type="function" if service == "lambda" else "instance",
+        resource_type=source_type,
         account_id=source_match["account"],
         region=region,
-        resource_id=source_resource["resource_id"],
+        resource_id=source_id,
         resource_arn=source_arn,
     )
     target = ResourceRef(
@@ -174,22 +215,79 @@ def _project_binding(role: Resource, binding: object) -> Relationship | None:
     )
 
 
+def _project_bedrock_agent(resource: Resource) -> Relationship | None:
+    if resource.service != "bedrock" or resource.resource_type != "agent":
+        return None
+    source_match = _parse_arn(resource.resource_arn)
+    role_arn = resource.data.get("execution_role_arn")
+    role_match = _parse_arn(role_arn)
+    if source_match is None or role_match is None or resource.region is None:
+        return None
+    source_resource = _BEDROCK_AGENT_RESOURCE.fullmatch(source_match["resource"])
+    role_resource = _IAM_ROLE_RESOURCE.fullmatch(role_match["resource"])
+    if (
+        source_match["service"] != "bedrock"
+        or source_match["region"] != resource.region
+        or source_match["account"] != resource.account_id
+        or source_resource is None
+        or source_resource["resource_id"] != resource.resource_id
+        or role_match["service"] != "iam"
+        or role_match["region"] != ""
+        or role_match["account"] != resource.account_id
+        or role_match["partition"] != source_match["partition"]
+        or role_resource is None
+    ):
+        return None
+    return Relationship(
+        source=ResourceRef(
+            service="bedrock", resource_type="agent", account_id=resource.account_id,
+            region=resource.region, resource_id=resource.resource_id,
+            resource_arn=resource.resource_arn,
+        ),
+        relationship_type=RelationshipType.RUNS_AS,
+        target=ResourceRef(
+            service="iam", resource_type="role", account_id=resource.account_id,
+            region=None, resource_id=role_resource["resource_id"], resource_arn=role_arn,
+        ),
+        evidence=(RelationshipEvidence(
+            service="bedrock", fact="execution_role_arn", operation="GetAgent",
+        ),),
+    )
+
+
+def _validate_ai_role_consistency(edges: Iterable[Relationship]) -> None:
+    targets: dict[tuple[str, str, str, str, str], set[tuple[str, str, str, str, str]]] = {}
+    for edge in edges:
+        source_type = (edge.source.service, edge.source.resource_type)
+        if source_type not in {("bedrock", "agent"), ("agentcore", "runtime-version")}:
+            continue
+        targets.setdefault(edge.source.logical_key, set()).add(edge.target.logical_key)
+    if any(len(values) > 1 for values in targets.values()):
+        raise RelationshipError("AI workload evidence contains conflicting execution roles")
+
+
 def project_relationships(services: Mapping[str, CollectionResult]) -> tuple[Relationship, ...]:
-    """Project only Lambda/EC2 identity bindings already present in IAM facts."""
+    """Project positive workload execution-role evidence collected during a live scan."""
     edges = []
     iam = services.get("iam")
-    if iam is None:
-        return ()
-    for role in iam.resources:
-        if role.service != "iam" or role.resource_type != "role":
-            continue
-        bindings = role.data.get("identity_bindings")
-        if not isinstance(bindings, list):
-            continue
-        for binding in bindings:
-            edge = _project_binding(role, binding)
+    if iam is not None:
+        for role in iam.resources:
+            if role.service != "iam" or role.resource_type != "role":
+                continue
+            bindings = role.data.get("identity_bindings")
+            if not isinstance(bindings, list):
+                continue
+            for binding in bindings:
+                edge = _project_binding(role, binding)
+                if edge is not None:
+                    edges.append(edge)
+    bedrock = services.get("bedrock")
+    if bedrock is not None:
+        for resource in bedrock.resources:
+            edge = _project_bedrock_agent(resource)
             if edge is not None:
                 edges.append(edge)
+    _validate_ai_role_consistency(edges)
     return normalize_relationships(edges, services)
 
 

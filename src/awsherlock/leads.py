@@ -241,6 +241,48 @@ def _stale_broad_role(context: CorrelationContext) -> tuple[Lead, ...]:
     return tuple(candidates)
 
 
+def _ai_workload_broad_execution_role(context: CorrelationContext) -> tuple[Lead, ...]:
+    candidates = []
+    approved_sources = {("bedrock", "agent"), ("agentcore", "runtime-version")}
+    for edge in context.snapshot.relationships:
+        if (
+            edge.relationship_type is not RelationshipType.RUNS_AS
+            or (edge.source.service, edge.source.resource_type) not in approved_sources
+            or edge.target.service != "iam"
+            or edge.target.resource_type != "role"
+        ):
+            continue
+        broad = _broad_findings(context, edge.target)
+        if not broad:
+            continue
+        candidates.append(Lead(
+            pattern_id="AI-WORKLOAD-BROAD-EXECUTION-ROLE",
+            subjects=(edge.source,),
+            title="AI workload execution role has broad IAM permission signals",
+            priority=LeadPriority.MEDIUM,
+            related_resources=(edge.target,),
+            finding_refs=tuple(finding_ref(item) for item in broad),
+            relationship_refs=(relationship_ref(edge),),
+            observed=_statements((
+                ("AI_WORKLOAD_RUNS_AS_IAM_ROLE", "The AI workload is observed running as an IAM role."),
+                ("IAM_BROAD_PERMISSION_FINDING", "The exact execution role has a broad IAM permission finding."),
+            )),
+            unknown=_statements((
+                ("EFFECTIVE_IAM_PERMISSIONS_NOT_EVALUATED", "Effective IAM permissions were not evaluated."),
+                ("WORKLOAD_REACHABILITY_NOT_EVALUATED", "Workload reachability was not evaluated."),
+            )),
+            not_proven=_statements((
+                ("ATTACK_PATH_NOT_PROVEN", "A confirmed attack path is not proven."),
+                ("COMPROMISE_NOT_PROVEN", "Compromise is not proven."),
+                ("EFFECTIVE_ACCESS_NOT_PROVEN", "Effective IAM access is not proven."),
+                ("EXPLOITABILITY_NOT_PROVEN", "Exploitability is not proven."),
+            )),
+            why_it_matters="An AI workload and broad permission signals on its exact execution role warrant review together.",
+            next_step="Review the workload's need for each permission, then inspect role boundaries, denies, and effective permissions.",
+        ))
+    return tuple(candidates)
+
+
 CORRELATION_RULES = (
     CorrelationRule(pattern_id="LAMBDA-URL-BROAD-ROLE",
                     title="Lambda URL and broad execution-role policy signals are related",
@@ -258,6 +300,10 @@ CORRELATION_RULES = (
                     title="Stale IAM role has broad permission signals",
                     priority=LeadPriority.MEDIUM, requires_relationships=False,
                     correlate=_stale_broad_role),
+    CorrelationRule(pattern_id="AI-WORKLOAD-BROAD-EXECUTION-ROLE",
+                    title="AI workload execution role has broad IAM permission signals",
+                    priority=LeadPriority.MEDIUM, requires_relationships=True,
+                    correlate=_ai_workload_broad_execution_role),
 )
 validate_correlation_rules(CORRELATION_RULES)
 
