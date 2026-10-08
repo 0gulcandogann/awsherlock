@@ -7,6 +7,7 @@ from typing import Protocol
 
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.cloudtrail import collect_cloudtrail
+from awsherlock.collectors.bedrock import collect_bedrock
 from awsherlock.collectors.common import CollectionResult
 from awsherlock.collectors.dynamodb import collect_dynamodb
 from awsherlock.collectors.ec2 import collect_ec2
@@ -19,6 +20,7 @@ from awsherlock.collectors.s3 import collect_s3
 from awsherlock.collectors.secrets import collect_secrets
 from awsherlock.models import Finding, Resource, Severity
 from awsherlock.rules.audit import CLOUDTRAIL_RULES, KMS_RULES
+from awsherlock.rules.bedrock import BEDROCK_RULES
 from awsherlock.rules.dynamodb import DYNAMODB_RULES
 from awsherlock.rules.ec2 import EC2_RULES
 from awsherlock.rules.guardduty import GUARDDUTY_RULES
@@ -81,6 +83,7 @@ _SCOPES = {
     "rds": "Opt-in regional manual snapshot restore permissions and non-cluster DB instance storage encryption/public-access settings. Findings are configuration indicators; actual data access, internet reachability, key policy and encryption in transit are not verified.",
     "guardduty": "Opt-in regional detector presence and enabled status. Optional protection plans and other Regions are not verified.",
     "dynamodb": "Opt-in regional table point-in-time recovery status. On-demand backups, restore success and other Regions are not verified.",
+    "bedrock": "Opt-in regional Amazon Bedrock Runtime logging and Agents Classic DRAFT configuration indicators. Other inference endpoints, deployed aliases, published versions, effective permissions, reachability, prompts and model content are not evaluated.",
 }
 
 _S3_TITLES = (
@@ -201,6 +204,16 @@ _DYNAMODB_CHECKS = (
         "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Point-in-time-recovery.html",
     )),
 )
+_BEDROCK_CHECKS = (
+    _check("AWSH-BEDROCK-001", "bedrock", BEDROCK_RULES[0], Severity.MEDIUM, (
+        "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent_GetAgent.html",
+        "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent_GuardrailConfiguration.html",
+    )),
+    _check("AWSH-BEDROCK-002", "bedrock", BEDROCK_RULES[1], Severity.LOW, (
+        "https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html",
+        "https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetModelInvocationLoggingConfiguration.html",
+    )),
+)
 
 SERVICE_SPECS = (
     ServiceSpec(identifier="iam", check_prefix="IAM", scope=_SCOPES["iam"],
@@ -258,6 +271,14 @@ SERVICE_SPECS = (
                 default_enabled=False, collector=collect_dynamodb,
                 resource_facts=_resource_facts({"table": {"pitr_enabled"}}),
                 evaluators=DYNAMODB_RULES, checks=_DYNAMODB_CHECKS),
+    ServiceSpec(identifier="bedrock", check_prefix="BEDROCK", scope=_SCOPES["bedrock"],
+                default_enabled=False, collector=collect_bedrock,
+                resource_facts=_resource_facts({
+                    "agent": {"agent_status", "agent_version", "execution_role_arn",
+                              "guardrail_configuration"},
+                    "regional-settings": {"model_invocation_logging_configuration"},
+                }), evaluators=BEDROCK_RULES, checks=_BEDROCK_CHECKS,
+                completed_operations=("ListAgents",)),
 )
 
 _SERVICE_INDEX = MappingProxyType({spec.identifier: spec for spec in SERVICE_SPECS})

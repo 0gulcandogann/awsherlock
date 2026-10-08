@@ -148,6 +148,18 @@ def dynamodb_missing_fact_issue(resource: Resource, identifier: str,
                                   f"{identifier} requires pitr_enabled; {reason}."))
 
 
+def bedrock_missing_fact_issue(resource: Resource, identifier: str, fact: str,
+                               collection_issues: list[CollectionIssue]) -> dict:
+    operation = ("GetAgent" if fact == "guardrail_configuration" else
+                 "GetModelInvocationLoggingConfiguration")
+    failed = any(issue.operation == operation and issue.resource_id == resource.resource_id
+                 for issue in collection_issues)
+    reason = ("a related collection issue is recorded separately" if failed else
+              "the fact is absent from this snapshot")
+    return asdict(CollectionIssue(resource.resource_id, "RequiredFact",
+                                  f"{identifier} requires {fact}; {reason}."))
+
+
 def iam_missing_fact_issue(resource: Resource, identifier: str, fact: str,
                            collection_issues: list[CollectionIssue]) -> dict:
     """Explain absent core IAM facts without exposing credential or policy data."""
@@ -225,16 +237,37 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
     identities = []
     for service, collection in snapshot.services.items():
         checks = specifications[service].checks
-        issues = [asdict(issue) for issue in collection.issues]
+        isolated_bedrock_check = None
+        relevant_collection_issues = collection.issues
+        if service == "bedrock" and selected_checks is not None:
+            selected_bedrock_checks = set(selected_checks) & set(identifiers[service])
+            if len(selected_bedrock_checks) == 1:
+                isolated_bedrock_check = next(iter(selected_bedrock_checks))
+                irrelevant_operations = (
+                    {"GetModelInvocationLoggingConfiguration"}
+                    if isolated_bedrock_check == "AWSH-BEDROCK-001"
+                    else {"ListAgents", "GetAgent"}
+                )
+                relevant_collection_issues = [
+                    issue for issue in collection.issues
+                    if issue.operation not in irrelevant_operations
+                ]
+        issues = [asdict(issue) for issue in relevant_collection_issues]
         if (service == "rds" and (selected_checks is None or
                 bool({"AWSH-RDS-002", "AWSH-RDS-003"} & set(selected_checks)))
                 and "DescribeDBInstances" not in collection.completed_operations
                 and not any(issue.operation == "DescribeDBInstances" for issue in collection.issues)):
             issues.append(asdict(CollectionIssue(None, "RequiredCollection",
                                                   "AWSH-RDS-002 and AWSH-RDS-003 require completed DescribeDBInstances collection; absent from this snapshot.")))
+        if (service == "bedrock" and (selected_checks is None or
+                "AWSH-BEDROCK-001" in selected_checks)
+                and "ListAgents" not in collection.completed_operations
+                and not any(issue.operation == "ListAgents" for issue in collection.issues)):
+            issues.append(asdict(CollectionIssue(None, "RequiredCollection",
+                                                  "AWSH-BEDROCK-001 requires completed ListAgents collection; absent from this snapshot.")))
         excluded = ([identifier for identifier in identifiers[service] if identifier not in selected_checks]
                     if selected_checks is not None else [])
-        if excluded:
+        if excluded and isolated_bedrock_check is None:
             issues.append(asdict(CollectionIssue(None, "CheckSelection", "Checks excluded by selection: " + ", ".join(excluded))))
         evaluated = missing = found = 0
         for resource in collection.resources:
@@ -268,7 +301,8 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                 if service == "kms" and fact == "policy" and resource.data.get("rotation", {}).get("reason") == "AWS-managed key":
                     continue
                 if identifier in excluded or resource_excluded:
-                    missing += 1
+                    if resource_excluded or isolated_bedrock_check is None:
+                        missing += 1
                     continue
                 if fact not in resource.data:
                     missing += 1
@@ -290,6 +324,9 @@ def evaluate_snapshot(snapshot: Snapshot, selected_checks: list[str] | None = No
                         issues.append(guardduty_missing_fact_issue(resource, identifier, collection.issues))
                     elif service == "dynamodb":
                         issues.append(dynamodb_missing_fact_issue(resource, identifier, collection.issues))
+                    elif service == "bedrock":
+                        issues.append(bedrock_missing_fact_issue(resource, identifier, fact,
+                                                                 collection.issues))
                     elif service == "iam" and rule.number <= 6:
                         issues.append(iam_missing_fact_issue(resource, identifier, fact, collection.issues))
                     elif service == "iam":

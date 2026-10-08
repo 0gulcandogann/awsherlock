@@ -1,6 +1,8 @@
 """Strict shapes at the live/offline boundary prevent truthy strings becoming passes."""
 
+import re
 from ipaddress import ip_address, ip_network
+
 from awsherlock.models import Resource
 from awsherlock.s3_facts import validate_fact
 
@@ -29,6 +31,65 @@ SCHEMAS = {
     ("dynamodb", "pitr_enabled"): bool,
 }
 
+_BEDROCK_AGENT_STATUSES = {
+    "CREATING", "PREPARING", "PREPARED", "NOT_PREPARED",
+    "DELETING", "FAILED", "VERSIONING", "UPDATING",
+}
+_BEDROCK_DESTINATIONS = {"cloudwatch", "s3"}
+_BEDROCK_MODALITIES = {"audio", "embedding", "image", "text", "video"}
+
+
+def _bedrock_fact(resource: Resource, fact: str, value: object) -> None:
+    if resource.resource_type == "agent":
+        if fact == "agent_status":
+            if value not in _BEDROCK_AGENT_STATUSES:
+                raise ValueError("Invalid Bedrock Agent status")
+            return
+        if fact == "agent_version":
+            if value != "DRAFT":
+                raise ValueError("Invalid Bedrock Agent version")
+            return
+        if fact == "execution_role_arn":
+            if not isinstance(value, str) or re.fullmatch(
+                rf"arn:[a-z0-9-]+:iam::{resource.account_id}:role/[^\s*?]+", value,
+            ) is None:
+                raise ValueError("Invalid Bedrock execution role ARN")
+            return
+        if fact == "guardrail_configuration":
+            if not isinstance(value, dict) or set(value) != {"identifier", "version"}:
+                raise ValueError("Invalid Bedrock Guardrail configuration")
+            identifier, version = value["identifier"], value["version"]
+            if identifier is None and version is None:
+                return
+            if not isinstance(identifier, str) or not isinstance(version, str):
+                raise ValueError("Invalid Bedrock Guardrail configuration")
+            guardrail_id = identifier.rsplit("/", 1)[-1]
+            if re.fullmatch(r"[a-z0-9]+", guardrail_id) is None or re.fullmatch(
+                r"(?:[0-9]{1,8}|DRAFT)", version,
+            ) is None:
+                raise ValueError("Invalid Bedrock Guardrail configuration")
+            if identifier != guardrail_id and re.fullmatch(
+                rf"arn:[a-z0-9-]+:bedrock:{re.escape(resource.region or '')}:"
+                rf"{resource.account_id}:guardrail/{guardrail_id}", identifier,
+            ) is None:
+                raise ValueError("Invalid Bedrock Guardrail ARN")
+            return
+    if resource.resource_type == "regional-settings" and fact == "model_invocation_logging_configuration":
+        if not isinstance(value, dict) or set(value) != {"configured", "destinations", "modalities"}:
+            raise ValueError("Invalid Bedrock Runtime logging configuration")
+        configured = value["configured"]
+        destinations = value["destinations"]
+        modalities = value["modalities"]
+        if type(configured) is not bool or not isinstance(destinations, list) or not isinstance(modalities, list):
+            raise ValueError("Invalid Bedrock Runtime logging configuration")
+        if (destinations != sorted(set(destinations)) or modalities != sorted(set(modalities))
+                or not set(destinations) <= _BEDROCK_DESTINATIONS
+                or not set(modalities) <= _BEDROCK_MODALITIES
+                or not configured and (destinations or modalities)):
+            raise ValueError("Inconsistent Bedrock Runtime logging configuration")
+        return
+    raise ValueError("Invalid Bedrock normalized fact")
+
 
 def _matches(value, shape) -> bool:
     if isinstance(shape, type):
@@ -39,7 +100,14 @@ def _matches(value, shape) -> bool:
 
 
 def validate_resource_facts(resource: Resource) -> None:
+    if (resource.service == "bedrock" and resource.resource_type == "agent"
+            and "guardrail_configuration" in resource.data
+            and resource.data.get("agent_version") != "DRAFT"):
+        raise ValueError("Bedrock Guardrail evidence requires DRAFT Agent context")
     for fact, value in resource.data.items():
+        if resource.service == "bedrock":
+            _bedrock_fact(resource, fact, value)
+            continue
         if resource.service == "iam" and fact.startswith("identity_"):
             from awsherlock.identity_validation import validate_identity_fact
             validate_identity_fact(fact, value)
