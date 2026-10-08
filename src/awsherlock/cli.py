@@ -25,6 +25,7 @@ from awsherlock.scanner import SERVICES, parse_services
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
+from awsherlock.html_report import HtmlScope
 from awsherlock.sarif import render_sarif
 from awsherlock.diff import compare_snapshots, render_diff_json
 from awsherlock.history import HistoryError, finding_history, render_history_json
@@ -610,6 +611,8 @@ def scan(
             message("External ID: supplied, value hidden")
         return
     sink = snapshot_saver(save_snapshot, bundle=organization or selected_regions is not None) if save_snapshot is not None else None
+    html_scopes: list[HtmlScope] = []
+    evaluated_scope_sink = (lambda saved, evaluated: html_scopes.append(HtmlScope(saved, evaluated))) if output == "html" else None
     work_total = (sum(len(names) for _, names in collection_scopes(selected, selected_regions))
                   if selected_regions is not None else len(selected)) + 2
     measurements = ScanMeasurements() if measurements_file is not None else None
@@ -638,6 +641,7 @@ def scan(
                     **({"selected_ous": selected_ous} if selected_ous is not None else {}),
                     **({"regions": selected_regions} if selected_regions is not None else {}),
                     **({"snapshot_sink": sink} if sink is not None else {}),
+                    **({"evaluated_scope_sink": evaluated_scope_sink} if evaluated_scope_sink is not None else {}),
                 )
             elif snapshot_path is not None:
                 activity("Reading snapshot", 0, 2)
@@ -666,7 +670,9 @@ def scan(
                     def regional_progress(stage: str, completed: int, total: int) -> None:
                         activity(stage, completed + 1, total + 1)
                     report = scan_regions(context, selected, selected_regions,
-                                          progress=regional_progress, snapshot_sink=sink, **selection_options)
+                                          progress=regional_progress, snapshot_sink=sink,
+                                          evaluated_scope_sink=evaluated_scope_sink,
+                                          **selection_options)
                 else:
                     snapshot = capture_snapshot(context, selected, progress=service_progress)
                     if sink is not None:
@@ -674,12 +680,14 @@ def scan(
                     activity("Evaluating security checks", len(selected) + 1, len(selected) + 2)
             if not organization and selected_regions is None:
                 report = evaluate_snapshot(snapshot, **selection_options)
+                if evaluated_scope_sink is not None:
+                    evaluated_scope_sink(snapshot, report)
             if suppression_entries is not None:
                 apply_suppressions(report, suppression_entries)
             activity("Scan finished - incomplete coverage" if report.incomplete else "Scan finished", 1, 1)
         if output == "html":
             destination = report_file or Path("awsherlock-report.html")
-            write_report(render_html(report), destination)
+            write_report(render_html(report, scopes=html_scopes), destination)
             message(f"HTML report saved: {terminal_text(str(destination))}", style=GREEN)
         elif output in {"json", "sarif"}:
             content = render_sarif(report) if output == "sarif" else render_json(report)

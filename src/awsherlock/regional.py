@@ -15,6 +15,7 @@ from awsherlock.registry import service_spec
 
 GLOBAL_SERVICES = {"iam", "s3"}
 SnapshotSink = Callable[[Snapshot, str], None]
+EvaluatedScopeSink = Callable[[Snapshot, Report], None]
 
 
 def parse_regions(value: str) -> list[str]:
@@ -36,6 +37,7 @@ def collection_scopes(services: list[str], regions: list[str]) -> list[tuple[str
 def scan_regions(context: ScanContext, services: list[str], regions: list[str], *,
                  progress: Callable[[str, int, int], None] | None = None,
                  snapshot_sink: SnapshotSink | None = None,
+                 evaluated_scope_sink: EvaluatedScopeSink | None = None,
                  selected_checks: list[str] | None = None,
                  selected_resources: list[str] | None = None,
                  report_unmatched: bool = True) -> Report:
@@ -73,6 +75,8 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
                             if selected_checks is not None else None)
             result = evaluate_snapshot(snapshot, **({"selected_checks": scope_checks} if scope_checks is not None else {}),
                                        **({"selected_resources": selected_resources, "report_unmatched": False} if selected_resources is not None else {}))
+            if evaluated_scope_sink is not None:
+                evaluated_scope_sink(snapshot, result)
             matched_resources.update(result.metadata.get("matched_resource_selectors", []))
             report.identities.extend(result.identities)
             entries = result.coverage

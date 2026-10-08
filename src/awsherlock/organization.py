@@ -13,7 +13,7 @@ from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, error_mess
 from awsherlock.evaluation import Report, evaluate_snapshot, finalize_resource_selection
 from awsherlock.coverage import coverage_status
 from awsherlock.snapshot import SnapshotError, capture_snapshot
-from awsherlock.regional import SnapshotSink, collection_scopes, scan_regions
+from awsherlock.regional import EvaluatedScopeSink, SnapshotSink, collection_scopes, scan_regions
 from awsherlock.selection import parse_ou_selection
 
 
@@ -53,6 +53,7 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                       progress: Callable[[str, int, int], None] | None = None,
                       regions: list[str] | None = None,
                       snapshot_sink: SnapshotSink | None = None,
+                      evaluated_scope_sink: EvaluatedScopeSink | None = None,
                       selected_checks: list[str] | None = None,
                       selected_accounts: list[str] | None = None,
                       selected_ous: list[str] | None = None,
@@ -147,6 +148,7 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 identity_callback(context)
             if regions is not None:
                 result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
+                                      evaluated_scope_sink=evaluated_scope_sink,
                                       **resource_options,
                                       **({"selected_checks": selected_checks} if selected_checks is not None else {}))
             else:
@@ -154,6 +156,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 if snapshot_sink is not None:
                     snapshot_sink(snapshot, context.region or "global")
                 result = evaluate_snapshot(snapshot, **resource_options, **({"selected_checks": selected_checks} if selected_checks is not None else {}))
+                if evaluated_scope_sink is not None:
+                    evaluated_scope_sink(snapshot, result)
         except (SessionError, SnapshotError) as error:
             account["scan_status"] = coverage_status([{"message": str(error)}], 0, 0)
             operation = "AssumeRole" if isinstance(error, SessionError) else "SnapshotValidation"

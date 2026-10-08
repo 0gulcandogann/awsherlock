@@ -18,7 +18,7 @@ from awsherlock.correlation import (
     resource_ref,
     validate_correlation_rules,
 )
-from awsherlock.evaluation import evaluate_snapshot
+from awsherlock.evaluation import Report, evaluate_snapshot
 from awsherlock.models import RelationshipType
 from awsherlock.snapshot import Snapshot
 
@@ -308,8 +308,9 @@ CORRELATION_RULES = (
 validate_correlation_rules(CORRELATION_RULES)
 
 
-def investigation_leads(snapshot: Snapshot) -> dict:
-    report = evaluate_snapshot(snapshot)
+def investigation_leads(snapshot: Snapshot, *, report: Report | None = None) -> dict:
+    """Correlate one snapshot using its exact, optionally pre-evaluated report."""
+    report = evaluate_snapshot(snapshot) if report is None else report
     context = build_correlation_context(snapshot, report.findings, report.coverage)
     candidates = []
     for rule in CORRELATION_RULES:

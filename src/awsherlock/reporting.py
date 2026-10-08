@@ -3,7 +3,9 @@
 import json
 from pathlib import Path
 from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
+from collections.abc import Iterable
 from awsherlock.evaluation import Report
+from awsherlock.html_report import HtmlScope, build_html_view
 from awsherlock.branding import terminal_text
 from rich import box
 from rich.panel import Panel
@@ -21,13 +23,16 @@ def write_report(content: str, path: Path) -> None:
         output.write(content)
 
 
-def render_html(report: Report) -> str:
+def render_html(report: Report, *, scopes: Iterable[HtmlScope] = ()) -> str:
     environment = Environment(loader=PackageLoader("awsherlock", "templates"),
                               autoescape=select_autoescape(default=True), undefined=StrictUndefined)
-    data = report.to_dict()
+    investigation = build_html_view(report, scopes)
+    data = investigation["report"]
     accounts = sorted({data["metadata"]["account_id"], *(entry["account_id"] for entry in data["metadata"].get("accounts", [])), *(finding["account_id"] for finding in data["findings"])})
     services = sorted({entry["service"] for entry in data["coverage"]})
-    return environment.get_template("report.html").render(report=data, accounts=accounts, services=services)
+    return environment.get_template("report.html").render(
+        report=data, accounts=accounts, services=services, investigation=investigation,
+    )
 
 
 SEVERITY_STYLES = {"CRITICAL": f"bold {RED}", "HIGH": ORANGE, "MEDIUM": YELLOW, "LOW": CYAN, "INFO": GREEN}
