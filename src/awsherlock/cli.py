@@ -22,6 +22,7 @@ from awsherlock.help import RootHelpGroup
 from awsherlock.aws.session import SessionError, create_scan_context, validate_region, validate_account_id, verify_account_id
 from awsherlock.snapshot import SnapshotError, capture_snapshot, read_snapshot, write_snapshot, snapshot_saver
 from awsherlock.scanner import SERVICES, parse_services
+from awsherlock.registry import SERVICE_SPECS
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.organization import scan_organization
 from awsherlock.reporting import render_console, render_json, render_html, write_report, render_check_description
@@ -53,6 +54,13 @@ app = typer.Typer(
     cls=RootHelpGroup,
     add_completion=False,
     invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+
+_OPT_IN_SERVICES = tuple(spec.identifier for spec in SERVICE_SPECS if not spec.default_enabled)
+_SERVICE_SELECTION_HELP = (
+    f"Comma-separated services: {','.join(spec.identifier for spec in SERVICE_SPECS)}. "
+    f"Opt-in: {', '.join(_OPT_IN_SERVICES)}."
 )
 
 
@@ -334,9 +342,10 @@ def main(
         raise typer.Exit()
     if list_services:
         checks = check_catalog()
-        for service in SERVICES:
-            count = sum(entry[1] == service for entry in checks)
-            message(f"{service:<14} {count} checks", style=GREEN)
+        for spec in SERVICE_SPECS:
+            count = sum(entry[1] == spec.identifier for entry in checks)
+            availability = "Default" if spec.default_enabled else "Opt-in"
+            message(f"{spec.identifier:<14} {count} checks  {availability}", style=GREEN)
         raise typer.Exit()
     if update:
         update_installation()
@@ -362,7 +371,7 @@ def main(
     "Use --region OR --regions. --summary-only requires console output. "
     "--report-file requires JSON/HTML/SARIF. --timeout sets both request limits; "
     "do not combine with separate timeout flags. Offline scans reject AWS "
-    "authentication, regions, request timeouts, --save-snapshot and --measurements-file. "
+    "authentication, regions, request timeouts, --max-workers, --save-snapshot and --measurements-file. "
     "--accounts and --ous are organization-only. --ous includes descendants and intersects --accounts. --checks and --resources select evaluation, not collection. "
     "--preview validates a local plan without AWS calls or output files; --preview-format json prints a version-1 plan separate from --output. Identity and organization membership remain unverified. "
     "Excluded scope stays NOT_SCANNED/PARTIAL and exits 1. "
@@ -385,11 +394,19 @@ def scan(
         str | None, typer.Option("--external-id", help="External ID required by the role trust policy.", rich_help_panel="Targets and credentials")
     ] = None,
     services: Annotated[
-        str | None, typer.Option("--services", help="Comma-separated services: iam,s3,ec2,lambda,secretsmanager,cloudtrail,kms,rds,guardduty,dynamodb. RDS, GuardDuty and DynamoDB are opt-in.", rich_help_panel="Scope and selection")
+        str | None, typer.Option("--services", help=_SERVICE_SELECTION_HELP, rich_help_panel="Scope and selection")
     ] = None,
-    output: Annotated[str | None, typer.Option("--output", help="Report format: console, json, html or sarif.", rich_help_panel="Reports and measurements")] = None,
+    output: Annotated[str | None, typer.Option(
+        "--output",
+        help="Report format: console, json, sarif, or standalone investigation-oriented html. With snapshot context, HTML includes Leads, Relationships, Resources, Findings, and Coverage.",
+        rich_help_panel="Reports and measurements",
+    )] = None,
     fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for unsuppressed high/critical findings; incomplete coverage still exits 1.", rich_help_panel="Execution and display")] = None,
-    report_file: Annotated[Path | None, typer.Option("--report-file", help="Write a report to a new file.", rich_help_panel="Reports and measurements")] = None,
+    report_file: Annotated[Path | None, typer.Option(
+        "--report-file",
+        help="Write a report to a new file; HTML defaults to awsherlock-report.html. Existing files are not overwritten.",
+        rich_help_panel="Reports and measurements",
+    )] = None,
     suppressions_file: Annotated[Path | None, typer.Option("--suppressions-file", help="Apply exact, expiring local finding annotations; findings remain visible.", rich_help_panel="Reports and measurements")] = None,
     role_name: Annotated[str | None, typer.Option("--role-name", help="Organization target role name/path (default: AWSherlockAuditRole).", rich_help_panel="Targets and credentials")] = None,
     no_progress: Annotated[bool, typer.Option("--no-progress", help="Hide the startup banner and progress bar.", rich_help_panel="Execution and display")] = False,

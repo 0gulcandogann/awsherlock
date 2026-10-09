@@ -375,8 +375,8 @@ These commands do not contact AWS or resolve credentials. `--doctor` shows the
 running Python, package location, PATH launcher, dependency versions and terminal
 information. Use it when the command appears to run an older installation.
 `--list-checks` lists the registered check IDs and titles; `--list-services` shows
-each supported service and its check count. Use one action at a time, without a
-subcommand.
+each supported service, its check count, and whether it is Default or Opt-in.
+Use one action at a time, without a subcommand.
 
 ## Command reference
 
@@ -401,12 +401,12 @@ awsherlock snapshot --help
 
 | Option | Default | Usage |
 | --- | --- | --- |
-| `--help` | Off | Show command help and exit without AWS calls. |
+| `-h`, `--help` | Off | Show command help and exit without AWS calls. |
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
 | `--list-checks` | Off | List all 42 registered check IDs and titles; no AWS calls. Six identity governance checks, three RDS checks, one GuardDuty check, one DynamoDB check and two Bedrock checks are opt-in. |
-| `--list-services` | Off | List supported services and their check counts; no AWS calls. |
+| `--list-services` | Off | List supported services, check counts, and Default/Opt-in status; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
 
@@ -498,19 +498,34 @@ permissions and skipped services remain visible in coverage. Valid history
 exits 0 even with incomplete coverage; invalid options exit 2 and invalid or
 unreadable snapshots exit 1.
 
-### Review correlated Lambda findings
+### Review conservative investigation Leads
 
-`awsherlock leads facts.json` reads one normalized snapshot offline and links
-two **existing** findings on the same Lambda function: a Function URL without
-IAM authentication (`AWSH-LAMBDA-001`) and a broad AWS-managed execution-role
-policy (`AWSH-LAMBDA-002`). Use `--output json` for a version-1
-`investigation-leads` document. The output retains scan coverage; incomplete
-coverage exits 1. No match is not proof of safety when facts are missing.
+`awsherlock leads facts.json` reads one normalized snapshot offline and emits a
+schema-v2 `investigation-leads` document. Five deterministic patterns correlate
+already-observed security signals:
 
-Each lead is a review hint. It does not prove anonymous reachability, effective
-permissions, exploitability or an attack path. It creates no new security
-check, graph or AWS call, and omits raw finding evidence. Invalid options exit
-2; invalid or unreadable snapshots exit 1.
+- `LAMBDA-URL-BROAD-ROLE` links a Lambda Function URL without IAM authentication
+  to the same function's broad AWS-managed execution-role policy signal.
+- `PUBLIC-EC2-IMDSV1-BROAD-ROLE` links public addressing, IMDSv1, the exact
+  `RUNS_AS` role relationship, and broad IAM permission findings for that role.
+- `UNOWNED-BROAD-IAM-WORKLOAD-ROLE` highlights an unowned role with broad IAM
+  permission findings when one or more observed workloads run as that role.
+- `STALE-BROAD-IAM-ROLE` combines stale-use and broad-permission findings on the
+  same IAM role.
+- `AI-WORKLOAD-BROAD-EXECUTION-ROLE` links a Bedrock Agent or AgentCore Runtime
+  Version to broad IAM permission findings on its exact execution role.
+
+The output retains coverage and normalized supporting Finding and Relationship
+references; incomplete coverage exits 1. Relationship-dependent patterns need
+snapshot schema v2. Historical v1 snapshots remain readable, but cannot produce
+Leads that require relationships. AgentCore evidence covers the inventory-
+reported runtime version, not every historical endpoint-pinned version.
+
+Each Lead is an investigation hint, not a Finding. It does not prove anonymous
+or network reachability, effective permissions, exploitability, compromise, or
+an attack path. It creates no new security check or AWS call, and omits raw
+finding evidence. No match is not proof of safety when facts or coverage are
+missing. Invalid options exit 2; invalid or unreadable snapshots exit 1.
 
 ### Record expiring suppressions
 

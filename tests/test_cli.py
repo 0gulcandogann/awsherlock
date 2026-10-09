@@ -34,7 +34,17 @@ def test_help() -> None:
     assert "--update" in result.output
 
 
-@pytest.mark.parametrize("args", [[], ["--help"]])
+def test_short_root_help_matches_long_help_on_stdout() -> None:
+    options = {"terminal_width": 120, "env": {"COLUMNS": "120"}}
+    long_help = runner.invoke(app, ["--help"], **options)
+    short_help = runner.invoke(app, ["-h"], **options)
+
+    assert short_help.exit_code == long_help.exit_code == 0
+    assert short_help.stdout == long_help.stdout
+    assert short_help.stderr == long_help.stderr == ""
+
+
+@pytest.mark.parametrize("args", [[], ["--help"], ["-h"]])
 def test_root_usage_guide_is_available_without_aws(args, context_factory):
     result = runner.invoke(app, args, terminal_width=120, env={"COLUMNS": "120"})
     assert result.exit_code == 0
@@ -45,6 +55,14 @@ def test_root_usage_guide_is_available_without_aws(args, context_factory):
     assert "awsherlock snapshot --help" in result.output
     assert "#command-reference" in result.output
     context_factory.assert_not_called()
+
+
+def test_root_help_describes_leads_as_conservative_review_hints() -> None:
+    result = runner.invoke(app, ["--help"], terminal_width=160, env={"COLUMNS": "160"})
+
+    assert result.exit_code == 0
+    assert "Correlate saved security signals as review hints." in result.output
+    assert "Correlate saved Lambda findings" not in result.output
 
 
 @pytest.mark.parametrize("command", ["scan", "snapshot"])

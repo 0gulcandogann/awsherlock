@@ -50,3 +50,26 @@ def test_grouped_help_is_local_and_readable_without_color(tmp_path, monkeypatch)
     assert wide.exit_code == 0 and "--identity-governance" in wide.output
     assert list(tmp_path.iterdir()) == []
     blocked.assert_not_called()
+
+
+def test_scan_help_discovers_bedrock_html_and_offline_worker_constraints():
+    command = typer.main.get_command(app).commands["scan"]
+    services_help = next(parameter.help for parameter in command.params
+                         if parameter.name == "services")
+    assert services_help.endswith("Opt-in: rds, guardduty, dynamodb, bedrock.")
+
+    result = CliRunner().invoke(
+        app,
+        ["scan", "--help"],
+        terminal_width=180,
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "180"},
+    )
+
+    assert result.exit_code == 0
+    assert "bedrock" in result.output and "opt-in" in result.output.lower()
+    assert "standalone investigation-oriented" in result.output
+    for section in ("Leads", "Relationships", "Resources", "Findings", "Coverage"):
+        assert section in result.output
+    assert "awsherlock-report.html" in result.output
+    assert "not overwritten" in result.output
+    assert "Offline scans reject" in result.output and "--max-workers" in result.output

@@ -48,6 +48,19 @@ def test_discovery_needs_no_aws_and_does_not_leak_environment(option, no_aws, mo
         assert "s3" in result.output and "5 checks" in result.output
 
 
+def test_service_catalog_marks_default_and_opt_in_services(no_aws):
+    result = CliRunner().invoke(app, ["--list-services"])
+
+    assert result.exit_code == 0
+    lines = [line.strip() for line in result.output.splitlines() if "checks" in line]
+    assert len(lines) == 11
+    assert sum("Default" in line for line in lines) == 7
+    assert sum("Opt-in" in line for line in lines) == 4
+    assert any("iam" in line and "12 checks" in line and "Default" in line for line in lines)
+    assert any("bedrock" in line and "2 checks" in line and "Opt-in" in line for line in lines)
+    no_aws.assert_not_called()
+
+
 def test_catalog_ids_are_unique_and_match_supported_check_families():
     catalog = check_catalog()
     ids = {entry[0] for entry in catalog}

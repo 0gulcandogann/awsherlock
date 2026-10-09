@@ -129,6 +129,9 @@ def smoke(dist: Path) -> None:
     result = subprocess.run([str(executable), "--version"], check=True, capture_output=True, text=True)
     if version not in result.stdout:
         raise ValueError("Installed CLI entrypoint failed")
+    result = subprocess.run([str(executable), "-h"], capture_output=True, text=True)
+    if result.returncode != 0 or "Quick start" not in result.stdout or result.stderr:
+        raise ValueError("Installed CLI short-help entrypoint failed")
 
     def forbidden(*args, **kwargs):
         raise AssertionError("Offline smoke attempted network/AWS authentication")
