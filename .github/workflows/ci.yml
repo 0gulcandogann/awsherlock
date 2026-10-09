@@ -47,7 +47,7 @@ jobs:
             installed_python=.ci-venv/bin/python
           fi
           "$installed_python" -m pip install --index-url https://pypi.org/simple/ dist/*.whl
-          "$installed_python" -m pip install pytest
+          "$installed_python" -m pip install "pytest==8.4.2" "typer==0.27.2"
           "$installed_python" -m pip check
           "$installed_python" -m pytest -q --ignore=tests/test_report_browser.py
           "$installed_python" .github/scripts/ci_checks.py
