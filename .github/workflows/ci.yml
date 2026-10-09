@@ -47,9 +47,9 @@ jobs:
             installed_python=.ci-venv/bin/python
           fi
           "$installed_python" -m pip install --index-url https://pypi.org/simple/ dist/*.whl
-          "$installed_python" -m pip install "pytest==8.4.2" "typer==0.27.2"
+          "$installed_python" -m pip install "pytest==8.4.2"
           "$installed_python" -m pip check
-          "$installed_python" -m pytest -q --ignore=tests/test_report_browser.py
+          env -u GITHUB_ACTIONS -u FORCE_COLOR "$installed_python" -m pytest -q --ignore=tests/test_report_browser.py
           "$installed_python" .github/scripts/ci_checks.py
           "$installed_python" .github/scripts/release.py smoke
       - name: Run browser report tests
@@ -57,4 +57,4 @@ jobs:
         shell: bash
         run: |
           command -v google-chrome
-          .ci-venv/bin/python -m pytest -q tests/test_report_browser.py
+          env -u GITHUB_ACTIONS -u FORCE_COLOR .ci-venv/bin/python -m pytest -q tests/test_report_browser.py
