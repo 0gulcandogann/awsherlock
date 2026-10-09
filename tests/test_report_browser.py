@@ -12,7 +12,10 @@ from test_snapshot import snapshot
 
 
 def chromium_path() -> str | None:
-    for name in ("chromium", "chromium-browser", "google-chrome", "msedge"):
+    # GitHub's Ubuntu image may expose a non-functional Chromium wrapper while
+    # also providing a working Google Chrome binary. Prefer the installed
+    # Chrome browser, then fall back to Chromium and Edge for local runs.
+    for name in ("google-chrome", "chromium", "chromium-browser", "msedge"):
         found = shutil.which(name)
         if found:
             return found
