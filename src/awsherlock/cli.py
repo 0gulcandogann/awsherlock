@@ -268,10 +268,10 @@ def update_installation() -> None:
         commands.append([sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", REPOSITORY_URL])
     pipx = shutil.which("pipx")
     if pipx:
-        commands.append([pipx, "upgrade", "awsherlock", "--pip-args=--force-reinstall"])
+        commands.append([pipx, "install", "--force", REPOSITORY_URL])
     launcher = shutil.which("py") or shutil.which("python3") or shutil.which("python")
     if launcher:
-        commands.append([launcher, "-m", "pipx", "upgrade", "awsherlock", "--pip-args=--force-reinstall"])
+        commands.append([launcher, "-m", "pipx", "install", "--force", REPOSITORY_URL])
     if not commands:
         message("Update failed: pipx or a Python launcher was not found.", style=RED, err=True)
         raise typer.Exit(code=1)
