@@ -2,14 +2,14 @@
 
 # AWSherlock
 
-[![Release v0.3.0](https://img.shields.io/badge/release-v0.3.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0)
-[![PyPI v0.3.0](https://img.shields.io/badge/PyPI-v0.3.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.3.0/)
+[![Release v0.4.0](https://img.shields.io/badge/release-v0.4.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.4.0)
+[![PyPI v0.4.0](https://img.shields.io/badge/PyPI-v0.4.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.4.0/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-[![40 security checks](https://img.shields.io/badge/security_checks-40-7C3AED?style=flat-square)](#checks)
-[![10 supported AWS services](https://img.shields.io/badge/AWS_services-10_supported-FF9900?style=flat-square)](#checks)
+[![42 security checks](https://img.shields.io/badge/security_checks-42-7C3AED?style=flat-square)](#checks)
+[![11 supported AWS services](https://img.shields.io/badge/AWS_services-11_supported-FF9900?style=flat-square)](#checks)
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE)
 
-AWSherlock is a command-line scanner for AWS security configuration. It has 40 registered checks across ten supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks, three opt-in RDS checks, one opt-in GuardDuty check and one opt-in DynamoDB check. Reports appear in your terminal, as JSON, or as an HTML file you can open in a browser. Optional identity evidence covers external agents, IAM users, role chains, OIDC workloads and native Bedrock/AgentCore role bindings.
+AWSherlock is a command-line scanner for AWS security configuration. It has 42 registered checks across 11 supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks, three opt-in RDS checks, one opt-in GuardDuty check, one opt-in DynamoDB check and two opt-in Amazon Bedrock checks. Reports appear in your terminal, as JSON, or as a standalone investigation-oriented HTML file. Snapshot schema v2 records positive workload relationships, and five conservative Lead patterns connect exact supporting findings and relationships without claiming effective access or an attack path.
 
 > [!TIP]
 > **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
@@ -59,9 +59,10 @@ copy the [new-check specification template](docs/check-spec-template.md), and
 select the read-only `awsherlock-security-reviewer` agent for a security review.
 The IDE hook runs focused local tests after a rule or collector file save. In
 Kiro CLI, run `python .kiro/scripts/check_rule_tests.py --path src/awsherlock/rules/rds.py`
-explicitly for a changed file. When the local ignored test module is absent,
-the script reports that only the public synthetic scanner smoke ran; this is
-not validation of the changed rule. It does not contact or modify AWS. The
+explicitly for a changed file. The script runs the matching public regression
+module when available and otherwise reports that only the synthetic scanner
+smoke ran; the smoke alone is not validation of the changed rule. It does not
+contact or modify AWS. The
 steering complements the public contributor guides; maintainer-only planning
 files are not part of
 the published repository.
@@ -271,6 +272,14 @@ different evidence is retained. Resource/check counts represent collection and
 evaluation observations across the selected scopes. Other regions remain outside
 the selected scope, and failures retain incomplete coverage and exit code 1.
 
+`--max-workers` is an opt-in live-scan performance control. The default `1`
+preserves serial collection; larger values run independent selected service
+collectors concurrently inside one account/region scope. Account and region loops
+remain sequential, results retain registry order, and relationships/evaluation run
+only after collection is assembled. The option bounds collector tasks, not AWS API
+requests per second; SDK retries and service throttling still apply. Offline replay
+does not accept it.
+
 `--save-snapshot` writes normalized facts, including collection issues, without
 another collection pass. A single live scan writes a new JSON file. Organization
 or `--regions` scans create a new directory of `ACCOUNT-SCOPE.json` files; replay
@@ -396,7 +405,7 @@ awsherlock snapshot --help
 | `--version` | Off | Print the installed version and exit without AWS calls. |
 | `--update` | Off | Update the installation from GitHub main; requires network access. See [updates](#update-or-remove). |
 | `--doctor` | Off | Show allowlisted local installation, dependency and terminal diagnostics; no AWS calls. |
-| `--list-checks` | Off | List all 40 registered check IDs and titles; no AWS calls. Six identity governance checks, three RDS checks, one GuardDuty check and one DynamoDB check are opt-in. |
+| `--list-checks` | Off | List all 42 registered check IDs and titles; no AWS calls. Six identity governance checks, three RDS checks, one GuardDuty check, one DynamoDB check and two Bedrock checks are opt-in. |
 | `--list-services` | Off | List supported services and their check counts; no AWS calls. |
 | `--describe-check ID` | Not selected | Explain a supported check, required fact, remediation and scope; IDs are case-insensitive. Example: `AWSH-CT-001`. No AWS calls. |
 | `--color MODE` | `auto` | `auto`, `always` or `never`; honors `NO_COLOR`. Place before eager `--help`/`--version` to style them. |
@@ -573,7 +582,7 @@ option name in full.
 | `--role ARN` | No assumed role | Assume an IAM role for a single-account scan, or for organization discovery/source authentication. |
 | `--role-session-name NAME` | `AWSherlock` | Name the assumed-role session; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
 | `--external-id ID` | Not supplied | External ID for the assumed role; requires `--role` in a single-account scan. In organization mode, applies to member-account roles. |
-| `--services LIST` | Seven default services | Comma-separated supported service names; RDS, GuardDuty and DynamoDB are opt-in. Offline selection must exist in the snapshot. |
+| `--services LIST` | Seven default services | Comma-separated supported service names; RDS, GuardDuty, DynamoDB and Bedrock are opt-in. Offline selection must exist in the snapshot. |
 | `--checks LIST` | All checks | Evaluate comma-separated registered IDs, such as `AWSH-S3-001,AWSH-S3-003`. Collection is unchanged; IDs must belong to the selected services/snapshot. Excluded checks remain visible in coverage. |
 | `--accounts LIST` | All discovered accounts | Organization-only: scan comma-separated 12-digit IDs. Discovery still lists all accounts; excluded and undiscovered requested accounts are `NOT_SCANNED`. |
 | `--ous LIST` | No OU restriction | Organization-only: comma-separated OU IDs and all descendants; intersects `--accounts`. Requires paginated `organizations:ListChildren`. Failed membership discovery prevents role assumption for uncertain accounts. |
@@ -604,6 +613,7 @@ option name in full.
 | `--connect-timeout SECONDS` | SDK default | Finite positive socket connection timeout, at most 3600 seconds. |
 | `--read-timeout SECONDS` | SDK default | Finite positive socket read timeout, at most 3600 seconds. |
 | `--timeout SECONDS` | SDK defaults | Set both request timeouts; cannot be combined with either separate timeout flag. Not an overall scan deadline. |
+| `--max-workers N` | `1` | Maximum concurrent service collectors per live scope. Values above one enable bounded service-level threads; account and region traversal stays sequential. This bounds collector tasks, not AWS API request rate, and is unavailable for offline replay. |
 | `--color MODE` | `auto` / inherited top-level preference | Override terminal colors with `auto`, `always` or `never`. JSON payloads remain unstyled. |
 | `--stats` | Off | Write measured elapsed time and resource/check/finding counts to stderr; no API-call count claims. |
 | `--measurements-file PATH` | Off | Live scans only: write version-1 SDK invocation counts and collection timing samples to a new JSON file, separate from reports and snapshots. Authentication calls and HTTP retries are excluded. |
@@ -648,7 +658,7 @@ it is different from scan's `--output FORMAT`.
 | --- | --- | --- |
 | `--help` | Off | Show snapshot help without contacting AWS. |
 | `--output PATH` | Required | Write a new normalized JSON snapshot file; existing files are not overwritten. |
-| `--services LIST` | Seven default services | Select supported services using a comma-separated list; RDS is opt-in. |
+| `--services LIST` | Seven default services | Select supported services using a comma-separated list; RDS, GuardDuty, DynamoDB and Bedrock are opt-in. |
 | `--profile NAME` | SDK credential chain | Authenticate with a named AWS profile. |
 | `--role ARN` | No assumed role | Assume this IAM role before collecting facts. |
 | `--role-session-name NAME` | `AWSherlock` | Set the role session name; requires `--role`. |
@@ -658,6 +668,7 @@ it is different from scan's `--output FORMAT`.
 | `--connect-timeout SECONDS` | SDK default | Finite positive socket connection timeout, at most 3600 seconds. |
 | `--read-timeout SECONDS` | SDK default | Finite positive socket read timeout, at most 3600 seconds. |
 | `--timeout SECONDS` | SDK defaults | Set both request timeouts; cannot be combined with either separate timeout flag. |
+| `--max-workers N` | `1` | Maximum concurrent service collectors for this live snapshot capture; bounds collector tasks, not AWS API request rate. |
 | `--color MODE` | `auto` / inherited top-level preference | `auto`, `always` or `never`; honors `NO_COLOR`. |
 
 ```bash
@@ -717,7 +728,7 @@ Open `awsherlock-report.html` in your browser. To choose a file name:
 awsherlock scan --profile production --output html --report-file production.html
 ```
 
-The report uses a light theme with bordered cards. It includes scan metadata, severity counts, findings, evidence, remediation, and coverage details. Use the search field and severity, service, and account filters to narrow the findings. Sorting is available by severity, service, resource, or check ID.
+The report uses a light theme with bordered cards and an investigation-first flow: overview, conservative Leads, positive resource relationships, collected resources, findings and coverage. Lead priority is distinct from finding severity, and each Lead links to its exact supporting findings and relationships. AgentCore runtime-version references can appear as relationship-only identities without a fabricated resource or ARN. Use the search field and severity, service, and account filters to narrow findings; sorting is available by severity, service, resource, or check ID. Partial collection and `AccessDenied` remain visible, and an empty relationship list is not presented as proof that no relationship exists.
 
 > [!TIP]
 > HTML reports are single files with embedded styles and JavaScript. They need no server or internet connection. All findings remain readable with JavaScript disabled.
@@ -826,10 +837,11 @@ Snapshots reflect the time of collection. They contain account IDs, resource nam
 | RDS (opt-in) | 3 | Public manual snapshot restore, non-cluster DB instance storage encryption and public-access setting |
 | GuardDuty (opt-in) | 1 | Regional detector enabled status |
 | DynamoDB (opt-in) | 1 | Table point-in-time recovery status |
+| Bedrock (opt-in) | 2 | Agents Classic DRAFT Guardrail association; Bedrock Runtime model invocation logging configuration |
 
 [Checks and permissions](#checks-and-permissions) lists the check IDs, finding triggers, required AWS actions, and service-specific limits.
 
-AWSherlock evaluates configuration indicators. It does not prove effective access or simulate policy conditions, explicit denies, permissions boundaries, or SCPs. Unknown Lambda runtimes and container-image runtimes leave runtime coverage incomplete. OU analysis, automatic remediation, and compliance certification are not included.
+AWSherlock evaluates configuration indicators. It does not prove effective access or simulate policy conditions, explicit denies, permissions boundaries, or SCPs. Investigation Leads correlate exact normalized evidence but do not prove exploitability or an attack path. Unknown Lambda runtimes and container-image runtimes leave runtime coverage incomplete. OU analysis, automatic remediation, and compliance certification are not included.
 
 The scanner does not retrieve secret values, Lambda code or environment values, EC2 user data, or KMS key material. Validation includes mocked AWS APIs, local browser checks, and LocalStack integration scenarios; live AWS-account validation is not claimed.
 
@@ -1186,6 +1198,24 @@ unknown status leaves coverage incomplete. The finding does not mean that no
 on-demand backup exists. Enabling PITR is a separate, potentially billable
 owner action, so review recovery needs and pricing before changing a table.
 
+### Amazon Bedrock security scanning (opt-in)
+
+Run `awsherlock scan --services bedrock --region us-east-1`. `AWSH-BEDROCK-001`
+is MEDIUM when a successfully validated Amazon Bedrock Agents Classic current
+DRAFT configuration has no associated Guardrail. It does not make a claim about
+published versions, deployed aliases, reachability or exploitability.
+`AWSH-BEDROCK-002` is LOW when the regional Bedrock Runtime model invocation
+logging facility has no active normalized destination/modality configuration.
+This facility applies to supported calls through the `bedrock-runtime` endpoint;
+it does not establish logging coverage for every Bedrock inference endpoint.
+
+Required reads are `bedrock:ListAgents`, `bedrock:GetAgent` and
+`bedrock:GetModelInvocationLoggingConfiguration`. The collector stores only
+normalized configuration categories, never prompts, instructions, model
+inputs/outputs, bucket names, prefixes or log-group names. Logging content can
+contain request/response data, so enable and govern it according to applicable
+security, privacy and retention requirements. Bedrock is not part of the
+seven-service default scan.
 
 ### Check IDs for the remaining services
 
@@ -1220,10 +1250,12 @@ owner action, so review recovery needs and pricing before changing a table.
 | AWSH-RDS-003 | Non-cluster RDS DB instance public-access setting is enabled | MEDIUM |
 | AWSH-GD-001 | No enabled GuardDuty detector in scanned region | MEDIUM |
 | AWSH-DDB-001 | DynamoDB table point-in-time recovery is disabled | MEDIUM |
+| AWSH-BEDROCK-001 | Bedrock Agents Classic DRAFT configuration has no associated Guardrail | MEDIUM |
+| AWSH-BEDROCK-002 | Bedrock Runtime model invocation logging has no active configuration in scanned region | LOW |
 
 ### Validation and limits
 
-The full local regression suite passed 1,100 tests (2026-09-24), primarily with mocked AWS responses. A bounded real-AWS read-only pilot in one account and `eu-central-1` exercised empty RDS and DynamoDB listings and the no-detector GuardDuty case. All three service collections had complete coverage; the GuardDuty case produced `AWSH-GD-001`. Live JSON findings, coverage and summary matched offline replay of the same-collection snapshot. Existing-resource positive and negative cases for RDS and DynamoDB, and enabled/disabled GuardDuty detectors, remain untested in real AWS. See the [40-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md).
+The public deterministic regression suite contains 1,367 tests for the v0.4.0 source, primarily with mocked AWS responses, including three standalone-browser report tests. Scanner CI runs the non-browser suite on Linux/Python 3.11 and 3.13, Windows/Python 3.13 and macOS/Python 3.13, plus the browser tests on Linux/Python 3.13. A bounded real-AWS read-only pilot for v0.3.0 exercised empty RDS and DynamoDB listings and the no-detector GuardDuty case in one account and `eu-central-1`; it did not validate the new Bedrock, relationship, Lead, HTML or concurrency features against live AWS. See the [42-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md).
 
 A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
@@ -1231,7 +1263,7 @@ Positive scenarios exercised 27 of the 28 checks. IAM key-age and stale-key scen
 
 LocalStack's ready-made AWS-managed policies added findings outside the selected test resources. The 25-resource match count excludes those ambient policies; it is not an overall accuracy score. IAM wildcard findings also need context because some AWS actions require wildcard resources. Emulator validation does not establish identical behavior in a real AWS account.
 
-Test harnesses, fixtures, screenshots, local reports and development notes are kept outside the published repository and package. The commands in this README work with your own AWS profiles or snapshots; no bundled test environment is required.
+Deterministic test modules and synthetic fixtures are published in the repository but excluded from wheel and source archives. Screenshots, local reports and development notes remain local. The commands in this README work with your own AWS profiles or snapshots; no AWS credentials or real AWS calls are required by the public regression suite.
 
 ## Docker
 
@@ -1354,6 +1386,10 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
+Version [0.4.0](docs/releases/v0.4.0.md) adds opt-in Amazon Bedrock security scanning, snapshot-v2 positive relationships, five conservative investigation Lead patterns, Bedrock Agent and AgentCore runtime-version execution-role relationships, investigation-oriented standalone HTML and opt-in bounded service collection with `--max-workers`. The public deterministic suite and Scanner CI now cover the release across supported platforms. The default scan remains seven services; Bedrock is opt-in, and AgentCore is not a registered check service.
+
+Important limits remain: AWSherlock does not simulate effective IAM permissions or prove attack paths. The Agents Classic Guardrail check evaluates only the current DRAFT configuration. Bedrock Runtime logging evidence covers that facility, not every Bedrock inference endpoint. AgentCore relationships cover the inventory-reported runtime version, not every historical or endpoint-pinned version. Worker count bounds service collector tasks, not AWS API requests per second. Missing relationships and incomplete coverage do not prove security.
+
 Version [0.3.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0) adds five opt-in security checks across RDS, GuardDuty and DynamoDB: public manual RDS snapshot restore access, non-cluster RDS instance storage encryption and public-access settings, regional GuardDuty detector posture, and DynamoDB table point-in-time recovery status. The seven-service default scan remains unchanged. Missing or denied reads remain incomplete coverage. See [validation and limits](#validation-and-limits) for the bounded live pilot and untested resource cases.
 
 Version [0.2.0](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.2.0) is published on GitHub, PyPI and TestPyPI. It adds offline `diff`, observed `history` and bounded investigation
@@ -1392,7 +1428,7 @@ scanning, offline evaluation and report formats remain supported. Collection sta
 sequential; this release does not claim new security rules or measured API-call
 performance improvements. Version 0.1.0 remains the original release baseline.
 
-Recent changes simplify installation from a clone, add the convenience update command, organize terminal findings into severity-ordered cards, and give HTML reports a light theme with purple borders and orange shadows. Untrusted terminal control and directional formatting characters are shown as visible escapes in terminal results and CLI file messages. JSON and HTML retain the original data. Examples and development artifacts are excluded from the public tree and source distribution.
+Recent changes simplify installation from a clone, add the convenience update command, organize terminal findings into severity-ordered cards, and make standalone HTML reports investigation-oriented. Untrusted terminal control and directional formatting characters are shown as visible escapes in terminal results and CLI file messages. JSON and HTML retain the original data. Synthetic examples and deterministic tests are public; development planning and generated reports remain excluded, and test/example files are not included in package archives.
 
 ## License
 

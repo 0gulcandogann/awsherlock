@@ -2,10 +2,10 @@
 
 [README](../README.md) · [Pilot procedure](pilot.md) · [Checks and permissions](../README.md#checks-and-permissions)
 
-Updated 2026-09-24 from the local collectors, rules, snapshot fact allowlist and
-evaluation pipeline. There are 40 registered checks: 29 default, six opt-in
-IAM governance checks, three opt-in RDS checks, one opt-in GuardDuty check and
-one opt-in DynamoDB check. A bounded v0.3.0 live pilot exercised empty RDS and
+Updated 2026-10-09 from the collectors, rules, snapshot fact allowlist and
+evaluation pipeline. There are 42 registered checks: 29 default, six opt-in
+IAM governance checks, three opt-in RDS checks, one opt-in GuardDuty check,
+one opt-in DynamoDB check and two opt-in Bedrock checks. A bounded v0.3.0 live pilot exercised empty RDS and
 DynamoDB listings plus an absent GuardDuty detector in one account/region; the
 GuardDuty case produced `AWSH-GD-001` with complete coverage and matched offline
 replay. Other check scenarios and resource-dependent positive/negative pairs
@@ -130,6 +130,17 @@ the scanner never enables it.
 | --- | --- | --- | --- | --- |
 | AWSH-DDB-001 | `PointInTimeRecoveryStatus` is `DISABLED` | DynamoDB bundle | Disabled table / enabled table | Other backup methods and actual restore success unverified; denied, missing, malformed or unknown status remains incomplete |
 
+## Amazon Bedrock — opt-in Agents Classic and Runtime settings
+
+Select `--services bedrock` and a region. These checks use normalized
+configuration metadata only. They do not read prompts, model inputs/outputs or
+logged content, and AgentCore is not a registered check service.
+
+| Check ID | Positive | Reads | Positive / negative fixture | Limits |
+| --- | --- | --- | --- | --- |
+| AWSH-BEDROCK-001 | Valid current DRAFT configuration has no `guardrailConfiguration` | `bedrock:ListAgents`, `bedrock:GetAgent` | Absent association / valid identifier and version | Agents Classic current DRAFT only; no claim about aliases, published versions, reachability or exploitability. Failed/mismatched/malformed evidence is incomplete |
+| AWSH-BEDROCK-002 | Runtime logging config absent, or valid but lacks a destination or enabled modality | `bedrock:GetModelInvocationLoggingConfiguration` | Absent/inert config / CloudWatch or S3 plus an enabled supported modality | Bedrock Runtime logging facility only, not every inference endpoint; denied/malformed reads are incomplete. Logging governance and sensitive request/response handling remain owner responsibilities |
+
 ## IAM — opt-in governance
 
 Use `--identity-governance`; the last two checks require approval evidence from
@@ -186,7 +197,7 @@ those absence values. Exit 0 means completed evaluation even with findings; exit
 
 ## Pilot result ledger
 
-Copy this record for each matrix ID and scenario, keeping all 40 IDs represented.
+Copy this record for each matrix ID and scenario, keeping all 42 IDs represented.
 Initial status for every ID is UNTESTED; unavailable positive/negative scenarios
 stay untested even if another scenario for that ID succeeds.
 
@@ -211,7 +222,7 @@ accuracy, a general security score or resolved risk from finding counts.
 Implementation: [catalog](../src/awsherlock/catalog.py),
 [collectors](../src/awsherlock/collectors/), [rules](../src/awsherlock/rules/),
 [snapshot facts](../src/awsherlock/snapshot.py), [evaluation](../src/awsherlock/evaluation.py).
-Local ignored tests: test_s3_complete.py/test_s3_account.py, test_iam.py,
+Public deterministic tests: test_s3_complete.py/test_s3_account.py, test_iam.py,
 test_ec2.py, test_serverless.py, test_audit.py/test_cloudtrail_management.py,
 test_identity.py/test_identity_integrations.py, test_collection_resilience.py,
 test_resource_selection.py/test_ou_selection.py and test_report_browser.py.

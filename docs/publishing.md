@@ -1,6 +1,6 @@
 # Publishing AWSherlock to PyPI
 
-AWSherlock 0.3.0 is published on [GitHub Releases](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.3.0), [PyPI](https://pypi.org/project/awsherlock/0.3.0/) and [TestPyPI](https://test.pypi.org/project/awsherlock/0.3.0/). The tagged release completed its build, four-platform fresh-install matrix, Trusted Publishing uploads, downloaded hash checks and installed smoke checks on both indices in [GitHub Actions run 36009629727](https://github.com/0gulcandogann/awsherlock/actions/runs/36009629727). The public Release is the repository's latest. Preserve published files. Before a future tag, complete the local release milestone and obtain owner release authorization.
+AWSherlock stable releases are published on [GitHub Releases](https://github.com/0gulcandogann/awsherlock/releases) and [PyPI](https://pypi.org/project/awsherlock/) through the tag-triggered Trusted Publishing workflow. The latest verified release remains the source of truth on those public pages. Preserve published files; before a future tag, complete the local release milestone and obtain owner release authorization.
 
 ## One-time Trusted Publishing setup
 
@@ -23,7 +23,12 @@ Setup is not complete until both publishers are saved, the workflow/scripts are 
 
 Once the workflow is on the default branch, open GitHub Actions, select **Publish Python package**, and use **Run workflow** on `main`. This builds once, checks source version, wheel/source metadata and README rendering, then installs the wheel in fresh environments on Linux/Python 3.11 and 3.13, Windows/Python 3.13 and macOS/Python 3.13. Installed-code equality, CLI discovery and offline JSON/HTML are checked. This branch run cannot upload to either index and does not exercise the OIDC exchange.
 
-CI runs committed package smoke checks, not the ignored local full scanner test suite. Before a release, run the relevant local scanner tests as well. None of these checks require AWS credentials or make an AWS request.
+Scanner CI runs the committed deterministic pytest suite on the supported Linux,
+Windows and macOS/Python matrix, plus the standalone-browser tests in the
+configured Linux/Chrome job. It also retains the package build, installed-wheel
+smoke, dependency and metadata checks. None of these checks require AWS
+credentials or make an AWS request. Browser tests are not counted as executed if
+the configured browser is unavailable.
 
 ## Publish a new stable version
 
@@ -45,6 +50,6 @@ Users install released packages with `pipx install awsherlock` or `python -m pip
 
 **`awsherlock --update` intentionally installs GitHub `main`** so users can test unreleased fixes and features, including changes without a version bump. It requires Git and internet access. This task preserves the existing updater behavior.
 
-The 0.3.0 archives embed the README as it stood at tag time. This page records the verified publication status; its update after publication does not change the tagged archives.
+Published archives embed the README as it stood at tag time. Updating this page after publication does not change tagged archives. Curated v0.4.0 notes are maintained in [`docs/releases/v0.4.0.md`](releases/v0.4.0.md).
 
 References: [Adding a Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [Publishing with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/), [official PyPA publish action](https://github.com/pypa/gh-action-pypi-publish).
