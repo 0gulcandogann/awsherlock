@@ -2,11 +2,13 @@
 
 import json
 import re
+from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
 from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 from awsherlock import __version__
@@ -79,24 +81,79 @@ class Snapshot:
         return data
 
 
+def _collect_service(context: ScanContext, service: str) -> CollectionResult:
+    collector, _ = service_components(service)
+    timer = (context.measurements.collection(context.account_id, context.caller_arn,
+                                             context.region, service)
+             if context.measurements is not None else nullcontext())
+    with timer:
+        result = collector(context)
+    return CollectionResult(result.resources, result.issues,
+                            getattr(result, "completed_operations", []))
+
+
 def capture_snapshot(context: ScanContext, services: list[str],
-                     progress: Callable[[str, int, int], None] | None = None) -> Snapshot:
+                     progress: Callable[[str, int, int], None] | None = None,
+                     *, max_workers: int = 1) -> Snapshot:
+    if type(max_workers) is not int or not 1 <= max_workers <= len(SERVICES):
+        raise SnapshotError(f"max_workers must be between 1 and {len(SERVICES)}")
     metadata = ScanMetadata(scan_id=str(uuid4()), started_at=datetime.now(timezone.utc),
                             account_id=context.account_id, region=context.region, version=__version__)
     results = {}
-    for index, service in enumerate(services):
-        if progress is not None:
-            progress(f"Scanning {service.upper()}", index, len(services))
-        collector, _ = service_components(service)
-        timer = (context.measurements.collection(context.account_id, context.caller_arn,
-                                                 context.region, service)
-                 if context.measurements is not None else nullcontext())
-        with timer:
-            result = collector(context)
-        results[service] = CollectionResult(result.resources, result.issues,
-                                            getattr(result, "completed_operations", []))
-        if progress is not None:
-            progress(f"Collected {service.upper()}", index + 1, len(services))
+    if max_workers == 1 or len(services) <= 1:
+        for index, service in enumerate(services):
+            if progress is not None:
+                progress(f"Scanning {service.upper()}", index, len(services))
+            results[service] = _collect_service(context, service)
+            if progress is not None:
+                progress(f"Collected {service.upper()}", index + 1, len(services))
+    else:
+        executor = ThreadPoolExecutor(max_workers=min(max_workers, len(services)),
+                                      thread_name_prefix="awsherlock-collect")
+        stop = Event()
+        futures: list[tuple[str, Future[CollectionResult | None]]] = []
+
+        def collect(service: str) -> CollectionResult | None:
+            if stop.is_set():
+                return None
+            try:
+                return _collect_service(context, service)
+            except BaseException:
+                stop.set()
+                raise
+
+        failed: Future[CollectionResult | None] | None = None
+        try:
+            futures = [(service, executor.submit(collect, service)) for service in services]
+            done, _ = wait((future for _, future in futures), return_when=FIRST_EXCEPTION)
+            if any(not future.cancelled() and future.exception() is not None for future in done):
+                stop.set()
+                for _, future in futures:
+                    future.cancel()
+                executor.shutdown(wait=True, cancel_futures=True)
+                failed = next(
+                    future for _, future in futures
+                    if not future.cancelled() and future.exception() is not None
+                )
+            else:
+                for index, (service, future) in enumerate(futures):
+                    if progress is not None:
+                        progress(f"Scanning {service.upper()}", index, len(services))
+                    result = future.result()
+                    if result is None:
+                        raise RuntimeError("Collection stopped without a collector failure")
+                    results[service] = result
+                    if progress is not None:
+                        progress(f"Collected {service.upper()}", index + 1, len(services))
+                executor.shutdown(wait=True)
+        except BaseException:
+            stop.set()
+            for _, future in futures:
+                future.cancel()
+            executor.shutdown(wait=True, cancel_futures=True)
+            raise
+        if failed is not None:
+            failed.result()
     return Snapshot(metadata, results, project_relationships(results), CURRENT_SCHEMA_VERSION)
 
 

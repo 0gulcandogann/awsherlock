@@ -58,7 +58,8 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                       selected_accounts: list[str] | None = None,
                       selected_ous: list[str] | None = None,
                       selected_resources: list[str] | None = None,
-                      identity_callback: Callable[[ScanContext], None] | None = None) -> Report:
+                      identity_callback: Callable[[ScanContext], None] | None = None,
+                      max_workers: int = 1) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
     report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
@@ -149,10 +150,14 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             if regions is not None:
                 result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
                                       evaluated_scope_sink=evaluated_scope_sink,
+                                      **({"max_workers": max_workers} if max_workers != 1 else {}),
                                       **resource_options,
                                       **({"selected_checks": selected_checks} if selected_checks is not None else {}))
             else:
-                snapshot = capture_snapshot(context, services)
+                snapshot = capture_snapshot(
+                    context, services,
+                    **({"max_workers": max_workers} if max_workers != 1 else {}),
+                )
                 if snapshot_sink is not None:
                     snapshot_sink(snapshot, context.region or "global")
                 result = evaluate_snapshot(snapshot, **resource_options, **({"selected_checks": selected_checks} if selected_checks is not None else {}))

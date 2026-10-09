@@ -403,6 +403,10 @@ def scan(
     connect_timeout: Annotated[float | None, typer.Option("--connect-timeout", help="Socket connection timeout in seconds, greater than 0 and at most 3600.", rich_help_panel="Execution and display")] = None,
     read_timeout: Annotated[float | None, typer.Option("--read-timeout", help="Socket read timeout in seconds, greater than 0 and at most 3600.", rich_help_panel="Execution and display")] = None,
     timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts; not an overall scan deadline.", rich_help_panel="Execution and display")] = None,
+    max_workers: Annotated[int | None, typer.Option(
+        "--max-workers", min=1, max=len(SERVICES),
+        help="Maximum concurrent service collectors per live scope (default: 1). Bounds collector tasks, not AWS API request rate.",
+        rich_help_panel="Execution and display")] = None,
     color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.", rich_help_panel="Execution and display")] = None,
     stats: Annotated[bool, typer.Option("--stats", help="Print measured scan duration and result counts on stderr.", rich_help_panel="Execution and display")] = False,
     measurements_file: Annotated[Path | None, typer.Option("--measurements-file", help="Write opt-in SDK invocation and collection timing JSON to a new file; live scans only.", rich_help_panel="Reports and measurements")] = None,
@@ -442,6 +446,9 @@ def scan(
         raise typer.BadParameter("--suppressions-file supports console, json or html reports; SARIF has no suppression audit.")
     organization = snapshot_path == Path("organization")
     offline = snapshot_path is not None and not organization
+    if offline and max_workers is not None:
+        raise typer.BadParameter("--max-workers requires a live scan.", param_hint="--max-workers")
+    worker_count = max_workers if max_workers is not None else 1
     if measurements_file is not None and (offline or preview):
         raise typer.BadParameter("--measurements-file requires a live scan without --preview.")
     identity_extra = identity_inventory is not None or identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60
@@ -573,6 +580,7 @@ def scan(
                                  "snapshot": str(save_snapshot) if save_snapshot else None},
                 "options": {"external_id_supplied": external_id is not None,
                             "identity_governance_requested": identity_governance,
+                            "max_workers": worker_count,
                             "request_timeouts_configured": any(value is not None for value in
                                                                (connect_timeout, read_timeout, timeout))},
             }
@@ -602,6 +610,7 @@ def scan(
         message("Checks and resources restrict evaluation; collection scope is unchanged.")
         message(f"Report: {output or 'console'}" + (f" -> {report_destination}" if report_destination else " -> terminal"))
         message(f"Finding threshold: {fail_on or 'off'}")
+        message(f"Maximum service workers: {worker_count}")
         message(f"Snapshot destination: {save_snapshot or 'none'} (no file created)")
         if identity_governance:
             message("Identity governance: selected; evidence availability unverified")
@@ -636,6 +645,7 @@ def scan(
                     context, selected, role_name or "AWSherlockAuditRole", external_id,
                     role_session_name, progress=account_progress,
                     identity_callback=target_identity,
+                    **({"max_workers": worker_count} if max_workers is not None else {}),
                     **selection_options,
                     **({"selected_accounts": selected_accounts} if selected_accounts is not None else {}),
                     **({"selected_ous": selected_ous} if selected_ous is not None else {}),
@@ -672,9 +682,13 @@ def scan(
                     report = scan_regions(context, selected, selected_regions,
                                           progress=regional_progress, snapshot_sink=sink,
                                           evaluated_scope_sink=evaluated_scope_sink,
+                                          **({"max_workers": worker_count} if max_workers is not None else {}),
                                           **selection_options)
                 else:
-                    snapshot = capture_snapshot(context, selected, progress=service_progress)
+                    snapshot = capture_snapshot(
+                        context, selected, progress=service_progress,
+                        **({"max_workers": worker_count} if max_workers is not None else {}),
+                    )
                     if sink is not None:
                         sink(snapshot, context.region or "global")
                     activity("Evaluating security checks", len(selected) + 1, len(selected) + 2)
@@ -866,6 +880,9 @@ def snapshot_command(
     connect_timeout: Annotated[float | None, typer.Option("--connect-timeout", help="Socket connection timeout in seconds.")] = None,
     read_timeout: Annotated[float | None, typer.Option("--read-timeout", help="Socket read timeout in seconds.")] = None,
     timeout: Annotated[float | None, typer.Option("--timeout", help="Set both request timeouts.")] = None,
+    max_workers: Annotated[int | None, typer.Option(
+        "--max-workers", min=1, max=len(SERVICES),
+        help="Maximum concurrent service collectors per live scope (default: 1). Bounds collector tasks, not AWS API request rate.")] = None,
     color: Annotated[str | None, typer.Option("--color", callback=color_option, is_eager=True, help="Terminal colors: auto, always or never.")] = None,
 ) -> None:
     """Collect normalized AWS facts without running security rules."""
@@ -882,7 +899,10 @@ def snapshot_command(
         options["region"] = region
     try:
         context = create_scan_context(profile=profile, role=role, role_session_name=role_session_name, external_id=external_id, **options)
-        snapshot = capture_snapshot(context, selected)
+        snapshot = capture_snapshot(
+            context, selected,
+            **({"max_workers": max_workers} if max_workers is not None else {}),
+        )
         write_snapshot(snapshot, output)
     except (SessionError, SnapshotError) as error:
         message(f"Error: {terminal_text(str(error))}", style=RED, err=True)

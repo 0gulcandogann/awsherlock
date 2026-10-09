@@ -1,6 +1,8 @@
 """Account metadata and the shared AWS session for a scan."""
 
 from dataclasses import dataclass, field
+from threading import RLock
+from typing import Any
 
 from boto3.session import Session
 from botocore.config import Config
@@ -26,12 +28,20 @@ class ScanContext:
         default=None, repr=False, compare=False)
     trail_selector_cache: dict[tuple[str, str, str, str], dict] | None = field(
         default=None, repr=False, compare=False)
+    _clients: dict[tuple[str, tuple[tuple[str, object], ...]], BaseClient] = field(
+        default_factory=dict, init=False, repr=False, compare=False)
+    _client_lock: Any = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     def client(self, service_name: str, **options: object) -> BaseClient:
         """Use the authenticated session with scan-specific request configuration."""
         if self.client_config is not None:
             options.setdefault("config", self.client_config)
-        client = self.session.client(service_name, **options)
-        if self.measurements is not None:
-            self.measurements.instrument(client, self.account_id, self.caller_arn)
-        return client
+        key = (service_name, tuple(sorted(options.items())))
+        with self._client_lock:
+            client = self._clients.get(key)
+            if client is None:
+                client = self.session.client(service_name, **options)
+                if self.measurements is not None:
+                    self.measurements.instrument(client, self.account_id, self.caller_arn)
+                self._clients[key] = client
+            return client

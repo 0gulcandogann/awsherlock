@@ -40,7 +40,8 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
                  evaluated_scope_sink: EvaluatedScopeSink | None = None,
                  selected_checks: list[str] | None = None,
                  selected_resources: list[str] | None = None,
-                 report_unmatched: bool = True) -> Report:
+                 report_unmatched: bool = True,
+                 max_workers: int = 1) -> Report:
     """Collect global services once and label every regional coverage entry."""
     # One cache per orchestration, never retained on the caller's context.
     context = replace(context, trail_status_cache={}, trail_selector_cache={})
@@ -65,7 +66,10 @@ def scan_regions(context: ScanContext, services: list[str], regions: list[str], 
             if progress is not None:
                 progress(f"{label} / {stage}", finished + completed, total)
         try:
-            snapshot = capture_snapshot(target, selected, progress=service_progress)
+            snapshot = capture_snapshot(
+                target, selected, progress=service_progress,
+                **({"max_workers": max_workers} if max_workers != 1 else {}),
+            )
             if snapshot_sink is not None:
                 snapshot_sink(snapshot, label)
             # A global/regional scope can contain only some requested check services.
