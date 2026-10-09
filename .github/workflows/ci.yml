@@ -47,6 +47,14 @@ jobs:
             installed_python=.ci-venv/bin/python
           fi
           "$installed_python" -m pip install --index-url https://pypi.org/simple/ dist/*.whl
+          "$installed_python" -m pip install pytest
           "$installed_python" -m pip check
+          "$installed_python" -m pytest -q --ignore=tests/test_report_browser.py
           "$installed_python" .github/scripts/ci_checks.py
           "$installed_python" .github/scripts/release.py smoke
+      - name: Run browser report tests
+        if: runner.os == 'Linux' && matrix.python == '3.13'
+        shell: bash
+        run: |
+          command -v google-chrome
+          .ci-venv/bin/python -m pytest -q tests/test_report_browser.py
