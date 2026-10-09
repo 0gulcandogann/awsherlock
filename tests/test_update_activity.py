@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 from awsherlock.cli import REPOSITORY_URL, app
 
 
-def test_update_pipx_launcher_replaces_stale_package_source_in_place(monkeypatch):
+def test_update_pipx_launcher_ignores_stale_package_source(monkeypatch):
     monkeypatch.setattr('awsherlock.cli.importlib.util.find_spec', lambda name: None)
     monkeypatch.setattr(
         'awsherlock.cli.shutil.which',
@@ -19,8 +19,8 @@ def test_update_pipx_launcher_replaces_stale_package_source_in_place(monkeypatch
 
     assert result.exit_code == 0, result.output
     run.assert_called_once_with(
-        [r'C:\Windows\py.EXE', '-m', 'pipx', 'inject', '--force',
-         '--pip-args=--no-cache-dir', 'awsherlock', REPOSITORY_URL],
+        [r'C:\Windows\py.EXE', '-m', 'pipx', 'runpip', 'awsherlock', 'install',
+         '--upgrade', '--force-reinstall', '--no-deps', '--no-cache-dir', REPOSITORY_URL],
         check=True,
     )
 
@@ -38,8 +38,8 @@ def test_update_logs_and_fallback(monkeypatch,failures,code):
     assert ('updated successfully' in result.output)==(code==0)
     if failures==1:
         assert run.call_args_list[1].args[0] == [
-            'pipx', 'inject', '--force', '--pip-args=--no-cache-dir',
-            'awsherlock', REPOSITORY_URL,
+            'pipx', 'runpip', 'awsherlock', 'install', '--upgrade',
+            '--force-reinstall', '--no-deps', '--no-cache-dir', REPOSITORY_URL,
         ]
 
 @pytest.mark.parametrize('args',[[],['--help']])
