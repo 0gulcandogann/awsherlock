@@ -1,6 +1,7 @@
 """The guided command only prepares a live scan invocation."""
 
 from unittest.mock import Mock
+import sys
 
 import pytest
 from typer.testing import CliRunner
@@ -30,7 +31,12 @@ def test_guide_selected_profile_region_and_services(local_guide):
     assert "Regions: eu-west-1" in result.output
     assert "Services: iam, ec2" in result.output
     assert "Identity and credential availability: unverified" in result.output
-    assert "awsherlock scan --profile 'production team' --region 'eu-west-1' --services 'iam,ec2'" in result.output
+    expected = (
+        "awsherlock scan --profile 'production team' --region 'eu-west-1' --services 'iam,ec2'"
+        if sys.platform == "win32"
+        else "awsherlock scan --profile 'production team' --region eu-west-1 --services iam,ec2"
+    )
+    assert expected in result.output
     local_guide.assert_not_called()
 
 
@@ -90,5 +96,6 @@ def test_guide_quotes_apostrophe_in_profile(local_guide, monkeypatch):
     monkeypatch.setattr("awsherlock.cli.list_profiles", lambda: [ProfileMetadata("team's profile", None)])
     result = CliRunner().invoke(app, ["guide"], input="1\n\nall\n")
     assert result.exit_code == 0, result.output
-    assert "--profile 'team''s profile'" in result.output
+    expected = "--profile 'team''s profile'" if sys.platform == "win32" else "--profile 'team'\"'\"'s profile'"
+    assert expected in result.output
     local_guide.assert_not_called()

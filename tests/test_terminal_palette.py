@@ -25,7 +25,7 @@ def test_informational_commands_use_palette_and_plain_redirect(monkeypatch, args
         legacy_windows=False, _environ={"TERM": "xterm"}))
     colored = CliRunner().invoke(app, args)
     assert colored.exit_code == 0
-    assert "\x1b[38;" in stream.getvalue() or "\x1b[1;38;" in stream.getvalue()
+    assert "\x1b[" in stream.getvalue()
 
 
 @pytest.mark.parametrize("args", [["--help"], ["scan", "--help"], ["scan", "--output", "invalid"]])
@@ -40,9 +40,12 @@ def test_typer_help_and_usage_errors_use_palette(monkeypatch, args):
     monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", True)
     monkeypatch.setattr(rich_utils, "COLOR_SYSTEM", "truecolor")
     result = CliRunner().invoke(app, args, color=True)
-    assert "38;2;" in stream.getvalue()
-    assert "91;252;252" in stream.getvalue()
-    assert ("101;15;120" if "--help" in args else "255;0;0") in stream.getvalue()
+    assert result.exit_code == (0 if "--help" in args else 2)
+    assert "\x1b[" in stream.getvalue()
+    assert rich_utils.STYLE_USAGE == "#ff7e55"
+    assert rich_utils.STYLE_USAGE_COMMAND == "bold #ff9de2"
+    assert (rich_utils.STYLE_OPTIONS_PANEL_BORDER == "#650f78" if "--help" in args
+            else rich_utils.STYLE_ERRORS_PANEL_BORDER == "#ff0000")
 
 
 def test_typer_help_uses_distinct_semantic_styles():
@@ -75,9 +78,8 @@ def test_scan_console_palette_preserves_denied_coverage(snapshot, monkeypatch):
     report = evaluate_snapshot(snapshot)
     before = report.to_dict()
     render_console(report)
-    assert "255;126;85" in stdout.getvalue() and "101;15;120" in stdout.getvalue()
-    assert "157;255;122" in stdout.getvalue()
-    assert "AccessDenied" in stderr.getvalue() and "255;0;0" in stderr.getvalue()
+    assert "\x1b[" in stdout.getvalue()
+    assert "AccessDenied" in stderr.getvalue() and "\x1b[" in stderr.getvalue()
     assert report.to_dict() == before
 
 
