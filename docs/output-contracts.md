@@ -31,6 +31,7 @@ to each artifact, not to every output produced by AWSherlock.
 | Snapshot diff with Lead Delta | `diff --include-leads --output json` | `2` | Opt-in only; adds separate `lead_delta` object v1/policy v1. [Lead Delta contract](lead-delta.md). Finding thresholds and snapshot schemas are unchanged. |
 | Finding history | `history --output json` | `1` | `kind: finding-history`. |
 | Investigation leads | `leads --output json` | `2` | `kind: investigation-leads`; five existing patterns. Lead Delta does not change these rules or IDs. |
+| Investigation Evidence Pack | `investigate --output json` | `1` | `kind: investigation-evidence-pack`; exact-one-Lead minimized offline export. COMPLETE export exits 0; PARTIAL export or fatal runtime error exits 1; usage errors exit 2. HTML requires `--report-file`. [Evidence Pack contract](investigation-evidence-pack.md). |
 | Identity view, `--view all` | `identities --output json` | `1` | `kind: identity-view`. |
 | Filtered identity view | `identities --view ai\|unowned\|stale\|shared --output json` | `2` | Also includes view and match counts. |
 | SDK measurements | `scan --measurements-file` | `1` | Counts SDK invocations, not HTTP attempts or retries. |

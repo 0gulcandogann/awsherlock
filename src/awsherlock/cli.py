@@ -32,6 +32,7 @@ from awsherlock.diff import compare_snapshots, render_diff_json
 from awsherlock.history import HistoryError, finding_history, render_history_json
 from awsherlock.correlation import CorrelationError
 from awsherlock.leads import investigation_leads, render_leads_json
+from awsherlock.investigation import InvestigationError, build_evidence_pack, render_evidence_json, render_evidence_html
 from awsherlock.suppressions import SuppressionError, read_suppressions, apply_suppressions
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
@@ -182,6 +183,43 @@ def leads_command(
         message("These are review hints, not verified attack paths or effective access.")
     if document["incomplete"]:
         raise typer.Exit(code=1)
+
+@app.command("investigate")
+def investigate_command(
+    snapshot_path: Annotated[Path, typer.Argument(help="Saved snapshot to investigate entirely offline.")],
+    lead_id: Annotated[str, typer.Option("--lead-id", help="Required full, exact Lead ID; no prefixes or fuzzy matching.")],
+    output: Annotated[str, typer.Option("--output", help="Evidence Pack format: json or html.")] = "json",
+    report_file: Annotated[Path | None, typer.Option("--report-file", help="Exclusive-create destination; required for HTML. Never overwrites.")] = None,
+) -> None:
+    """Export one minimized Lead Evidence Pack offline; partial export exits 1."""
+    if output not in {"json", "html"}:
+        raise typer.BadParameter("Use json or html.", param_hint="--output")
+    if output == "html" and report_file is None:
+        raise typer.BadParameter("HTML requires --report-file.", param_hint="--report-file")
+    try:
+        if report_file is not None:
+            if report_file.resolve() == snapshot_path.resolve():
+                raise InvestigationError("Output destination resolves to the input snapshot")
+            if report_file.exists():
+                raise InvestigationError("Output destination already exists; refusing overwrite")
+        pack = build_evidence_pack(read_snapshot(snapshot_path), lead_id)
+        content = render_evidence_json(pack) if output == "json" else render_evidence_html(pack)
+        if report_file is not None:
+            write_report(content, report_file)
+        else:
+            typer.echo(content, nl=False)
+    except (SnapshotError, CorrelationError, InvestigationError) as error:
+        message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    except (OSError, RuntimeError):
+        message("Error: Could not read the snapshot or exclusively create the output file.", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    if report_file is not None:
+        message(f"{output.upper()} Evidence Pack saved: {terminal_text(str(report_file))}", style=GREEN)
+    if pack["status"] == "PARTIAL":
+        message("Partial evidence exported; review the pack's coverage and limitations.", style=YELLOW, err=True)
+        raise typer.Exit(code=1)
+
 
 REPOSITORY_URL = "git+https://github.com/0gulcandogann/awsherlock.git@main"
 

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <title>Investigation Evidence Pack — {{ pack.lead.pattern_id }}</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172536; background: #edf1f5; }
+    body { max-width: 980px; margin: auto; padding: 2rem 1rem; line-height: 1.6; }
+    header, section { background: white; border: 1px solid #c8d3df; border-radius: .6rem; padding: 1.3rem; margin-bottom: 1rem; }
+    h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.8rem; } h2 { font-size: 1.3rem; }
+    .label { font-weight: 650; } .notice { border-left: .35rem solid #996006; padding: .5rem 1rem; background: #fff8e8; }
+    code, pre { font-family: ui-monospace, monospace; } pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f3f6f8; padding: 1rem; }
+    dd, code, p, li { overflow-wrap: anywhere; } dt { font-weight: 650; } dd { margin: 0 0 .5rem; }
+    article + article { border-top: 1px solid #d1dbe5; padding-top: 1rem; margin-top: 1rem; }
+    a { color: #174d85; } a:focus-visible { outline: 3px solid #996006; }
+    @media print { :root { background: white; } body { max-width: none; padding: 0; } header, section { border-radius: 0; } h2, h3 { break-after: avoid; } article { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+{% macro identity(ref) -%}
+  <dl>
+    <dt>Logical resource</dt><dd>{{ ref.service }} / {{ ref.resource_type }} / <code>{{ ref.resource_id }}</code></dd>
+    <dt>Account and region</dt><dd>{{ ref.account_id }} / {{ ref.region if ref.region is not none else 'Global / not applicable' }}</dd>
+    <dt>ARN locator</dt><dd><code>{{ ref.resource_arn if ref.resource_arn is not none else 'Unavailable — no ARN fabricated' }}</code></dd>
+  </dl>
+{%- endmacro %}
+<header>
+  <p class="label">AWSherlock · Investigation Evidence Pack</p>
+  <h1>{{ pack.lead.title }}</h1>
+  <p><span class="label">Lead priority:</span> {{ pack.lead.priority }} · <span class="label">Evidence export:</span> {{ pack.status }}</p>
+  <p><span class="label">Full Lead ID:</span> <code>{{ pack.lead.lead_id }}</code></p>
+  <p>{{ pack.lead.why_it_matters }}</p>
+  <p class="notice">{{ pack.disclaimer }} COMPLETE describes supporting evidence export, never a security PASS.</p>
+</header>
+<main>
+  <section aria-labelledby="subjects"><h2 id="subjects">Exact subjects and related resources</h2>
+    {% for ref in pack.lead.subjects %}<h3>Lead subject</h3>{{ identity(ref) }}{% endfor %}
+    {% for ref in pack.lead.related_resources %}<h3>Related resource</h3>{{ identity(ref) }}{% endfor %}
+  </section>
+  <section aria-labelledby="findings"><h2 id="findings">Supporting Findings</h2>
+    {% for finding in pack.findings %}<article>
+      <h3>{{ finding.check_id }} — {{ finding.title }}</h3>
+      <p><span class="label">Finding severity:</span> {{ finding.severity }} (separate from Lead priority)</p>
+      {{ identity(finding.resource) }}
+      <h4>Observed normalized evidence</h4><pre>{{ evidence_text[loop.index0] }}</pre>
+      <p>Source scan: <code>{{ finding.provenance.scan_id }}</code>. API operation: unavailable; not persisted with the Finding.</p>
+      <ul>{% for reference in finding.references %}<li>{% if links[reference] is not none %}<a href="{{ links[reference] }}" rel="noopener noreferrer" referrerpolicy="no-referrer">{{ reference }}</a>{% else %}{{ reference }} (not linked){% endif %}</li>{% endfor %}</ul>
+    </article>{% endfor %}
+  </section>
+  <section aria-labelledby="relationships"><h2 id="relationships">Supporting positive Relationships</h2>
+    {% for edge in pack.relationships %}<article>
+      <h3>{{ edge.type }}</h3><h4>Source</h4>{{ identity(edge.source) }}<h4>Target</h4>{{ identity(edge.target) }}
+      <h4>Stored evidence provenance</h4><ul>{% for evidence in edge.evidence %}<li>{{ evidence.service if evidence.service is not none else 'Unavailable' }} / {{ evidence.fact if evidence.fact is not none else 'Unavailable' }} / operation: {{ evidence.operation if evidence.operation is not none else 'Unavailable — not persisted or not safe to export' }}</li>{% endfor %}</ul>
+    </article>{% else %}<p>No supporting relationships in this Lead. Unsupported or uncollected relationships do not establish absence.</p>{% endfor %}
+  </section>
+  {% for kind, heading in [('observed', 'Observed facts'), ('unknown', 'Unknown facts'), ('not_proven', 'What is not proven')] %}
+  <section aria-labelledby="{{ kind }}"><h2 id="{{ kind }}">{{ heading }}</h2>
+    <ul>{% for statement in pack.statements[kind] %}<li>{{ statement.text }} <code>{{ statement.code }}</code></li>{% endfor %}</ul>
+  </section>{% endfor %}
+  <section aria-labelledby="steps"><h2 id="steps">Suggested manual investigation</h2>
+    <ol>{% for step in pack.manual_steps %}<li>{{ step }}</li>{% endfor %}</ol>
+  </section>
+  <section aria-labelledby="coverage"><h2 id="coverage">Relevant coverage and limitations</h2>
+    <p>Service coverage is not per-Lead check completeness or exhaustive relationship inventory.</p>
+    {% for row in pack.coverage %}<article><h3>{{ row.service }} — {{ row.status }}</h3>
+      <ul>{% for issue in row.issues %}<li>{{ issue.reason_code }} / {{ issue.operation if issue.operation is not none else 'Operation unavailable' }} / {{ issue.resource_id if issue.resource_id is not none else 'Service scope' }}</li>{% endfor %}</ul>
+    </article>{% endfor %}
+    <ul>{% for limitation in pack.limitations %}<li><code>{{ limitation }}</code></li>{% endfor %}</ul>
+  </section>
+  <section aria-labelledby="provenance"><h2 id="provenance">Source snapshot and derivation</h2>
+    <dl><dt>Scan ID</dt><dd><code>{{ pack.source_snapshot.scan_id }}</code></dd>
+      <dt>Account / region</dt><dd>{{ pack.source_snapshot.account_id }} / {{ pack.source_snapshot.region if pack.source_snapshot.region is not none else 'Global / not configured' }}</dd>
+      <dt>Collection started</dt><dd>{{ pack.source_snapshot.collection_started_at }}</dd>
+      <dt>Snapshot schema / producer</dt><dd>{{ pack.source_snapshot.schema_version }} / {{ pack.source_snapshot.producer_version }}</dd>
+      <dt>Evaluator / correlation implementation</dt><dd>{{ pack.evaluation.evaluator_version }} / {{ pack.evaluation.correlation_version }}</dd>
+      <dt>Evidence Pack schema / export policy / locator policy</dt><dd>{{ pack.schema_version }} / {{ pack.export_policy_version }} / {{ pack.evaluation.locator_policy_version }}</dd>
+    </dl>
+    <p>Explanations come from existing registered Lead rules. Source metadata and stored evidence are not AWS attestation or proof of authenticity.</p>
+  </section>
+</main>
+</body>
+</html>
