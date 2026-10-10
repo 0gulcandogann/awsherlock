@@ -70,6 +70,7 @@ def diff_command(
     after: Annotated[Path, typer.Argument(help="Later normalized snapshot JSON.")],
     output: Annotated[str, typer.Option("--output", help="Comparison format: console or json.")] = "console",
     fail_on: Annotated[str | None, typer.Option("--fail-on", help="Exit 3 for confidently NEW findings; UNKNOWN coverage exits 1.")] = None,
+    include_leads: Annotated[bool, typer.Option("--include-leads", help="Include evidence-aware Lead Delta (opt-in diff document v2); no Lead exit thresholds.")] = False,
 ) -> None:
     """Compare two saved snapshots without AWS calls."""
     if output not in {"console", "json"}:
@@ -77,8 +78,8 @@ def diff_command(
     if fail_on not in {None, "new"}:
         raise typer.BadParameter("Use new.", param_hint="--fail-on")
     try:
-        comparison = compare_snapshots(read_snapshot(before), read_snapshot(after))
-    except SnapshotError as error:
+        comparison = compare_snapshots(read_snapshot(before), read_snapshot(after), include_leads=include_leads)
+    except (SnapshotError, CorrelationError) as error:
         message(f"Error: {error}", style=RED, err=True)
         raise typer.Exit(code=1) from None
     except OSError:
@@ -98,6 +99,16 @@ def diff_command(
             message(f"{change['status']} {change['check_id']} {terminal_text(change['account_id'])} "
                     f"{terminal_text(change['resource_id'])}")
         message("UNKNOWN means coverage or scope cannot establish a change.")
+        if include_leads:
+            delta = comparison["lead_delta"]
+            message("Lead Delta: " + ", ".join(f"{state} {count}" for state, count in delta["summary"].items()))
+            for lead in delta["changes"]:
+                subject = lead["subjects"][0]
+                message(f"{lead['state']} {lead['pattern_id']} / priority {lead['priority']} / "
+                        f"{terminal_text(subject['account_id'])} / {terminal_text(subject['resource_id'])} / "
+                        f"support {lead['support_comparison']}")
+            message("NO_LONGER_OBSERVED is a disproved observed predicate, not proof of remediation. "
+                    "Lead states do not affect --fail-on new.")
     if fail_on == "new":
         uncertain = (not comparison["same_scope"] or comparison["summary"]["UNKNOWN"] > 0 or
                      any(status != "COMPLETE" for side in comparison["coverage"].values() for status in side.values()) or

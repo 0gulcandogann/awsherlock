@@ -1,8 +1,8 @@
 # Output contracts in the current main source
 
-This records current behavior for automation. It does not introduce a new
-format or promise that every format has the same version number. A plain scan
-selects seven services; RDS is an eighth supported, opt-in service.
+This records current behavior for automation. Each artifact has its own version.
+A plain scan selects seven services; eleven services are supported. Lead Delta
+is an explicitly opt-in diff document extension, not a snapshot schema change.
 
 ## Exit statuses
 
@@ -25,11 +25,12 @@ to each artifact, not to every output produced by AWSherlock.
 
 | Artifact | Producer | Current top-level version | Notes |
 | --- | --- | --- | --- |
-| Snapshot | `snapshot` or `scan --save-snapshot` | `1` | Contains `metadata` and `services`; strict reader validation. Successful new RDS instance listings add an allowlisted `DescribeDBInstances` completion marker; older snapshots remain readable with incomplete new-check coverage. |
+| Snapshot | `snapshot` or `scan --save-snapshot` | `2` | New captures add normalized positive `relationships`; v1 remains readable. Strict reader validation; older snapshots remain readable with incomplete coverage for unsupported evidence. |
 | Scan preview | `scan --preview --preview-format json` | `1` | `kind: scan-preview`; describes intended scope before collection. |
 | Snapshot diff | `diff --output json` | `1` | `kind: snapshot-diff`; incomplete after-coverage can make a disappearance `UNKNOWN`. |
+| Snapshot diff with Lead Delta | `diff --include-leads --output json` | `2` | Opt-in only; adds separate `lead_delta` object v1/policy v1. [Lead Delta contract](lead-delta.md). Finding thresholds and snapshot schemas are unchanged. |
 | Finding history | `history --output json` | `1` | `kind: finding-history`. |
-| Investigation leads | `leads --output json` | `1` | `kind: investigation-leads`. |
+| Investigation leads | `leads --output json` | `2` | `kind: investigation-leads`; five existing patterns. Lead Delta does not change these rules or IDs. |
 | Identity view, `--view all` | `identities --output json` | `1` | `kind: identity-view`. |
 | Filtered identity view | `identities --view ai\|unowned\|stale\|shared --output json` | `2` | Also includes view and match counts. |
 | SDK measurements | `scan --measurements-file` | `1` | Counts SDK invocations, not HTTP attempts or retries. |

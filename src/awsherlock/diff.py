@@ -16,7 +16,7 @@ def finding_key(finding: Finding) -> tuple[str, str, str, str, str]:
             finding.region or "", finding.resource_id)
 
 
-def compare_snapshots(before: Snapshot, after: Snapshot) -> dict:
+def compare_snapshots(before: Snapshot, after: Snapshot, *, include_leads: bool = False) -> dict:
     """Compare observed findings; unresolved coverage always produces UNKNOWN."""
     previous = evaluate_snapshot(before)
     current = evaluate_snapshot(after)
@@ -46,7 +46,7 @@ def compare_snapshots(before: Snapshot, after: Snapshot) -> dict:
                         "before_count": before_count, "after_count": after_count})
     counts = {status: sum(change["status"] == status for change in changes)
               for status in ("NEW", "RESOLVED", "UNCHANGED", "UNKNOWN")}
-    return {"schema_version": SCHEMA_VERSION, "kind": "snapshot-diff",
+    comparison = {"schema_version": SCHEMA_VERSION, "kind": "snapshot-diff",
             "before": {"scan_id": before.metadata.scan_id, "account_id": before.metadata.account_id,
                        "region": before.metadata.region, "started_at": before.metadata.started_at.isoformat()},
             "after": {"scan_id": after.metadata.scan_id, "account_id": after.metadata.account_id,
@@ -54,6 +54,11 @@ def compare_snapshots(before: Snapshot, after: Snapshot) -> dict:
             "same_scope": same_scope,
             "coverage": {"before": old_coverage, "after": new_coverage},
             "summary": counts, "changes": changes}
+    if include_leads:
+        from awsherlock.lead_delta import compare_lead_delta
+        comparison["schema_version"] = 2
+        comparison["lead_delta"] = compare_lead_delta(before, after, previous, current)
+    return comparison
 
 
 def render_diff_json(comparison: dict) -> str:
