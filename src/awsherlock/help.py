@@ -28,6 +28,7 @@ class RootHelpGroup(TyperGroup):
             ("awsherlock diff before.json after.json", "Compare saved findings with coverage checks."),
             ("awsherlock history first.json latest.json", "Review first and last observed findings offline."),
             ("awsherlock leads facts.json", "Correlate saved security signals as review hints."),
+            ("awsherlock coverage facts.json", "Explain recorded evidence and uncertainty offline."),
             ("awsherlock identities facts.json", "Inspect saved IAM identities offline."),
             ("awsherlock --describe-check AWSH-CT-001", "Explain a check offline."),
             ("awsherlock --update", "Update from GitHub main; internet required."),

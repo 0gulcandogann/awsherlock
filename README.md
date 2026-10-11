@@ -393,6 +393,7 @@ awsherlock identities --help
 awsherlock diff --help
 awsherlock history --help
 awsherlock leads --help
+awsherlock coverage --help
 awsherlock scan --help
 awsherlock snapshot --help
 ```
@@ -497,6 +498,30 @@ a later input is not reported as remediated or continuously present; missing
 permissions and skipped services remain visible in coverage. Valid history
 exits 0 even with incomplete coverage; invalid options exit 2 and invalid or
 unreadable snapshots exit 1.
+
+### Explain recorded coverage and uncertainty
+
+`awsherlock coverage snapshot.json` derives a conservative, offline diagnostic
+from the normalized snapshot and its ordinary evaluation report. Use:
+
+```bash
+awsherlock coverage snapshot.json --output json
+awsherlock coverage snapshot.json --output json --report-file coverage.json
+```
+
+JSON output is the deterministic, version-1 `coverage-diagnostics` contract.
+It identifies recorded resources, Findings, positive Relationships, evaluated
+checks, sanitized limitations and registered services absent from the snapshot.
+The optional output file is created exclusively and is never overwritten.
+Incomplete service coverage is still written and exits 1; complete recorded
+evaluation exits 0. Invalid options exit 2 and invalid snapshots exit 1.
+
+`COMPLETE` means the registered checks had their required normalized evidence;
+it is not an account-wide or service-wide security result. Missing Findings are
+not a security PASS. Missing Relationships do not prove non-use, non-deployment,
+remediation or exhaustive inventory. Snapshot v1 reports relationship support
+as unavailable; snapshot v2 reports stored positive relationships only. The
+command needs no AWS credentials and never creates AWS clients.
 
 ### Review conservative investigation Leads
 

@@ -173,6 +173,16 @@ traffic, successful invocation, reachability or effective permissions.
 
 ## Missing-data and orchestration scenarios (apply to every row)
 
+Coverage Intelligence is an offline interpretation layer over the saved
+snapshot and its normal evaluation report. Validate `awsherlock coverage
+snapshot.json` in console and JSON modes for schema-v1 relationship capability,
+schema-v2 positive-only relationships, AccessDenied, throttling, invalid
+responses, evaluation gaps, page/time budgets and absent registered services.
+The version-1 `coverage-diagnostics` output must never turn missing Findings or
+Relationships into a PASS or absence claim, copy raw issue details, or treat an
+unknown operation as validated provenance. Output files are exclusive-create;
+serial and parallel equivalent evidence must render identical diagnostic JSON.
+
 1. Deny the row's detail read using an independently managed pilot role, or use a
    mocked fixture. Confirm an issue and incomplete coverage, no negative/PASS
    assertion for the absent fact, and surviving evaluations for known facts.

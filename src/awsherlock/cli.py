@@ -33,6 +33,11 @@ from awsherlock.history import HistoryError, finding_history, render_history_jso
 from awsherlock.correlation import CorrelationError
 from awsherlock.leads import investigation_leads, render_leads_json
 from awsherlock.investigation import InvestigationError, build_evidence_pack, render_evidence_json, render_evidence_html
+from awsherlock.coverage_intelligence import (
+    build_coverage_diagnostics,
+    render_coverage_console,
+    render_coverage_json,
+)
 from awsherlock.suppressions import SuppressionError, read_suppressions, apply_suppressions
 from awsherlock.branding import terminal_banner, terminal_text
 from awsherlock.catalog import check_catalog, describe_check
@@ -182,6 +187,43 @@ def leads_command(
             message(lead["next_step"])
         message("These are review hints, not verified attack paths or effective access.")
     if document["incomplete"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("coverage")
+def coverage_command(
+    snapshot_path: Annotated[Path, typer.Argument(help="Normalized snapshot JSON to diagnose offline.")],
+    output: Annotated[str, typer.Option("--output", help="Coverage diagnostic format: console or json.")] = "console",
+    report_file: Annotated[Path | None, typer.Option(
+        "--report-file", help="Exclusive-create destination. Never overwrites."
+    )] = None,
+) -> None:
+    """Explain recorded coverage and uncertainty offline; never contacts AWS."""
+    if output not in {"console", "json"}:
+        raise typer.BadParameter("Use console or json.", param_hint="--output")
+    try:
+        if report_file is not None:
+            if report_file.resolve() == snapshot_path.resolve():
+                raise ValueError("Output destination resolves to the input snapshot")
+            if report_file.exists():
+                raise ValueError("Output destination already exists; refusing overwrite")
+        snapshot = read_snapshot(snapshot_path)
+        report = evaluate_snapshot(snapshot)
+        document = build_coverage_diagnostics(snapshot, report)
+        content = (render_coverage_json(document) if output == "json"
+                   else render_coverage_console(document))
+        if report_file is None:
+            typer.echo(content, nl=False)
+        else:
+            write_report(content, report_file)
+            message(f"Coverage diagnostics saved: {terminal_text(str(report_file))}", style=GREEN)
+    except (SnapshotError, ValueError) as error:
+        message(f"Error: {terminal_text(str(error))}", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    except OSError:
+        message("Error: Could not read the snapshot or exclusively create the output file.", style=RED, err=True)
+        raise typer.Exit(code=1) from None
+    if document["summary"]["incomplete_services"]:
         raise typer.Exit(code=1)
 
 @app.command("investigate")
