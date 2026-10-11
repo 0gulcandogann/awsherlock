@@ -15,7 +15,24 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import zipfile
+
+
+PROJECT_LOGO_URL = (
+    "https://raw.githubusercontent.com/0gulcandogann/awsherlock/"
+    "51dbff99fed93c7c16f82a632547acb9b9afeab6/awsherlock.png"
+)
+
+
+def validate_project_description(markdown: str) -> None:
+    logo = re.search(r"^!\[AWSherlock\]\(([^)]+)\)$", markdown, re.MULTILINE)
+    if logo is None or logo.group(1) != PROJECT_LOGO_URL:
+        raise ValueError("README project logo must use the canonical public HTTPS image")
+    for reference in re.findall(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)", markdown):
+        parsed = urlsplit(reference)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+            raise ValueError("README project images must use public absolute HTTPS URLs")
 
 
 def stable_version(value: str) -> str:
@@ -48,6 +65,7 @@ def artifacts(dist: Path) -> tuple[str, dict[str, str]]:
         raise ValueError("Unexpected package name/license")
     if metadata["Requires-Python"] != ">=3.11" or metadata["Description-Content-Type"] != "text/markdown":
         raise ValueError("Unexpected Python/README metadata")
+    validate_project_description(metadata.get_payload())
     if "awsherlock = awsherlock.cli:app" not in entrypoint:
         raise ValueError("Missing CLI entrypoint")
     if wheels[0].name != f"awsherlock-{version}-py3-none-any.whl" or sources[0].name != f"awsherlock-{version}.tar.gz":
@@ -55,11 +73,21 @@ def artifacts(dist: Path) -> tuple[str, dict[str, str]]:
     with tarfile.open(sources[0]) as archive:
         source_names = archive.getnames()
         pkg_info = archive.extractfile(f"awsherlock-{version}/PKG-INFO")
-        if pkg_info is None or Parser().parsestr(pkg_info.read().decode())["Version"] != version:
+        source_metadata = None if pkg_info is None else Parser().parsestr(pkg_info.read().decode())
+        if source_metadata is None or source_metadata["Version"] != version:
             raise ValueError("Source/wheel versions differ")
+        validate_project_description(source_metadata.get_payload())
+    required_members = {
+        "/templates/report.html",
+        "/templates/investigation.html",
+        "/lead_delta.py",
+        "/investigation.py",
+        "/coverage_intelligence.py",
+        "/LICENSE",
+    }
     for members in (names, source_names):
-        if not any(n.endswith("/templates/report.html") for n in members) or not any(n.endswith("/LICENSE") for n in members):
-            raise ValueError("Missing report template/license")
+        if any(not any(n.endswith(required) for n in members) for required in required_members):
+            raise ValueError("Missing required runtime module/template/license")
         for name in members:
             path = Path(name)
             if set(path.parts) & {"tests", "reports", ".aws", ".git", ".github", ".venv", "__pycache__"} or path.name in {".env", ".pypirc", "credentials"}:
@@ -223,9 +251,33 @@ def smoke(dist: Path) -> None:
         function_path = work / "function.json"
         write_snapshot(Snapshot(after_meta, {"lambda": CollectionResult([function], [])}), function_path)
         result = runner.invoke(app, ["leads", str(function_path), "--output", "json"])
-        if result.exit_code != 0 or json.loads(result.stdout)["summary"]["leads"] != 1:
+        leads_document = json.loads(result.stdout)
+        if result.exit_code != 0 or leads_document["summary"]["leads"] != 1:
             raise ValueError("Installed investigation-leads smoke failed")
-    print(f"PASS: installed {version} CLI, offline JSON/HTML, denial, diff/history/leads and thresholds")
+        result = runner.invoke(app, ["diff", str(before_path), str(function_path),
+                                     "--include-leads", "--output", "json"])
+        lead_delta = json.loads(result.stdout)
+        if result.exit_code != 0 or lead_delta.get("schema_version") != 2 or "lead_delta" not in lead_delta:
+            raise ValueError("Installed Lead Delta smoke failed")
+        lead_id = leads_document["leads"][0]["lead_id"]
+        result = runner.invoke(app, ["investigate", str(function_path), "--lead-id", lead_id,
+                                     "--output", "json"])
+        evidence_pack = json.loads(result.stdout)
+        if result.exit_code not in {0, 1} or evidence_pack.get("kind") != "investigation-evidence-pack":
+            raise ValueError("Installed Investigation Evidence Pack JSON smoke failed")
+        pack_path = work / "evidence-pack.html"
+        result = runner.invoke(app, ["investigate", str(function_path), "--lead-id", lead_id,
+                                     "--output", "html", "--report-file", str(pack_path)])
+        if result.exit_code not in {0, 1} or "Investigation Evidence Pack" not in pack_path.read_text(encoding="utf-8"):
+            raise ValueError("Installed Investigation Evidence Pack HTML smoke failed")
+        result = runner.invoke(app, ["coverage", str(function_path), "--output", "json"])
+        coverage = json.loads(result.stdout)
+        if result.exit_code not in {0, 1} or coverage.get("kind") != "coverage-diagnostics":
+            raise ValueError("Installed Coverage Intelligence JSON smoke failed")
+        result = runner.invoke(app, ["coverage", str(function_path)])
+        if result.exit_code not in {0, 1} or "Coverage Intelligence" not in result.stdout:
+            raise ValueError("Installed Coverage Intelligence console smoke failed")
+    print(f"PASS: installed {version} CLI, offline reports, M1-M4 artifacts and thresholds")
 
 
 def main() -> None:

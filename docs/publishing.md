@@ -50,6 +50,6 @@ Users install released packages with `pipx install awsherlock` or `python -m pip
 
 **`awsherlock --update` intentionally installs GitHub `main`** so users can test unreleased fixes and features, including changes without a version bump. It requires Git and internet access. This task preserves the existing updater behavior.
 
-Published archives embed the README as it stood at tag time. Updating this page after publication does not change tagged archives. Curated v0.4.0 notes are maintained in [`docs/releases/v0.4.0.md`](releases/v0.4.0.md).
+Published archives embed the README as it stood at tag time. Updating this page after publication does not change tagged archives. Curated release notes are maintained in [`docs/releases/`](releases/); the v0.5.0 candidate notes are [`v0.5.0.md`](releases/v0.5.0.md).
 
 References: [Adding a Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [Publishing with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/), [official PyPA publish action](https://github.com/pypa/gh-action-pypi-publish).

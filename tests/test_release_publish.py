@@ -3,11 +3,43 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import pytest
 
 spec = importlib.util.spec_from_file_location("release_checks", Path(__file__).resolve().parents[1] / ".github/scripts/release.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_project_logo_uses_pypi_portable_absolute_https_url():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    match = re.search(r"^!\[AWSherlock\]\(([^)]+)\)$", readme, re.MULTILINE)
+
+    assert match is not None
+    assert match.group(1).startswith("https://")
+    assert match.group(1) == release.PROJECT_LOGO_URL
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "awsherlock.png",
+        "./awsherlock.png",
+        r"C:\\Users\\developer\\awsherlock.png",
+        "http://example.com/awsherlock.png",
+        "https://example.com/not-the-project-logo.png",
+    ],
+)
+def test_project_description_rejects_nonportable_logo_references(reference):
+    with pytest.raises(ValueError, match="project logo"):
+        release.validate_project_description(f"![AWSherlock]({reference})\n\n# AWSherlock\n")
+
+
+def test_project_description_accepts_canonical_logo_reference():
+    release.validate_project_description(
+        f"![AWSherlock]({release.PROJECT_LOGO_URL})\n\n# AWSherlock\n"
+    )
 
 
 @pytest.mark.parametrize("tag", ["v0.1.11", "v0.1.10rc1", "0.1.10", "main", "v0.1.10; echo bad"])
@@ -23,6 +55,12 @@ def test_matching_tag_and_dry_run(tmp_path):
     source.write_text('__version__ = "0.1.10"\n')
     assert release.check_tag(source, "v0.1.10") == "0.1.10"
     assert release.check_tag(source, None) == "0.1.10"
+
+
+def test_v050_release_candidate_version_matches_tag():
+    source = ROOT / "src/awsherlock/__init__.py"
+
+    assert release.check_tag(source, "v0.5.0") == "0.5.0"
 
 
 @pytest.mark.parametrize("version", ["0.1.10rc1", "0.1", "", "0.1.10+dev"])

@@ -1,9 +1,9 @@
-![AWSherlock](awsherlock.png)
+![AWSherlock](https://raw.githubusercontent.com/0gulcandogann/awsherlock/51dbff99fed93c7c16f82a632547acb9b9afeab6/awsherlock.png)
 
 # AWSherlock
 
-[![Release v0.4.0](https://img.shields.io/badge/release-v0.4.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.4.0)
-[![PyPI v0.4.0](https://img.shields.io/badge/PyPI-v0.4.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.4.0/)
+[![Release v0.5.0](https://img.shields.io/badge/release-v0.5.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.5.0)
+[![PyPI v0.5.0](https://img.shields.io/badge/PyPI-v0.5.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.5.0/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![42 security checks](https://img.shields.io/badge/security_checks-42-7C3AED?style=flat-square)](#checks)
 [![11 supported AWS services](https://img.shields.io/badge/AWS_services-11_supported-FF9900?style=flat-square)](#checks)
@@ -483,6 +483,13 @@ exit 3. Changed scope, missing service or incomplete coverage exits 1 first;
 no new findings with complete coverage exits 0. The option does not alter JSON
 or console results.
 
+Add `--include-leads` to request the version-2 diff document with an
+evidence-aware Lead Delta. Lead identities are compared only within exactly
+paired account/region scopes. A Lead that appears or disappears without enough
+supporting finding, relationship or coverage evidence is `UNKNOWN`, not a new
+attack path or confirmed remediation. This option does not change the five Lead
+rules or add a Lead-based exit threshold.
+
 ### Review observed finding history
 
 `awsherlock history first.json later.json [more.json...]` reads two or more
@@ -551,6 +558,21 @@ or network reachability, effective permissions, exploitability, compromise, or
 an attack path. It creates no new security check or AWS call, and omits raw
 finding evidence. No match is not proof of safety when facts or coverage are
 missing. Invalid options exit 2; invalid or unreadable snapshots exit 1.
+
+To export one Lead's supporting context, run:
+
+```bash
+awsherlock investigate facts.json --lead-id LEAD_ID --output json
+awsherlock investigate facts.json --lead-id LEAD_ID --output html --report-file evidence-pack.html
+```
+
+The schema-v1 Investigation Evidence Pack is a standalone, minimized offline
+artifact. It resolves only that exact Lead's validated findings, relationships,
+resources, coverage and allowlisted operation provenance. `PARTIAL` means some
+required evidence or provenance was unavailable; it never upgrades uncertainty
+to an absence or security conclusion. JSON writes to stdout unless
+`--report-file` is supplied; HTML requires a new report file and remains
+self-contained.
 
 ### Record expiring suppressions
 
@@ -1304,7 +1326,7 @@ seven-service default scan.
 
 ### Validation and limits
 
-The public deterministic regression suite contains 1,367 tests for the v0.4.0 source, primarily with mocked AWS responses, including three standalone-browser report tests. Scanner CI runs the non-browser suite on Linux/Python 3.11 and 3.13, Windows/Python 3.13 and macOS/Python 3.13, plus the browser tests on Linux/Python 3.13. A bounded real-AWS read-only pilot for v0.3.0 exercised empty RDS and DynamoDB listings and the no-detector GuardDuty case in one account and `eu-central-1`; it did not validate the new Bedrock, relationship, Lead, HTML or concurrency features against live AWS. See the [42-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md).
+The public deterministic regression suite contains more than 1,700 tests for the v0.5.0 source, primarily with mocked AWS responses, including three standalone-browser report tests. Scanner CI runs the non-browser suite on Linux/Python 3.11 and 3.13, Windows/Python 3.13 and macOS/Python 3.13, plus the browser tests on Linux/Python 3.13. A bounded real-AWS read-only pilot for v0.3.0 exercised empty RDS and DynamoDB listings and the no-detector GuardDuty case in one account and `eu-central-1`; it did not validate Bedrock, relationship, Lead, AgentCore production-routing, Coverage Intelligence, HTML or concurrency features against live AWS. See the [42-check validation matrix](docs/validation-matrix.md) and [pilot guide](docs/pilot.md).
 
 A historical LocalStack run for the earlier 28-check baseline collected all seven services without collection errors. All 25 selected secure and insecure fixture resources matched their expected finding sets. Live JSON and independently captured snapshot/offline JSON agreed on findings, coverage and summary. HTML, console output, AssumeRole and actual HTTP permission-denial scenarios were also checked. Denied reads produced incomplete coverage and exit code 1.
 
@@ -1434,6 +1456,15 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Version [0.5.0](docs/releases/v0.5.0.md) adds evidence-aware Lead Delta with
+`diff --include-leads`, minimized Investigation Evidence Packs, opt-in AgentCore
+endpoint live/target routing with exact runtime-version execution-role context,
+and offline Coverage Intelligence. It retains 11 registered services, seven
+defaults, 42 checks, five conservative Lead rules and snapshot schema v2.
+These artifacts report positive observations and uncertainty; they do not prove
+effective IAM access, workload traffic, compromise, remediation or exhaustive
+relationship inventory.
 
 Version [0.4.0](docs/releases/v0.4.0.md) adds opt-in Amazon Bedrock security scanning, snapshot-v2 positive relationships, five conservative investigation Lead patterns, Bedrock Agent and AgentCore runtime-version execution-role relationships, investigation-oriented standalone HTML and opt-in bounded service collection with `--max-workers`. The public deterministic suite and Scanner CI now cover the release across supported platforms. The default scan remains seven services; Bedrock is opt-in, and AgentCore is not a registered check service.
 
