@@ -60,13 +60,18 @@ awsherlock scan --profile pilot --expect-account 123456789012 --region eu-centra
 awsherlock scan identity-facts.json --services iam --identity-governance --identity-inventory identities.json --output json --report-file identity-replay.json --no-progress
 ```
 
-Add `--identity-events`, `--identity-ai-services` or `--identity-analyzers` only
+Add `--identity-events`, `--identity-ai-services`, `--identity-ai-production` or
+`--identity-analyzers` only
 for separately recorded evidence scenarios with their read permissions. Live
 evidence switches are collection options; offline replay uses the saved facts
 and the same inventory. Check external/same-account roles and chains, IAM users,
 OIDC non-AI workloads, Lambda/EC2/native AI bindings, and shared/unknown actors.
 Declarations and native bindings do not prove execution; missing history does
 not prove non-use. Do not export raw audit events, credential IDs or secret values.
+Production AI routing additionally requires
+`bedrock-agentcore:ListAgentRuntimeEndpoints` and
+`bedrock-agentcore:GetAgentRuntimeEndpoint`; endpoint configuration does not
+prove invocation traffic or reachability.
 
 ## Expand scope after the baseline
 

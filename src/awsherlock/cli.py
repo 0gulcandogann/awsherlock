@@ -489,6 +489,7 @@ def scan(
     identity_inventory: Annotated[Path | None, typer.Option("--identity-inventory", help="Version-1 identity approval/declaration JSON; also works offline. Requires --identity-governance.", rich_help_panel="Identity evidence")] = None,
     identity_events: Annotated[bool, typer.Option("--identity-events", help="Read bounded regional CloudTrail identity history; requires --identity-governance and a live scan.", rich_help_panel="Identity evidence")] = False,
     identity_ai_services: Annotated[bool, typer.Option("--identity-ai-services", help="Read Bedrock/AgentCore execution-role metadata; requires live --identity-governance.", rich_help_panel="Identity evidence")] = False,
+    identity_ai_production: Annotated[bool, typer.Option("--identity-ai-production", help="Read AgentCore endpoint live/target routes and exact version roles; requires live --identity-governance and --identity-ai-services.", rich_help_panel="Identity evidence")] = False,
     identity_analyzers: Annotated[bool, typer.Option("--identity-analyzers", help="Read existing Access Analyzer findings; never creates analyzers. Requires live --identity-governance.", rich_help_panel="Identity evidence")] = False,
     identity_days: Annotated[int, typer.Option("--identity-days", min=1, max=90, help="CloudTrail lookback days (1–90); requires --identity-events.", rich_help_panel="Identity evidence")] = 30,
     identity_max_pages: Annotated[int, typer.Option("--identity-max-pages", min=1, max=1000, help="Page/read budget per optional evidence collector, across requested regions.", rich_help_panel="Identity evidence")] = 20,
@@ -520,12 +521,14 @@ def scan(
     worker_count = max_workers if max_workers is not None else 1
     if measurements_file is not None and (offline or preview):
         raise typer.BadParameter("--measurements-file requires a live scan without --preview.")
-    identity_extra = identity_inventory is not None or identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60
+    identity_extra = identity_inventory is not None or identity_events or identity_ai_services or identity_ai_production or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60
     if identity_extra and not identity_governance:
         raise typer.BadParameter("Identity evidence options require --identity-governance.")
+    if identity_ai_production and not identity_ai_services:
+        raise typer.BadParameter("--identity-ai-production requires --identity-ai-services.")
     if identity_days != 30 and not identity_events:
         raise typer.BadParameter("--identity-days requires --identity-events.")
-    if offline and (identity_events or identity_ai_services or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60):
+    if offline and (identity_events or identity_ai_services or identity_ai_production or identity_analyzers or identity_max_pages != 20 or identity_max_seconds != 60):
         raise typer.BadParameter("Live identity evidence options cannot be used with offline snapshots; saved evidence is evaluated automatically.")
     try:
         declarations = read_inventory(identity_inventory) if identity_inventory is not None else None
@@ -590,6 +593,7 @@ def scan(
     if identity_governance and not offline and "iam" not in selected:
         raise typer.BadParameter("--identity-governance requires iam in --services.")
     identity_options = IdentityOptions(inventory=declarations, events=identity_events, ai_services=identity_ai_services,
+                                       ai_production=identity_ai_production,
                                        analyzers=identity_analyzers, days=identity_days, max_pages=identity_max_pages,
                                        max_seconds=identity_max_seconds, regions=tuple(selected_regions or ([region] if region else []))) if identity_governance else None
     if offline and identity_governance:

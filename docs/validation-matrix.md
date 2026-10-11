@@ -164,6 +164,12 @@ metadata role bindings; `access-analyzer:ListAnalyzers`,
 V2 evidence. Enable only with the corresponding CLI switches. This is context
 for the six checks, not extra checks. Native bindings, declarations and observed
 callers remain separate; external/shared application actors may remain unknown.
+The additional `--identity-ai-production` switch requires
+`bedrock-agentcore:ListAgentRuntimeEndpoints` and
+`bedrock-agentcore:GetAgentRuntimeEndpoint`, and reuses
+`bedrock-agentcore:GetAgentRuntime` for each exact `liveVersion` or
+`targetVersion`. These are control-plane routing observations, not proof of
+traffic, successful invocation, reachability or effective permissions.
 
 ## Missing-data and orchestration scenarios (apply to every row)
 

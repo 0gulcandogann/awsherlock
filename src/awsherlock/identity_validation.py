@@ -58,6 +58,20 @@ def is_agentcore_runtime_version(value: object) -> bool:
     return isinstance(value, str) and _AGENTCORE_RUNTIME_VERSION.fullmatch(value) is not None
 
 
+def agentcore_endpoint_identity(value: object, runtime_arn: str) -> tuple[str, str] | None:
+    """Bind summary/detail identity to one exact observed runtime ARN."""
+    if not isinstance(value, dict) or agentcore_runtime_arn_identity(runtime_arn) is None:
+        return None
+    name, identifier = value.get("name"), value.get("id")
+    if (not isinstance(name, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,47}", name) is None
+            or not isinstance(identifier, str)
+            or re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,99}-[A-Za-z0-9]{10}", identifier) is None
+            or value.get("agentRuntimeArn") != runtime_arn
+            or value.get("agentRuntimeEndpointArn") != runtime_arn + "/runtime-endpoint/" + name):
+        return None
+    return name, identifier
+
+
 def _iam_role_arn_identity(value: object) -> tuple[str, str, str] | None:
     match = _IAM_ROLE_ARN.fullmatch(value) if isinstance(value, str) else None
     if match is None or match["resource"].startswith("/"):

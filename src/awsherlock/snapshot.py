@@ -89,7 +89,8 @@ def _collect_service(context: ScanContext, service: str) -> CollectionResult:
     with timer:
         result = collector(context)
     return CollectionResult(result.resources, result.issues,
-                            getattr(result, "completed_operations", []))
+                            getattr(result, "completed_operations", []),
+                            getattr(result, "relationship_observations", []))
 
 
 def capture_snapshot(context: ScanContext, services: list[str],

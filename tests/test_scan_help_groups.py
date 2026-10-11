@@ -14,7 +14,7 @@ PANELS = {
                                 "region", "regions", "expect_account", "accounts", "ous"},
     "Scope and selection": {"services", "checks", "resources", "preview", "preview_format"},
     "Identity evidence": {"identity_governance", "identity_inventory", "identity_events",
-                          "identity_ai_services", "identity_analyzers", "identity_days",
+                          "identity_ai_services", "identity_ai_production", "identity_analyzers", "identity_days",
                           "identity_max_pages", "identity_max_seconds"},
     "Reports and measurements": {"output", "report_file", "save_snapshot", "measurements_file", "suppressions_file"},
     "Execution and display": {"no_progress", "no_banner", "verbose", "summary_only", "fail_on",

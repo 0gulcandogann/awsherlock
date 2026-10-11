@@ -269,6 +269,8 @@ def _validate_ai_role_consistency(edges: Iterable[Relationship]) -> None:
 def project_relationships(services: Mapping[str, CollectionResult]) -> tuple[Relationship, ...]:
     """Project positive workload execution-role evidence collected during a live scan."""
     edges = []
+    for collection in services.values():
+        edges.extend(collection.relationship_observations)
     iam = services.get("iam")
     if iam is not None:
         for role in iam.resources:

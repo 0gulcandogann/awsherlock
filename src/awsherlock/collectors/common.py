@@ -7,7 +7,7 @@ from collections.abc import Callable
 from botocore.exceptions import (BotoCoreError, ClientError, ConnectTimeoutError,
                                 ReadTimeoutError, EndpointConnectionError)
 
-from awsherlock.models import JSONValue, Resource
+from awsherlock.models import JSONValue, Resource, Relationship
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,9 @@ class CollectionResult:
     resources: list[Resource] = field(default_factory=list)
     issues: list[CollectionIssue] = field(default_factory=list)
     completed_operations: list[str] = field(default_factory=list)
+    # Worker-owned positive observations, projected after collection assembly.
+    # Never serialized as a service field in a snapshot.
+    relationship_observations: list[Relationship] = field(default_factory=list)
 
 
 class InvalidResponse(ValueError):

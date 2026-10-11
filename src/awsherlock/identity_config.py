@@ -18,12 +18,15 @@ class IdentityOptions:
     max_pages: int = 20
     max_seconds: int = 60
     regions: tuple[str, ...] = ()
+    ai_production: bool = False
 
     def __post_init__(self) -> None:
         if self.inventory is not None:
             validate_inventory(self.inventory)
-        if any(type(value) is not bool for value in (self.events, self.ai_services, self.analyzers)):
+        if any(type(value) is not bool for value in (self.events, self.ai_services, self.analyzers, self.ai_production)):
             raise ValueError("Invalid identity evidence switches")
+        if self.ai_production and not self.ai_services:
+            raise ValueError("Production AI evidence requires AI identity discovery")
         for value, maximum in ((self.days, 90), (self.max_pages, 1000), (self.max_seconds, 3600)):
             if type(value) is not int or not 1 <= value <= maximum:
                 raise ValueError("Invalid identity evidence budget")

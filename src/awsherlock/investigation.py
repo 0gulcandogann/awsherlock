@@ -58,6 +58,7 @@ COVERAGE_OPERATIONS = {
         "IdentityBinding", "IdentityBindings", "IdentityEvents", "IdentityAnalyzers",
         "GetRole", "GetRolePolicy", "GetPolicy", "GetPolicyVersion", "ListRoleTags", "ListUserTags",
         "ListAttachedRolePolicies", "GetInstanceProfile",
+        "ListAgentRuntimeEndpoints", "GetAgentRuntimeEndpoint", "GetAgentRuntime",
     }),
     "lambda": frozenset({
         "Region", "ListFunctions", "LambdaMetadata", "ListFunctionUrlConfigs", "ListAttachedRolePolicies",
@@ -79,6 +80,9 @@ RELATIONSHIP_OPERATIONS = {
     ("iam", "identity_bindings", "bedrock"): frozenset({"GetRole", "ListAgents", "GetAgent"}),
     ("iam", "identity_bindings", "agentcore"): frozenset({"GetRole", "ListAgentRuntimes", "GetAgentRuntime"}),
     ("bedrock", "execution_role_arn", "bedrock"): frozenset({"GetAgent"}),
+    ("agentcore", "execution_role_arn", "agentcore"): frozenset({"GetAgentRuntime"}),
+    ("agentcore", "live_version", "agentcore"): frozenset({"GetAgentRuntimeEndpoint"}),
+    ("agentcore", "target_version", "agentcore"): frozenset({"GetAgentRuntimeEndpoint"}),
 }
 
 

@@ -608,6 +608,7 @@ option name in full.
 | `--identity-inventory FILE` | Not supplied | Version-1 exact ARN declarations/approvals; requires `--identity-governance`. Works live/offline. Missing, partial or out-of-scope approval evidence remains unknown. |
 | `--identity-events` | Off | Live opt-in regional CloudTrail management-event attribution, including role chains. Requires `--identity-governance`. No raw events or credential identifiers are exported. |
 | `--identity-ai-services` | Off | Live Bedrock/AgentCore execution-role metadata through the shared session; requires `--identity-governance`. No agent invocation or prompt/model-log reads. |
+| `--identity-ai-production` | Off | Live AgentCore endpoint routing (`liveVersion`/`targetVersion`) and exact routed runtime-version roles; requires `--identity-governance --identity-ai-services`. Configuration does not prove traffic, reachability or successful invocation. |
 | `--identity-analyzers` | Off | Read active findings from existing regional Access Analyzer instances. Requires live `--identity-governance`; never creates analyzers or query jobs. |
 | `--identity-days N` | 30 | CloudTrail lookback, 1–90 days; a non-default value requires `--identity-events`. |
 | `--identity-max-pages N` | 20 | Evidence page/read budget, 1–1000, shared across regions within each supplemental collector. Requires live `--identity-governance`. |
@@ -956,6 +957,7 @@ Start with IAM governance, then opt into additional evidence:
 ```bash
 awsherlock scan --services iam --region eu-central-1 --identity-governance
 awsherlock scan --services iam --regions eu-central-1,eu-west-1 --identity-governance --identity-inventory identities.json --identity-events --identity-ai-services --identity-analyzers --save-snapshot identity-facts
+awsherlock scan --services iam --region eu-central-1 --identity-governance --identity-ai-services --identity-ai-production --save-snapshot ai-production.json
 awsherlock scan identity-facts/123456789012-global-bucket.json --identity-governance --identity-inventory identities.json --output html --report-file identities.html
 ```
 
@@ -1053,6 +1055,12 @@ timeouts for in-flight requests. Credential/session identifiers are correlated
 only in memory; raw events, ExternalId/sourceIdentity values and key IDs are not
 exported. Native detail SDK responses are reduced immediately to role bindings;
 instructions, environment values, code and model content are not retained/reported.
+With `--identity-ai-production`, AgentCore endpoint `liveVersion` and
+`targetVersion` configuration is retained only as positive `USES` relationships,
+and each referenced version is joined to its exact validated execution role.
+The endpoint may intentionally remain a relationship-only resource reference.
+This does not establish endpoint reachability, successful deployment, invocation,
+traffic, effective IAM permissions or every historical endpoint-pinned version.
 
 Additional read permissions, according to enabled evidence:
 
@@ -1062,6 +1070,7 @@ Additional read permissions, according to enabled evidence:
 | Workload bindings | `lambda:ListFunctions`, `ec2:DescribeInstances`, `iam:GetInstanceProfile` |
 | Audit history | `cloudtrail:LookupEvents` |
 | Native AI bindings | `bedrock:ListAgents`, `bedrock:GetAgent`, `bedrock-agentcore:ListAgentRuntimes`, `bedrock-agentcore:GetAgentRuntime` |
+| AgentCore production routing (`--identity-ai-production`) | `bedrock-agentcore:ListAgentRuntimeEndpoints`, `bedrock-agentcore:GetAgentRuntimeEndpoint`; reuses `bedrock-agentcore:GetAgentRuntime` for each exact referenced version |
 | Existing analyzer evidence | `access-analyzer:ListAnalyzers`, `access-analyzer:ListFindings`, `access-analyzer:GetFinding` (the latter two authorize V2 reads too) |
 
 Analyzer imports retain active finding type/status, update time, tracking window,
