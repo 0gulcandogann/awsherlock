@@ -4,19 +4,25 @@ import pytest
 from typer.testing import CliRunner
 from awsherlock.cli import app
 from awsherlock.evaluation import evaluate_snapshot
-from awsherlock.snapshot import capture_snapshot, read_snapshot, write_snapshot, SnapshotError, snapshot_from_dict
+from awsherlock.snapshot import (
+    capture_snapshot,
+    read_snapshot,
+    write_snapshot,
+    SnapshotError,
+    snapshot_from_dict,
+)
 from awsherlock.reporting import render_json
-from test_s3 import context
-from test_snapshot import snapshot
 
 
-def test_live_offline_parity(context, tmp_path):
-    live = capture_snapshot(context, ["s3"])
+def test_live_offline_parity(s3_context, tmp_path):
+    live = capture_snapshot(s3_context, ["s3"])
     assert live.schema_version == 2
     assert live.supports_relationships
     path = tmp_path / "snapshot.json"
     write_snapshot(live, path)
-    assert render_json(evaluate_snapshot(live)) == render_json(evaluate_snapshot(read_snapshot(path)))
+    assert render_json(evaluate_snapshot(live)) == render_json(
+        evaluate_snapshot(read_snapshot(path))
+    )
 
 
 def test_offline_cli_without_aws(snapshot, monkeypatch, tmp_path):
@@ -46,15 +52,15 @@ def test_v2_offline_cli_with_empty_relationships_does_not_call_aws(snapshot, mon
     factory.assert_not_called()
 
 
-def test_live_json_clean_stdout(context, monkeypatch):
-    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
+def test_live_json_clean_stdout(s3_context, monkeypatch):
+    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=s3_context))
     result = CliRunner().invoke(app, ["scan", "--services", "s3", "--output", "json"])
     assert result.exit_code == 0
     assert json.loads(result.stdout)["summary"]["findings"] == 0
 
 
-def test_json_file_and_no_overwrite(context, monkeypatch, tmp_path):
-    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
+def test_json_file_and_no_overwrite(s3_context, monkeypatch, tmp_path):
+    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=s3_context))
     path = tmp_path / "report.json"
     args = ["scan", "--services", "s3", "--output", "json", "--report-file", str(path)]
     assert CliRunner().invoke(app, args).exit_code == 0
@@ -65,7 +71,9 @@ def test_json_file_and_no_overwrite(context, monkeypatch, tmp_path):
 
 def test_malformed_fact_is_not_pass(snapshot):
     data = snapshot.to_dict()
-    data["services"]["s3"]["resources"][0]["data"]["public_access_block"] = {"BlockPublicAcls": "true"}
+    data["services"]["s3"]["resources"][0]["data"]["public_access_block"] = {
+        "BlockPublicAcls": "true"
+    }
     with pytest.raises(SnapshotError):
         snapshot_from_dict(data)
 

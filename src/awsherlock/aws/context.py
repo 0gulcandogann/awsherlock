@@ -25,11 +25,14 @@ class ScanContext:
     identity_options: IdentityOptions | None = field(default=None, repr=False, compare=False)
     measurements: ScanMeasurements | None = field(default=None, repr=False, compare=False)
     trail_status_cache: dict[tuple[str, str, str, str], dict[str, bool]] | None = field(
-        default=None, repr=False, compare=False)
+        default=None, repr=False, compare=False
+    )
     trail_selector_cache: dict[tuple[str, str, str, str], dict] | None = field(
-        default=None, repr=False, compare=False)
+        default=None, repr=False, compare=False
+    )
     _clients: dict[tuple[str, tuple[tuple[str, object], ...]], BaseClient] = field(
-        default_factory=dict, init=False, repr=False, compare=False)
+        default_factory=dict, init=False, repr=False, compare=False
+    )
     _client_lock: Any = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     def client(self, service_name: str, **options: object) -> BaseClient:

@@ -12,10 +12,11 @@ from urllib.parse import urlsplit
 
 from awsherlock.evaluation import Report
 from awsherlock.leads import investigation_leads
+from awsherlock.investigation_engine import build_investigations
+from awsherlock.investigation_graph import build_investigation_graph
 from awsherlock.models import Resource, ResourceRef
 from awsherlock.relationships import relationship_to_dict
 from awsherlock.snapshot import Snapshot, SnapshotError
-
 
 SEVERITY_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 PRIORITY_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
@@ -40,21 +41,44 @@ def _anchor(prefix: str, identity: object) -> str:
 
 def _resource_key(value: dict | Resource | ResourceRef) -> tuple[str, str, str, str, str]:
     if isinstance(value, dict):
-        return (value["account_id"], value.get("region") or "", value["service"],
-                value["resource_type"], value["resource_id"])
-    return value.logical_key if isinstance(value, ResourceRef) else (
-        value.account_id, value.region or "", value.service, value.resource_type, value.resource_id,
+        return (
+            value["account_id"],
+            value.get("region") or "",
+            value["service"],
+            value["resource_type"],
+            value["resource_id"],
+        )
+    return (
+        value.logical_key
+        if isinstance(value, ResourceRef)
+        else (
+            value.account_id,
+            value.region or "",
+            value.service,
+            value.resource_type,
+            value.resource_id,
+        )
     )
 
 
 def _finding_key(value: dict) -> tuple[str, str, str, str, str]:
-    return (value["id"], value["service"], value["account_id"],
-            value.get("region") or "", value["resource_id"])
+    return (
+        value["id"],
+        value["service"],
+        value["account_id"],
+        value.get("region") or "",
+        value["resource_id"],
+    )
 
 
 def _finding_ref_key(value: dict) -> tuple[str, str, str, str, str]:
-    return (value["check_id"], value["service"], value["account_id"],
-            value.get("region") or "", value["resource_id"])
+    return (
+        value["check_id"],
+        value["service"],
+        value["account_id"],
+        value.get("region") or "",
+        value["resource_id"],
+    )
 
 
 def _relationship_key(value: dict) -> tuple:
@@ -62,20 +86,32 @@ def _relationship_key(value: dict) -> tuple:
 
 
 def _safe_https_url(value: str) -> str | None:
-    if (not isinstance(value, str) or any(character.isspace() for character in value)
-            or "\\" in value or any(ord(character) < 32 for character in value)):
+    if (
+        not isinstance(value, str)
+        or any(character.isspace() for character in value)
+        or "\\" in value
+        or any(ord(character) < 32 for character in value)
+    ):
         return None
     try:
         parsed = urlsplit(value)
-        if (parsed.scheme != "https" or not parsed.netloc or parsed.hostname is None
-                or parsed.username is not None or parsed.password is not None):
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
             return None
         if parsed.port is not None or parsed.netloc.lower() != parsed.hostname:
             return None
         labels = parsed.hostname.split(".")
-        if (any(not label or len(label) > 63 or
-                re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) is None
-                for label in labels)):
+        if any(
+            not label
+            or len(label) > 63
+            or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) is None
+            for label in labels
+        ):
             return None
     except ValueError:
         return None
@@ -85,13 +121,22 @@ def _safe_https_url(value: str) -> str | None:
 def _ordered_report(report: Report) -> dict:
     data = report.to_dict()
     data["metadata"] = deepcopy(data["metadata"])
-    data["findings"] = sorted(data["findings"], key=lambda item: (
-        SEVERITY_RANK[item["severity"]], item["account_id"], item.get("region") or "",
-        item["service"], item["id"], item["resource_id"], item.get("resource_arn") or "",
-    ))
+    data["findings"] = sorted(
+        data["findings"],
+        key=lambda item: (
+            SEVERITY_RANK[item["severity"]],
+            item["account_id"],
+            item.get("region") or "",
+            item["service"],
+            item["id"],
+            item["resource_id"],
+            item.get("resource_arn") or "",
+        ),
+    )
     for finding in data["findings"]:
         finding["anchor"] = _anchor(
-            "finding", [_finding_key(finding), finding.get("resource_arn") or ""],
+            "finding",
+            [_finding_key(finding), finding.get("resource_arn") or ""],
         )
         finding["resource"] = {"href": None, "ambiguous": False}
         finding["references"] = [
@@ -101,29 +146,58 @@ def _ordered_report(report: Report) -> dict:
     ordered_coverage = []
     for entry in data["coverage"]:
         item = dict(entry)
-        item["issues"] = sorted((dict(issue) for issue in entry["issues"]), key=lambda issue: (
-            issue["operation"], issue.get("resource_id") or "", issue["message"],
-        ))
-        item["anchor"] = _anchor("coverage", [
-            item["account_id"], item.get("region") or "", item.get("scope") or "",
-            item["service"],
-        ])
+        item["issues"] = sorted(
+            (dict(issue) for issue in entry["issues"]),
+            key=lambda issue: (
+                issue["operation"],
+                issue.get("resource_id") or "",
+                issue["message"],
+            ),
+        )
+        item["anchor"] = _anchor(
+            "coverage",
+            [
+                item["account_id"],
+                item.get("region") or "",
+                item.get("scope") or "",
+                item["service"],
+            ],
+        )
         ordered_coverage.append(item)
-    data["coverage"] = sorted(ordered_coverage, key=lambda item: (
-        item["account_id"], item.get("region") or "", item.get("scope") or "",
-        item["service"], item["status"],
-    ))
+    data["coverage"] = sorted(
+        ordered_coverage,
+        key=lambda item: (
+            item["account_id"],
+            item.get("region") or "",
+            item.get("scope") or "",
+            item["service"],
+            item["status"],
+        ),
+    )
     if "identities" in data:
-        data["identities"] = sorted(data["identities"], key=lambda item: (
-            item["account_id"], item["type"], item["name"], item.get("arn") or "",
-        ))
+        data["identities"] = sorted(
+            data["identities"],
+            key=lambda item: (
+                item["account_id"],
+                item["type"],
+                item["name"],
+                item.get("arn") or "",
+            ),
+        )
     if "suppressions" in data:
-        data["suppressions"] = sorted(data["suppressions"], key=lambda item: (
-            item["account_id"], item["check_id"], item["resource_id"], item["expires_on"],
-        ))
+        data["suppressions"] = sorted(
+            data["suppressions"],
+            key=lambda item: (
+                item["account_id"],
+                item["check_id"],
+                item["resource_id"],
+                item["expires_on"],
+            ),
+        )
     if "accounts" in data["metadata"]:
         data["metadata"]["accounts"] = sorted(
-            data["metadata"]["accounts"], key=lambda item: item["account_id"],
+            data["metadata"]["accounts"],
+            key=lambda item: item["account_id"],
         )
     return data
 
@@ -141,7 +215,12 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
         return {
             "available": False,
             "relationship_capability": "unavailable",
-            "scopes": [], "leads": [], "relationships": [], "resources": [],
+            "scopes": [],
+            "leads": [],
+            "relationships": [],
+            "resources": [],
+            "contextual": [],
+            "graph": build_investigation_graph([]),
             "priority": {"HIGH": 0, "MEDIUM": 0, "LOW": 0},
             "coverage_status": _coverage_counts(report_data["coverage"]),
             "report": report_data,
@@ -150,24 +229,29 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
     resource_values: dict[tuple, list[Resource]] = {}
     relationship_values: dict[tuple, dict] = {}
     lead_values: dict[str, dict] = {}
+    contextual_values: dict[str, dict] = {}
     scope_views = []
     capabilities = set()
     for scope in scope_values:
         snapshot = scope.snapshot
         report_scan_id = scope.report.metadata.get("scan_id")
-        if (not isinstance(report_scan_id, str)
-                or report_scan_id != snapshot.metadata.scan_id
-                or scope.report.metadata.get("account_id") != snapshot.metadata.account_id
-                or scope.report.metadata.get("region") != snapshot.metadata.region):
+        if (
+            not isinstance(report_scan_id, str)
+            or report_scan_id != snapshot.metadata.scan_id
+            or scope.report.metadata.get("account_id") != snapshot.metadata.account_id
+            or scope.report.metadata.get("region") != snapshot.metadata.region
+        ):
             raise SnapshotError("HTML scope report does not match its snapshot scope")
         capabilities.add(snapshot.supports_relationships)
-        scope_views.append({
-            "account_id": snapshot.metadata.account_id,
-            "region": snapshot.metadata.region,
-            "scan_id": snapshot.metadata.scan_id,
-            "schema_version": snapshot.schema_version,
-            "supports_relationships": snapshot.supports_relationships,
-        })
+        scope_views.append(
+            {
+                "account_id": snapshot.metadata.account_id,
+                "region": snapshot.metadata.region,
+                "scan_id": snapshot.metadata.scan_id,
+                "schema_version": snapshot.schema_version,
+                "supports_relationships": snapshot.supports_relationships,
+            }
+        )
         for collection in snapshot.services.values():
             for resource in collection.resources:
                 resource_values.setdefault(_resource_key(resource), []).append(resource)
@@ -185,9 +269,54 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
                         raise SnapshotError("Conflicting relationship locators in HTML scopes")
                     if current_arn is None and observed_arn is not None:
                         current[endpoint]["resource_arn"] = observed_arn
-                evidence = {_canonical(item): item for item in current["evidence"] + raw["evidence"]}
+                evidence = {
+                    _canonical(item): item for item in current["evidence"] + raw["evidence"]
+                }
                 current["evidence"] = [evidence[item] for item in sorted(evidence)]
-        for lead in investigation_leads(snapshot, report=scope.report)["leads"]:
+        lead_document = investigation_leads(snapshot, report=scope.report)
+        for item in build_investigations(
+            snapshot, report=scope.report, leads=lead_document
+        ).to_dict()["investigations"]:
+            # Account-wide IAM observations can occur in several scope reports.
+            # Merge limitations conservatively; the identity stays scan-agnostic.
+            current = contextual_values.get(item["id"])
+            if current is not None:
+                for field in ("coverage_gaps", "unknown"):
+                    unique = {_canonical(value): value for value in current[field] + item[field]}
+                    item[field] = [unique[key] for key in sorted(unique)]
+                if current["priority_status"] == "BLOCKED":
+                    for field in (
+                        "priority",
+                        "priority_status",
+                        "priority_score",
+                        "priority_factors",
+                        "priority_explanation",
+                        "observed",
+                        "inferred",
+                        "explanation",
+                    ):
+                        item[field] = current[field]
+                if item["coverage_gaps"]:
+                    if not any(
+                        action["code"] == "VERIFY_EVIDENCE_GAPS"
+                        for action in item["recommended_actions"]
+                    ):
+                        item["recommended_actions"].insert(
+                            0,
+                            {
+                                "code": "VERIFY_EVIDENCE_GAPS",
+                                "text": "Review recorded coverage gaps before concluding safety or resolution.",
+                            },
+                        )
+                    if (
+                        item["priority_status"] != "BLOCKED"
+                        and "coverage" not in item["priority_explanation"].lower()
+                    ):
+                        item[
+                            "priority_explanation"
+                        ] += " Supporting coverage is limited across the rendered scopes."
+            contextual_values[item["id"]] = item
+        for lead in lead_document["leads"]:
             current = lead_values.get(lead["lead_id"])
             if current is None:
                 lead_values[lead["lead_id"]] = lead
@@ -209,17 +338,22 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
             all_matches = resource_links.get(key, [])
             matches = all_matches
             if endpoint.get("resource_arn") is not None:
-                matches = [item for item in matches
-                           if item.get("resource_arn") == endpoint["resource_arn"]]
+                matches = [
+                    item for item in matches if item.get("resource_arn") == endpoint["resource_arn"]
+                ]
                 if not matches and all_matches:
-                    observed = {item.get("resource_arn") for item in all_matches
-                                if item.get("resource_arn") is not None}
+                    observed = {
+                        item.get("resource_arn")
+                        for item in all_matches
+                        if item.get("resource_arn") is not None
+                    }
                     if observed:
                         raise SnapshotError("Relationship locator conflicts with an HTML resource")
                     item = all_matches[0]
                     item["resource_arn"] = endpoint["resource_arn"]
                     item["anchor"] = _anchor(
-                        "resource", [_resource_key(item), item["resource_arn"]],
+                        "resource",
+                        [_resource_key(item), item["resource_arn"]],
                     )
                     matches = [item]
             if not matches:
@@ -236,9 +370,14 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
             "anchor": _anchor("relationship", logical_key),
             "source": _reference_view(raw["source"], resource_links),
             "target": _reference_view(raw["target"], resource_links),
-            "evidence": sorted(raw["evidence"], key=lambda evidence: (
-                evidence["service"], evidence["fact"], evidence.get("operation") or "",
-            )),
+            "evidence": sorted(
+                raw["evidence"],
+                key=lambda evidence: (
+                    evidence["service"],
+                    evidence["fact"],
+                    evidence.get("operation") or "",
+                ),
+            ),
         }
         relationships.append(item)
         relationship_links.setdefault(logical_key, []).append(item)
@@ -260,48 +399,75 @@ def build_html_view(report: Report, scopes: Iterable[HtmlScope] = ()) -> dict:
                     resource["finding_hrefs"].append(f"#{finding['anchor']}")
 
     leads = []
-    for lead in sorted(lead_values.values(), key=lambda item: (
-        PRIORITY_RANK[item["priority"]], item["pattern_id"], item["lead_id"],
-    )):
+    for lead in sorted(
+        lead_values.values(),
+        key=lambda item: (
+            PRIORITY_RANK[item["priority"]],
+            item["pattern_id"],
+            item["lead_id"],
+        ),
+    ):
         item = dict(lead)
         item["anchor"] = _anchor("lead", lead["lead_id"])
-        item["subjects"] = [_reference_view(ref, resource_links, relationship_only=True)
-                            for ref in lead["subjects"]]
-        item["related_resources"] = [_reference_view(ref, resource_links)
-                                     for ref in lead["related_resources"]]
+        item["subjects"] = [
+            _reference_view(ref, resource_links, relationship_only=True) for ref in lead["subjects"]
+        ]
+        item["related_resources"] = [
+            _reference_view(ref, resource_links) for ref in lead["related_resources"]
+        ]
         item["findings"] = [_lead_finding_view(ref, finding_links) for ref in lead["findings"]]
         item["relationships"] = [
             _lead_relationship_view(ref, relationship_links) for ref in lead["relationships"]
         ]
         leads.append(item)
 
-    relationship_capability = ("mixed" if len(capabilities) > 1 else
-                               "supported" if True in capabilities else "unsupported")
+    relationship_capability = (
+        "mixed" if len(capabilities) > 1 else "supported" if True in capabilities else "unsupported"
+    )
     return {
         "available": True,
         "relationship_capability": relationship_capability,
         "scopes": scope_views,
         "leads": leads,
+        "contextual": [contextual_values[key] for key in sorted(contextual_values)],
+        "graph": build_investigation_graph(list(contextual_values.values())),
         "relationships": relationships,
-        "resources": sorted(resource_entries, key=lambda item: (
-            _resource_key(item), item.get("resource_arn") or "", item["reference_kind"],
-        )),
-        "priority": {priority: sum(item["priority"] == priority for item in leads)
-                     for priority in ("HIGH", "MEDIUM", "LOW")},
+        "resources": sorted(
+            resource_entries,
+            key=lambda item: (
+                _resource_key(item),
+                item.get("resource_arn") or "",
+                item["reference_kind"],
+            ),
+        ),
+        "priority": {
+            priority: sum(item["priority"] == priority for item in leads)
+            for priority in ("HIGH", "MEDIUM", "LOW")
+        },
         "coverage_status": _coverage_counts(report_data["coverage"]),
         "report": report_data,
     }
 
 
 def _coverage_counts(coverage: list[dict]) -> dict[str, int]:
-    return {status: sum(item["status"] == status for item in coverage)
-            for status in ("COMPLETE", "PARTIAL", "ERROR", "NOT_SCANNED")}
+    return {
+        status: sum(item["status"] == status for item in coverage)
+        for status in ("COMPLETE", "PARTIAL", "ERROR", "NOT_SCANNED")
+    }
 
 
 def _resource_view(value: dict, kind: str) -> dict:
-    item = {name: value.get(name) for name in (
-        "service", "resource_type", "account_id", "region", "resource_id", "resource_arn",
-    )}
+    item = {
+        name: value.get(name)
+        for name in (
+            "service",
+            "resource_type",
+            "account_id",
+            "region",
+            "resource_id",
+            "resource_arn",
+        )
+    }
     item["reference_kind"] = kind
     item["anchor"] = _anchor("resource", [_resource_key(item), item.get("resource_arn") or ""])
     item["finding_hrefs"] = []
@@ -310,24 +476,32 @@ def _resource_view(value: dict, kind: str) -> dict:
     return item
 
 
-def _reference_view(reference: dict, resources: dict[tuple, list[dict]],
-                    *, relationship_only: bool = False) -> dict:
+def _reference_view(
+    reference: dict, resources: dict[tuple, list[dict]], *, relationship_only: bool = False
+) -> dict:
     matches = resources.get(_resource_key(reference), [])
     if reference.get("resource_arn") is not None:
-        matches = [item for item in matches if item.get("resource_arn") == reference["resource_arn"]]
+        matches = [
+            item for item in matches if item.get("resource_arn") == reference["resource_arn"]
+        ]
     result = dict(reference)
     _add_agentcore_version_context(result)
     if len(matches) == 1:
         result.update(reference_kind=matches[0]["reference_kind"], href=f"#{matches[0]['anchor']}")
     else:
-        result.update(reference_kind=("relationship-only" if relationship_only or not matches
-                                      else "unresolved"), href=None)
+        result.update(
+            reference_kind=(
+                "relationship-only" if relationship_only or not matches else "unresolved"
+            ),
+            href=None,
+        )
     return result
 
 
 def _add_agentcore_version_context(value: dict) -> None:
     if (value.get("service"), value.get("resource_type")) == (
-        "agentcore", "runtime-version",
+        "agentcore",
+        "runtime-version",
     ):
         runtime_id, separator, version = value["resource_id"].rpartition(":")
         if separator and runtime_id and version:
@@ -336,26 +510,41 @@ def _add_agentcore_version_context(value: dict) -> None:
 
 
 def _finding_resource_link(finding: dict, resources: dict[tuple, list[dict]]) -> dict:
-    key = (finding["account_id"], finding.get("region") or "", finding["service"], finding["resource_id"])
+    key = (
+        finding["account_id"],
+        finding.get("region") or "",
+        finding["service"],
+        finding["resource_id"],
+    )
     matches = []
     for resource_key, entries in resources.items():
         if (resource_key[0], resource_key[1], resource_key[2], resource_key[4]) == key:
             matches.extend(entries)
     if finding.get("resource_arn") is not None:
         matches = [item for item in matches if item.get("resource_arn") == finding["resource_arn"]]
-    return {"href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
-            "ambiguous": len(matches) > 1}
+    return {
+        "href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
+        "ambiguous": len(matches) > 1,
+    }
 
 
 def _lead_finding_view(reference: dict, findings: dict[tuple, list[dict]]) -> dict:
     matches = findings.get(_finding_ref_key(reference), [])
     if reference.get("resource_arn") is not None:
-        matches = [item for item in matches if item.get("resource_arn") == reference["resource_arn"]]
-    return {**reference, "href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
-            "resolved": len(matches) == 1}
+        matches = [
+            item for item in matches if item.get("resource_arn") == reference["resource_arn"]
+        ]
+    return {
+        **reference,
+        "href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
+        "resolved": len(matches) == 1,
+    }
 
 
 def _lead_relationship_view(reference: dict, relationships: dict[tuple, list[dict]]) -> dict:
     matches = relationships.get(_relationship_key(reference), [])
-    return {**reference, "href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
-            "resolved": len(matches) == 1}
+    return {
+        **reference,
+        "href": f"#{matches[0]['anchor']}" if len(matches) == 1 else None,
+        "resolved": len(matches) == 1,
+    }

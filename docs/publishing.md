@@ -21,6 +21,22 @@ Setup is not complete until both publishers are saved, the workflow/scripts are 
 
 ## Validate without publishing
 
+For the v0.5.1 candidate, preserve any historical local artifacts by building
+into a separate version directory:
+
+```bash
+python -m build --no-isolation --outdir dist/v0.5.1
+python .github/scripts/release.py artifacts --dist dist/v0.5.1
+```
+
+Install that wheel in a fresh local environment and run
+`python .github/scripts/release.py smoke --dist dist/v0.5.1` with its Python.
+The no-isolation build requires the backend/build tools already installed.
+These commands validate locally and do not upload or publish. v0.5.1 retains
+substantial investigation features despite the patch version number. Review
+the [final release gate](releases/v0.5.1-final-release-gate.md), including separate
+agent/user browser evidence and blocked remote/Twine checks, before release.
+
 Once the workflow is on the default branch, open GitHub Actions, select **Publish Python package**, and use **Run workflow** on `main`. This builds once, checks source version, wheel/source metadata and README rendering, then installs the wheel in fresh environments on Linux/Python 3.11 and 3.13, Windows/Python 3.13 and macOS/Python 3.13. Installed-code equality, CLI discovery and offline JSON/HTML are checked. This branch run cannot upload to either index and does not exercise the OIDC exchange.
 
 Scanner CI runs the committed deterministic pytest suite on the supported Linux,
@@ -50,6 +66,18 @@ Users install released packages with `pipx install awsherlock` or `python -m pip
 
 **`awsherlock --update` intentionally installs GitHub `main`** so users can test unreleased fixes and features, including changes without a version bump. It requires Git and internet access. This task preserves the existing updater behavior.
 
-Published archives embed the README as it stood at tag time. Updating this page after publication does not change tagged archives. Curated release notes are maintained in [`docs/releases/`](releases/); the v0.5.0 candidate notes are [`v0.5.0.md`](releases/v0.5.0.md).
+Published archives embed the README as it stood at tag time. Updating this page after publication does not change tagged archives. Curated release notes are maintained in [`docs/releases/`](releases/); the v0.5.1 preparation notes are [`v0.5.1.md`](releases/v0.5.1.md). Publication still requires explicit owner authorization.
 
 References: [Adding a Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [Publishing with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/using-a-publisher/), [official PyPA publish action](https://github.com/pypa/gh-action-pypi-publish).
+
+
+## v0.5.1 owner approval gate
+
+The exact commit/tag/release text, artifact provenance, checksum manifest,
+remaining blocked checks and fail-closed remote preflight are recorded in the
+[v0.5.1 final release gate](releases/v0.5.1-final-release-gate.md).
+Local candidate archives are validation artifacts from a reviewed source export;
+they are not an authorization to upload an uncommitted working tree. Publish
+only the workflow build of the approved, clean tagged commit. A tag push triggers
+TestPyPI and PyPI automatically; it therefore requires publication approval,
+not merely approval to create a local tag. Never overwrite an existing version.

@@ -17,22 +17,52 @@ from awsherlock.rules.iam import IAM_RULES
 from test_s3 import aws_error
 
 NOW = datetime(2026, 9, 15, tzinfo=timezone.utc)
-POLICY = {"Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::test/object"}]}
+POLICY = {
+    "Statement": [
+        {"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::test/object"}
+    ]
+}
 
 
 def resource(data):
-    return Resource(service="iam", resource_type="user", account_id="123456789012", region=None,
-                    resource_id="test-user", resource_arn=None, data=data)
+    return Resource(
+        service="iam",
+        resource_type="user",
+        account_id="123456789012",
+        region=None,
+        resource_id="test-user",
+        resource_arn=None,
+        data=data,
+    )
 
 
-@pytest.mark.parametrize("index,bad,good", [
-    (0, ["arn:aws:iam::aws:policy/AdministratorAccess"], ["arn:aws:iam::123456789012:policy/AdministratorAccess"]),
-    (1, policy_statements({"Statement": {"Effect": "Allow", "Action": "s3:*", "Resource": "specific"}}), policy_statements(POLICY)),
-    (2, policy_statements({"Statement": {"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}}), policy_statements(POLICY)),
-    (3, {"console": True, "mfa": False}, {"console": True, "mfa": True}),
-    (4, {"active": True, "days": 91}, {"active": True, "days": 90}),
-    (5, {"days": 91, "never_used": True}, {"days": 90, "never_used": False}),
-])
+@pytest.mark.parametrize(
+    "index,bad,good",
+    [
+        (
+            0,
+            ["arn:aws:iam::aws:policy/AdministratorAccess"],
+            ["arn:aws:iam::123456789012:policy/AdministratorAccess"],
+        ),
+        (
+            1,
+            policy_statements(
+                {"Statement": {"Effect": "Allow", "Action": "s3:*", "Resource": "specific"}}
+            ),
+            policy_statements(POLICY),
+        ),
+        (
+            2,
+            policy_statements(
+                {"Statement": {"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}}
+            ),
+            policy_statements(POLICY),
+        ),
+        (3, {"console": True, "mfa": False}, {"console": True, "mfa": True}),
+        (4, {"active": True, "days": 91}, {"active": True, "days": 90}),
+        (5, {"days": 91, "never_used": True}, {"days": 90, "never_used": False}),
+    ],
+)
 def test_six_rules(index, bad, good):
     rule = IAM_RULES[index]
     assert rule.evaluate(resource({rule.required_fact: bad}))[0].id == f"AWSH-IAM-{index + 1:03}"
@@ -46,13 +76,31 @@ def test_policy_semantics():
     facts = policy_statements(quote(json.dumps(document)))
     assert IAM_RULES[1].evaluate(resource({"statements": facts})) == []
     assert IAM_RULES[2].evaluate(resource({"statements": facts})) == []
-    facts = policy_statements({"Statement": {"Effect": "Allow", "NotAction": "iam:*", "NotResource": "specific", "Condition": {"StringEquals": {"secret-marker": "hidden"}}}})
+    facts = policy_statements(
+        {
+            "Statement": {
+                "Effect": "Allow",
+                "NotAction": "iam:*",
+                "NotResource": "specific",
+                "Condition": {"StringEquals": {"secret-marker": "hidden"}},
+            }
+        }
+    )
     assert "secret-marker" not in repr(facts)
     assert IAM_RULES[1].evaluate(resource({"statements": facts}))
     assert IAM_RULES[2].evaluate(resource({"statements": facts}))
 
 
-@pytest.mark.parametrize("document", [None, "bad-json", {}, {"Statement": [None]}, {"Statement": [{"Effect": "Allow", "Action": [], "Resource": "*"}]}])
+@pytest.mark.parametrize(
+    "document",
+    [
+        None,
+        "bad-json",
+        {},
+        {"Statement": [None]},
+        {"Statement": [{"Effect": "Allow", "Action": [], "Resource": "*"}]},
+    ],
+)
 def test_bad_policy(document):
     with pytest.raises(ValueError):
         policy_statements(document)
@@ -62,15 +110,42 @@ def test_bad_policy(document):
 def context():
     session = Mock()
     client = session.client.return_value
-    user = {"UserName": "alice", "Arn": "arn:aws:iam::123456789012:user/alice",
-            "AttachedManagedPolicies": [], "UserPolicyList": [{"PolicyDocument": POLICY}]}
-    managed = {"PolicyName": "managed", "Arn": "arn:aws:iam::123456789012:policy/managed", "DefaultVersionId": "v2",
-               "PolicyVersionList": [{"IsDefaultVersion": False, "VersionId": "v1", "Document": {"Statement": {"Effect": "Allow", "Action": "*", "Resource": "*"}}},
-                                     {"IsDefaultVersion": True, "VersionId": "v2", "Document": POLICY}]}
+    user = {
+        "UserName": "alice",
+        "Arn": "arn:aws:iam::123456789012:user/alice",
+        "AttachedManagedPolicies": [],
+        "UserPolicyList": [{"PolicyDocument": POLICY}],
+    }
+    managed = {
+        "PolicyName": "managed",
+        "Arn": "arn:aws:iam::123456789012:policy/managed",
+        "DefaultVersionId": "v2",
+        "PolicyVersionList": [
+            {
+                "IsDefaultVersion": False,
+                "VersionId": "v1",
+                "Document": {"Statement": {"Effect": "Allow", "Action": "*", "Resource": "*"}},
+            },
+            {"IsDefaultVersion": True, "VersionId": "v2", "Document": POLICY},
+        ],
+    }
     pages = {
         "get_account_authorization_details": [{"UserDetailList": [user]}, {"Policies": [managed]}],
-        "list_mfa_devices": [{"MFADevices": []}, {"MFADevices": [{"SerialNumber": "synthetic-mfa"}]}],
-        "list_access_keys": [{"AccessKeyMetadata": [{"AccessKeyId": "synthetic-key-marker", "Status": "Active", "CreateDate": NOW - timedelta(days=100)}]}],
+        "list_mfa_devices": [
+            {"MFADevices": []},
+            {"MFADevices": [{"SerialNumber": "synthetic-mfa"}]},
+        ],
+        "list_access_keys": [
+            {
+                "AccessKeyMetadata": [
+                    {
+                        "AccessKeyId": "synthetic-key-marker",
+                        "Status": "Active",
+                        "CreateDate": NOW - timedelta(days=100),
+                    }
+                ]
+            }
+        ],
     }
     client.get_paginator.side_effect = lambda name: Mock(paginate=Mock(return_value=pages[name]))
     client.get_login_profile.return_value = {"LoginProfile": {"UserName": "alice"}}

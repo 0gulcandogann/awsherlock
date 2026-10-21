@@ -40,6 +40,7 @@ def color_option(ctx: typer.Context, value: str | None) -> str | None:
     if value not in {"auto", "always", "never"}:
         raise typer.BadParameter("Use auto, always or never.", param_hint="--color")
     from typer import rich_utils
+
     token = COLOR_MODE.set(value)
     previous = (rich_utils.FORCE_TERMINAL, rich_utils.COLOR_SYSTEM, rich_utils.Console)
     baseline = ctx.find_root().meta.setdefault("awsherlock_color_baseline", previous)
@@ -51,9 +52,11 @@ def color_option(ctx: typer.Context, value: str | None) -> str | None:
         rich_utils.COLOR_SYSTEM = None
     else:
         rich_utils.FORCE_TERMINAL, rich_utils.COLOR_SYSTEM, rich_utils.Console = baseline
+
     def restore() -> None:
         COLOR_MODE.reset(token)
         rich_utils.FORCE_TERMINAL, rich_utils.COLOR_SYSTEM, rich_utils.Console = previous
+
     ctx.call_on_close(restore)
     return value
 
@@ -72,19 +75,31 @@ def field(label: str, value: str) -> None:
 def configure_typer_styles() -> None:
     """Configure Typer's Rich style constants once when constructing our CLI."""
     from typer import rich_utils
+
     rich_utils.OPTIONS_PANEL_TITLE = f"[bold {LIGHT_PURPLE}]Options[/]"
     rich_utils.COMMANDS_PANEL_TITLE = f"[bold {LIGHT_BLUE}]Commands[/]"
     styles = {
-        "STYLE_OPTION": f"bold {CYAN}", "STYLE_SWITCH": f"bold {GREEN}",
-        "STYLE_NEGATIVE_OPTION": f"bold {ORANGE}", "STYLE_NEGATIVE_SWITCH": f"bold {ORANGE}",
-        "STYLE_TYPES": YELLOW, "STYLE_USAGE": ORANGE, "STYLE_USAGE_COMMAND": f"bold {PINK}",
-        "STYLE_HELPTEXT_FIRST_LINE": CYAN, "STYLE_HELPTEXT": SOFT_BLUE,
-        "STYLE_OPTION_HELP": LIGHT_BLUE, "STYLE_OPTION_DEFAULT": YELLOW,
-        "STYLE_OPTION_ENVVAR": YELLOW, "STYLE_REQUIRED_SHORT": RED, "STYLE_REQUIRED_LONG": RED,
-        "STYLE_OPTIONS_PANEL_BORDER": PURPLE, "STYLE_COMMANDS_PANEL_BORDER": PURPLE,
+        "STYLE_OPTION": f"bold {CYAN}",
+        "STYLE_SWITCH": f"bold {GREEN}",
+        "STYLE_NEGATIVE_OPTION": f"bold {ORANGE}",
+        "STYLE_NEGATIVE_SWITCH": f"bold {ORANGE}",
+        "STYLE_TYPES": YELLOW,
+        "STYLE_USAGE": ORANGE,
+        "STYLE_USAGE_COMMAND": f"bold {PINK}",
+        "STYLE_HELPTEXT_FIRST_LINE": CYAN,
+        "STYLE_HELPTEXT": SOFT_BLUE,
+        "STYLE_OPTION_HELP": LIGHT_BLUE,
+        "STYLE_OPTION_DEFAULT": YELLOW,
+        "STYLE_OPTION_ENVVAR": YELLOW,
+        "STYLE_REQUIRED_SHORT": RED,
+        "STYLE_REQUIRED_LONG": RED,
+        "STYLE_OPTIONS_PANEL_BORDER": PURPLE,
+        "STYLE_COMMANDS_PANEL_BORDER": PURPLE,
         "STYLE_COMMANDS_TABLE_FIRST_COLUMN": f"bold {GREEN}",
-        "STYLE_ERRORS_PANEL_BORDER": RED, "STYLE_ERRORS_SUGGESTION": YELLOW,
-        "STYLE_ABORTED": RED, "STYLE_DEPRECATED": ORANGE,
+        "STYLE_ERRORS_PANEL_BORDER": RED,
+        "STYLE_ERRORS_SUGGESTION": YELLOW,
+        "STYLE_ABORTED": RED,
+        "STYLE_DEPRECATED": ORANGE,
     }
     for name, style in styles.items():
         setattr(rich_utils, name, style)

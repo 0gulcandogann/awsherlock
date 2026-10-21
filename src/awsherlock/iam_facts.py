@@ -26,7 +26,10 @@ def policy_statements(document: object) -> list[dict]:
         normalized = {"effect": statement["Effect"], "conditional": "Condition" in statement}
         if "Condition" in statement and not isinstance(statement["Condition"], dict):
             raise InvalidResponse()
-        for positive, negative, target in (("Action", "NotAction", "actions"), ("Resource", "NotResource", "resources")):
+        for positive, negative, target in (
+            ("Action", "NotAction", "actions"),
+            ("Resource", "NotResource", "resources"),
+        ):
             if (positive in statement) == (negative in statement):
                 raise InvalidResponse()
             values = statement.get(positive, statement.get(negative))

@@ -32,6 +32,7 @@ to each artifact, not to every output produced by AWSherlock.
 | Finding history | `history --output json` | `1` | `kind: finding-history`. |
 | Investigation leads | `leads --output json` | `2` | `kind: investigation-leads`; five existing patterns. Lead Delta does not change these rules or IDs. |
 | Investigation Evidence Pack | `investigate --output json` | `1` | `kind: investigation-evidence-pack`; exact-one-Lead minimized offline export. COMPLETE export exits 0; PARTIAL export or fatal runtime error exits 1; usage errors exit 2. HTML requires `--report-file`. [Evidence Pack contract](investigation-evidence-pack.md). |
+| Contextual investigations | `investigate --contextual --output json` | `1` | `kind: contextual-investigations`; separate priority policy v1, traceable conditions and references. Optional exact `--lead-id` selection. Incomplete artifact exits 1; provisional priority alone does not. [Contextual schema](contextual-investigations.md). |
 | Coverage Diagnostics | `coverage --output json` | `1` | `kind: coverage-diagnostics`; offline evidence-derived limitations and positive-observation context. COMPLETE is recorded evaluation status, never an account security PASS or inventory-completeness claim. |
 | Identity view, `--view all` | `identities --output json` | `1` | `kind: identity-view`. |
 | Filtered identity view | `identities --view ai\|unowned\|stale\|shared --output json` | `2` | Also includes view and match counts. |

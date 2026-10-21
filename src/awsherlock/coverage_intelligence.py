@@ -9,62 +9,140 @@ from awsherlock.branding import terminal_text
 from awsherlock.registry import SERVICE_SPECS, service_spec
 from awsherlock.snapshot import Snapshot
 
-
 SCHEMA_VERSION = 1
 
 # Exact normalized operation labels that existing collectors/evaluation can
 # persist. This is an export boundary, not an AWS permission or dispatch list.
-_EVALUATION_OPERATIONS = frozenset({
-    "AccountPublicAccessContext", "AccountSelection", "CheckSelection",
-    "OUSelection", "RequiredCollection", "RequiredFact", "ResourceSelection",
-    "RuleEvaluation", "SnapshotValidation",
-})
+_EVALUATION_OPERATIONS = frozenset(
+    {
+        "AccountPublicAccessContext",
+        "AccountSelection",
+        "CheckSelection",
+        "OUSelection",
+        "RequiredCollection",
+        "RequiredFact",
+        "ResourceSelection",
+        "RuleEvaluation",
+        "SnapshotValidation",
+    }
+)
 _COLLECTION_OPERATIONS = {
-    "iam": frozenset({
-        "AuthorizationDetails", "ConsoleMFA", "GetAccessKeyLastUsed",
-        "GetAccountAuthorizationDetails", "GetAgent", "GetAgentRuntime",
-        "GetAgentRuntimeEndpoint", "GetInstanceProfile", "GetLoginProfile",
-        "GetPolicy", "GetPolicyVersion", "GetRole", "GetRolePolicy",
-        "IdentityAnalyzers", "IdentityBinding", "IdentityBindings",
-        "IdentityEvents", "IdentityManagedPolicy", "IdentityPolicyContext",
-        "IdentityProfile", "ListAccessKeys", "ListAgentRuntimeEndpoints",
-        "ListAgentRuntimes", "ListAgents", "ListAttachedRolePolicies",
-        "ListFunctions", "ListMFADevices", "ListRoleTags", "ListUserTags",
-        "PolicyNormalization", "RoleLastUsed", "RoleTrust",
-    }),
-    "s3": frozenset({
-        "AccountPublicAccessBlock", "CreateRegionalClient", "GetAccountPublicAccessBlock",
-        "GetBucketEncryption", "GetBucketLocation", "GetBucketLogging",
-        "GetBucketPolicyStatus", "GetBucketVersioning", "GetPublicAccessBlock", "ListBuckets",
-    }),
-    "ec2": frozenset({
-        "DescribeInstances", "DescribeSecurityGroups", "DescribeVolumes",
-        "EC2Client", "Region", "describe_instances", "describe_instances.addresses",
-        "describe_instances.metadata", "describe_security_groups", "describe_volumes",
-    }),
-    "lambda": frozenset({
-        "LambdaMetadata", "ListAttachedRolePolicies", "ListFunctionUrlConfigs",
-        "ListFunctions", "ManagedRuntime (images/unknown runtimes not scanned)", "Region",
-    }),
-    "secretsmanager": frozenset({
-        "DescribeKey", "GetResourcePolicy", "ListSecrets", "Region", "RotationMetadata",
-        "SecretMetadata",
-    }),
-    "cloudtrail": frozenset({
-        "DescribeTrails", "GetEventSelectors", "GetTrailStatus", "Region", "TrailMetadata",
-        "TrailSettings",
-    }),
+    "iam": frozenset(
+        {
+            "AuthorizationDetails",
+            "ConsoleMFA",
+            "GetAccessKeyLastUsed",
+            "GetAccountAuthorizationDetails",
+            "GetAgent",
+            "GetAgentRuntime",
+            "GetAgentRuntimeEndpoint",
+            "GetInstanceProfile",
+            "GetLoginProfile",
+            "GetPolicy",
+            "GetPolicyVersion",
+            "GetRole",
+            "GetRolePolicy",
+            "IdentityAnalyzers",
+            "IdentityBinding",
+            "IdentityBindings",
+            "IdentityEvents",
+            "IdentityManagedPolicy",
+            "IdentityPolicyContext",
+            "IdentityProfile",
+            "ListAccessKeys",
+            "ListAgentRuntimeEndpoints",
+            "ListAgentRuntimes",
+            "ListAgents",
+            "ListAttachedRolePolicies",
+            "ListFunctions",
+            "ListMFADevices",
+            "ListRoleTags",
+            "ListUserTags",
+            "PolicyNormalization",
+            "RoleLastUsed",
+            "RoleTrust",
+        }
+    ),
+    "s3": frozenset(
+        {
+            "AccountPublicAccessBlock",
+            "CreateRegionalClient",
+            "GetAccountPublicAccessBlock",
+            "GetBucketEncryption",
+            "GetBucketLocation",
+            "GetBucketLogging",
+            "GetBucketPolicyStatus",
+            "GetBucketVersioning",
+            "GetPublicAccessBlock",
+            "ListBuckets",
+        }
+    ),
+    "ec2": frozenset(
+        {
+            "DescribeInstances",
+            "DescribeSecurityGroups",
+            "DescribeVolumes",
+            "EC2Client",
+            "Region",
+            "describe_instances",
+            "describe_instances.addresses",
+            "describe_instances.metadata",
+            "describe_security_groups",
+            "describe_volumes",
+        }
+    ),
+    "lambda": frozenset(
+        {
+            "LambdaMetadata",
+            "ListAttachedRolePolicies",
+            "ListFunctionUrlConfigs",
+            "ListFunctions",
+            "ManagedRuntime (images/unknown runtimes not scanned)",
+            "Region",
+        }
+    ),
+    "secretsmanager": frozenset(
+        {
+            "DescribeKey",
+            "GetResourcePolicy",
+            "ListSecrets",
+            "Region",
+            "RotationMetadata",
+            "SecretMetadata",
+        }
+    ),
+    "cloudtrail": frozenset(
+        {
+            "DescribeTrails",
+            "GetEventSelectors",
+            "GetTrailStatus",
+            "Region",
+            "TrailMetadata",
+            "TrailSettings",
+        }
+    ),
     "kms": frozenset({"DescribeKey", "GetKeyPolicy", "GetKeyRotationStatus", "ListKeys", "Region"}),
-    "rds": frozenset({
-        "DescribeDBClusterSnapshotAttributes", "DescribeDBClusterSnapshots",
-        "DescribeDBInstances", "DescribeDBSnapshotAttributes", "DescribeDBSnapshots", "Region",
-        "RDSClient",
-    }),
+    "rds": frozenset(
+        {
+            "DescribeDBClusterSnapshotAttributes",
+            "DescribeDBClusterSnapshots",
+            "DescribeDBInstances",
+            "DescribeDBSnapshotAttributes",
+            "DescribeDBSnapshots",
+            "Region",
+            "RDSClient",
+        }
+    ),
     "guardduty": frozenset({"GetDetector", "ListDetectors", "Region"}),
     "dynamodb": frozenset({"DescribeContinuousBackups", "ListTables", "Region"}),
-    "bedrock": frozenset({
-        "GetAgent", "GetModelInvocationLoggingConfiguration", "ListAgents", "Region",
-    }),
+    "bedrock": frozenset(
+        {
+            "GetAgent",
+            "GetModelInvocationLoggingConfiguration",
+            "ListAgents",
+            "Region",
+        }
+    ),
 }
 
 _MESSAGE_REASONS = {
@@ -118,34 +196,51 @@ def _operation(service: str, value: object) -> str | None:
     return value if value in allowed else None
 
 
-def _issue_rows(account_id: str, region: str | None, service: str, issues: list[dict]) -> list[dict]:
-    ordered = sorted(issues, key=lambda issue: (
-        str(issue.get("operation", "")), str(issue.get("resource_id") or ""),
-        _reason(issue.get("operation"), issue.get("message")), str(issue.get("message", "")),
-    ))
+def coverage_issue_rows(
+    account_id: str, region: str | None, service: str, issues: list[dict]
+) -> list[dict]:
+    """Project bounded diagnostics for all registered services; no raw messages.
+
+    Shared with contextual scope coverage. The exact-message and operation
+    allowlists are intentionally stricter than historical Evidence Pack policy.
+    """
+    ordered = sorted(
+        issues,
+        key=lambda issue: (
+            str(issue.get("operation", "")),
+            str(issue.get("resource_id") or ""),
+            _reason(issue.get("operation"), issue.get("message")),
+            str(issue.get("message", "")),
+        ),
+    )
     duplicates: Counter[tuple[str, str, str]] = Counter()
     result = []
     for issue in ordered:
         reason = _reason(issue.get("operation"), issue.get("message"))
         trusted_operation = _operation(service, issue.get("operation"))
-        resource_id = issue.get("resource_id") if isinstance(issue.get("resource_id"), str) else None
+        resource_id = (
+            issue.get("resource_id") if isinstance(issue.get("resource_id"), str) else None
+        )
         identity = (trusted_operation or "", resource_id or "", reason)
         ordinal = duplicates[identity]
         duplicates[identity] += 1
         digest_material = [account_id, region or "", service, *identity, str(ordinal)]
-        digest = hashlib.sha256(json.dumps(digest_material, separators=(",", ":"),
-                                           ensure_ascii=True).encode("ascii")).hexdigest()[:20]
-        result.append({
-            "reason_code": reason,
-            "explanation": _EXPLANATIONS[reason],
-            "operation": trusted_operation,
-            "resource_id": resource_id,
-            "issue_reference": {
-                "source_field": f"report.coverage.{service}.issues",
-                "id": f"issue-{digest}",
-                "occurrence": ordinal + 1,
-            },
-        })
+        digest = hashlib.sha256(
+            json.dumps(digest_material, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+        ).hexdigest()[:20]
+        result.append(
+            {
+                "reason_code": reason,
+                "explanation": _EXPLANATIONS[reason],
+                "operation": trusted_operation,
+                "resource_id": resource_id,
+                "issue_reference": {
+                    "source_field": f"report.coverage.{service}.issues",
+                    "id": f"issue-{digest}",
+                    "occurrence": ordinal + 1,
+                },
+            }
+        )
     return result
 
 
@@ -173,38 +268,50 @@ def build_coverage_diagnostics(snapshot: Snapshot, report: Report) -> dict:
             edge.source.service == service or edge.target.service == service
             for edge in snapshot.relationships
         )
-        services.append({
-            "account_id": snapshot.metadata.account_id,
-            "region": service_region,
-            "scope": "global" if service == "iam" else "bucket" if service == "s3" else "regional",
-            "service": service,
-            "registered_mode": "DEFAULT" if spec.default_enabled else "OPT_IN",
-            "recorded": True,
-            "coverage_status": row["status"],
-            "recorded_evidence": {
-                "resources": len(collection.resources),
-                "findings": row["findings"],
-                "checks_evaluated": row["evaluated"],
-                "checks_not_scanned": row["not_scanned"],
-                "relationships": related,
-                "completed_operations": sorted(collection.completed_operations),
-            },
-            "limitations": _issue_rows(snapshot.metadata.account_id, service_region, service, row["issues"]),
-            "uncertainty": [{
-                "reason_code": "COMPLETENESS_NOT_PROVEN",
-                "explanation": (
-                    "Recorded evidence and successful reads do not prove exhaustive service, resource, "
-                    "or relationship enumeration."
+        services.append(
+            {
+                "account_id": snapshot.metadata.account_id,
+                "region": service_region,
+                "scope": (
+                    "global" if service == "iam" else "bucket" if service == "s3" else "regional"
                 ),
-            }],
-        })
+                "service": service,
+                "registered_mode": "DEFAULT" if spec.default_enabled else "OPT_IN",
+                "recorded": True,
+                "coverage_status": row["status"],
+                "recorded_evidence": {
+                    "resources": len(collection.resources),
+                    "findings": row["findings"],
+                    "checks_evaluated": row["evaluated"],
+                    "checks_not_scanned": row["not_scanned"],
+                    "relationships": related,
+                    "completed_operations": sorted(collection.completed_operations),
+                },
+                "limitations": coverage_issue_rows(
+                    snapshot.metadata.account_id, service_region, service, row["issues"]
+                ),
+                "uncertainty": [
+                    {
+                        "reason_code": "COMPLETENESS_NOT_PROVEN",
+                        "explanation": (
+                            "Recorded evidence and successful reads do not prove exhaustive service, resource, "
+                            "or relationship enumeration."
+                        ),
+                    }
+                ],
+            }
+        )
     recorded = set(snapshot.services)
-    unrecorded = [{
-        "service": spec.identifier,
-        "registered_mode": "DEFAULT" if spec.default_enabled else "OPT_IN",
-        "reason_code": "SCOPE_NOT_RECORDED",
-        "explanation": "This service is not present in the snapshot; collection history is not established.",
-    } for spec in SERVICE_SPECS if spec.identifier not in recorded]
+    unrecorded = [
+        {
+            "service": spec.identifier,
+            "registered_mode": "DEFAULT" if spec.default_enabled else "OPT_IN",
+            "reason_code": "SCOPE_NOT_RECORDED",
+            "explanation": "This service is not present in the snapshot; collection history is not established.",
+        }
+        for spec in SERVICE_SPECS
+        if spec.identifier not in recorded
+    ]
     supports = snapshot.supports_relationships
     source = snapshot.metadata
     return {
@@ -234,8 +341,8 @@ def build_coverage_diagnostics(snapshot: Snapshot, report: Report) -> dict:
             ),
             "explanation": (
                 "Only positive relationships stored in this snapshot are reportable; absence is not proof of non-use."
-                if supports else
-                "Snapshot schema v1 cannot represent relationships; availability cannot be inferred."
+                if supports
+                else "Snapshot schema v1 cannot represent relationships; availability cannot be inferred."
             ),
         },
         "services": services,
@@ -252,7 +359,9 @@ def build_coverage_diagnostics(snapshot: Snapshot, report: Report) -> dict:
 
 
 def render_coverage_json(document: dict) -> str:
-    return json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    return (
+        json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    )
 
 
 def render_coverage_console(document: dict) -> str:
@@ -260,10 +369,14 @@ def render_coverage_console(document: dict) -> str:
     summary = document["summary"]
     lines = [
         "Coverage Intelligence",
-        (f"Scan: {terminal_text(source['scan_id'])} / Account: {terminal_text(source['account_id'])} / "
-         f"Region: {terminal_text(source['region'] or 'global')}"),
-        (f"Recorded: {summary['recorded_services']} services, {summary['recorded_resources']} resources, "
-         f"{summary['recorded_findings']} findings, {summary['recorded_relationships']} relationships"),
+        (
+            f"Scan: {terminal_text(source['scan_id'])} / Account: {terminal_text(source['account_id'])} / "
+            f"Region: {terminal_text(source['region'] or 'global')}"
+        ),
+        (
+            f"Recorded: {summary['recorded_services']} services, {summary['recorded_resources']} resources, "
+            f"{summary['recorded_findings']} findings, {summary['recorded_relationships']} relationships"
+        ),
         "Service coverage:",
     ]
     for row in document["services"]:
@@ -273,9 +386,15 @@ def render_coverage_console(document: dict) -> str:
         )
         for item in row["limitations"]:
             lines.append(f"  {item['reason_code']}: {item['explanation']}")
-    lines.extend([
-        ("Relationships: " + document["relationship_coverage"]["capability"] + " / "
-         + document["relationship_coverage"]["reason_code"]),
-        "Completeness is not proven. Missing findings or relationships are not security conclusions.",
-    ])
+    lines.extend(
+        [
+            (
+                "Relationships: "
+                + document["relationship_coverage"]["capability"]
+                + " / "
+                + document["relationship_coverage"]["reason_code"]
+            ),
+            "Completeness is not proven. Missing findings or relationships are not security conclusions.",
+        ]
+    )
     return "\n".join(lines) + "\n"

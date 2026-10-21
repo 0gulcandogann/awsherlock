@@ -4,8 +4,8 @@ Start with a narrow, testable risk statement and an agreed stable check ID.
 Existing IDs are visible through `awsherlock --list-checks` and
 `awsherlock --describe-check AWSH-S3-001`; do not reuse an ID for different
 semantics. The current registered catalog lives in
-[`scanner.py`](../src/awsherlock/scanner.py) and
-[`catalog.py`](../src/awsherlock/catalog.py). New checks require an approved
+[`registry.py`](../src/awsherlock/registry.py); `scanner.py` and `catalog.py`
+expose it to scanning and discovery. New checks require an approved
 scope change; this guide is not permission to extend v0.1 on its own.
 
 The data path is: credential/session layer → `ScanContext` → collector →
@@ -45,8 +45,8 @@ Before proposing the check, verify these synthetic cases locally:
 6. Console, JSON, SARIF and standalone HTML do not leak credentials, raw policies or
    unescaped terminal/HTML control text.
 
-Project regression fixtures currently stay local rather than being committed.
-Include the synthetic case and expected result in your PR description so a
-maintainer can reproduce and run the local suite. Live AWS is optional and
+Public regression tests and synthetic fixtures live in `tests/`. Include secure,
+insecure, partial and denied cases with the change. Live AWS is optional and
 must not be required for unit tests; potentially billable calls need owner
-approval.
+approval. Collector/evaluator registration is centralized in `registry.py`;
+`scanner.py` and `catalog.py` expose that registry to scanning and discovery.

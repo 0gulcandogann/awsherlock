@@ -14,7 +14,6 @@ from awsherlock.sarif import render_sarif
 from awsherlock.scanner import parse_services
 from awsherlock.snapshot import Snapshot, snapshot_from_dict
 
-
 ACCOUNT = "123456789012"
 REGION = "eu-west-1"
 
@@ -50,28 +49,39 @@ def collect(client):
     def get_client(service, **options):
         assert service == "guardduty" and options == {"region_name": REGION}
         return client
+
     context = SimpleNamespace(account_id=ACCOUNT, region=REGION, client=get_client)
     return collect_guardduty(context)
 
 
 def report_for(result):
-    metadata = ScanMetadata(scan_id="test", started_at=datetime.now(timezone.utc),
-                            account_id=ACCOUNT, region=REGION, version="test")
+    metadata = ScanMetadata(
+        scan_id="test",
+        started_at=datetime.now(timezone.utc),
+        account_id=ACCOUNT,
+        region=REGION,
+        version="test",
+    )
     snapshot = Snapshot(metadata, {"guardduty": result})
     return evaluate_snapshot(snapshot), snapshot
 
 
-@pytest.mark.parametrize("pages,statuses", [
-    ([{"DetectorIds": []}], {}),
-    ([{"DetectorIds": ["detector-a"]}], {"detector-a": "DISABLED"}),
-])
+@pytest.mark.parametrize(
+    "pages,statuses",
+    [
+        ([{"DetectorIds": []}], {}),
+        ([{"DetectorIds": ["detector-a"]}], {"detector-a": "DISABLED"}),
+    ],
+)
 def test_no_enabled_detector_is_a_regional_finding(pages, statuses):
     report, snapshot = report_for(collect(GuardDutyClient(pages, statuses)))
     assert report.coverage[0]["status"] == "COMPLETE"
     assert [(f.id, f.region, f.evidence) for f in report.findings] == [
-        ("AWSH-GD-001", REGION, {"enabled_detector_present": False})]
-    assert [f.to_dict() for f in evaluate_snapshot(snapshot_from_dict(snapshot.to_dict())).findings] == [
-        f.to_dict() for f in report.findings]
+        ("AWSH-GD-001", REGION, {"enabled_detector_present": False})
+    ]
+    assert [
+        f.to_dict() for f in evaluate_snapshot(snapshot_from_dict(snapshot.to_dict())).findings
+    ] == [f.to_dict() for f in report.findings]
     for rendered in (render_json(report), render_html(report), render_sarif(report)):
         assert "AWSH-GD-001" in rendered
 
@@ -95,8 +105,9 @@ def test_denied_listing_is_incomplete_not_a_no_detector_finding():
 
 def test_denied_or_malformed_detector_status_is_incomplete():
     for status in ("DENIED", "UNKNOWN"):
-        report, _ = report_for(collect(GuardDutyClient(
-            [{"DetectorIds": ["detector-a"]}], {"detector-a": status})))
+        report, _ = report_for(
+            collect(GuardDutyClient([{"DetectorIds": ["detector-a"]}], {"detector-a": status}))
+        )
         assert not report.findings
         assert report.coverage[0]["status"] == ("ACCESS_DENIED" if status == "DENIED" else "ERROR")
         assert any(issue["operation"] == "RequiredFact" for issue in report.coverage[0]["issues"])
@@ -109,8 +120,12 @@ def test_malformed_page_is_incomplete_and_duplicate_id_does_not_duplicate_status
 
 
 def test_observed_enabled_detector_retained_with_other_denied_status():
-    result = collect(GuardDutyClient([{"DetectorIds": ["detector-a", "detector-b"]}],
-                                     {"detector-a": "ENABLED", "detector-b": "DENIED"}))
+    result = collect(
+        GuardDutyClient(
+            [{"DetectorIds": ["detector-a", "detector-b"]}],
+            {"detector-a": "ENABLED", "detector-b": "DENIED"},
+        )
+    )
     report, _ = report_for(result)
     assert result.resources[0].data == {"enabled_detector_present": True}
     assert not report.findings and report.coverage[0]["status"] == "PARTIAL"

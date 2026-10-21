@@ -36,7 +36,11 @@ def service_components(service: str):
 
 
 def parse_services(value: str | None) -> list[str]:
-    selected = list(DEFAULT_SERVICES) if value is None else list(dict.fromkeys(part.strip() for part in value.split(",")))
+    selected = (
+        list(DEFAULT_SERVICES)
+        if value is None
+        else list(dict.fromkeys(part.strip() for part in value.split(",")))
+    )
     if any(service not in SERVICES for service in selected):
         raise ValueError("Unsupported service selection")
     return selected

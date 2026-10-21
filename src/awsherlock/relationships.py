@@ -49,7 +49,9 @@ def _reconcile_ref(current: ResourceRef | None, observed: ResourceRef) -> Resour
         return observed
     if current.resource_arn is not None and observed.resource_arn is not None:
         if current.resource_arn != observed.resource_arn:
-            raise RelationshipError("Conflicting resource ARNs for one logical relationship endpoint")
+            raise RelationshipError(
+                "Conflicting resource ARNs for one logical relationship endpoint"
+            )
         return current
     return replace(current, resource_arn=current.resource_arn or observed.resource_arn)
 
@@ -61,15 +63,27 @@ def _validate_against_resources(reference: ResourceRef, resources: tuple[Resourc
         if _resource_key(resource) == reference.logical_key and resource.resource_arn is not None
     }
     if len(matching_arns) > 1:
-        raise RelationshipError("Collected resources have conflicting ARNs for one logical identity")
+        raise RelationshipError(
+            "Collected resources have conflicting ARNs for one logical identity"
+        )
     for resource in resources:
         same_identity = _resource_key(resource) == reference.logical_key
-        same_arn = reference.resource_arn is not None and resource.resource_arn == reference.resource_arn
+        same_arn = (
+            reference.resource_arn is not None and resource.resource_arn == reference.resource_arn
+        )
         if same_arn and not same_identity:
-            raise RelationshipError("Relationship resource ARN resolves to a different collected identity")
-        if (same_identity and reference.resource_arn is not None and resource.resource_arn is not None
-                and reference.resource_arn != resource.resource_arn):
-            raise RelationshipError("Relationship resource ARN conflicts with the collected resource ARN")
+            raise RelationshipError(
+                "Relationship resource ARN resolves to a different collected identity"
+            )
+        if (
+            same_identity
+            and reference.resource_arn is not None
+            and resource.resource_arn is not None
+            and reference.resource_arn != resource.resource_arn
+        ):
+            raise RelationshipError(
+                "Relationship resource ARN conflicts with the collected resource ARN"
+            )
 
 
 def normalize_relationships(
@@ -88,7 +102,9 @@ def normalize_relationships(
             raise RelationshipError("Invalid relationship entry")
         for reference in (edge.source, edge.target):
             _validate_against_resources(reference, resources)
-            references[reference.logical_key] = _reconcile_ref(references.get(reference.logical_key), reference)
+            references[reference.logical_key] = _reconcile_ref(
+                references.get(reference.logical_key), reference
+            )
 
     grouped: dict[
         tuple[tuple[str, str, str, str, str], str, tuple[str, str, str, str, str]],
@@ -100,12 +116,14 @@ def normalize_relationships(
 
     normalized = []
     for (source_key, relationship_type, target_key), evidence in grouped.items():
-        normalized.append(Relationship(
-            source=references[source_key],
-            relationship_type=RelationshipType(relationship_type),
-            target=references[target_key],
-            evidence=tuple(sorted(evidence, key=lambda item: item.sort_key)),
-        ))
+        normalized.append(
+            Relationship(
+                source=references[source_key],
+                relationship_type=RelationshipType(relationship_type),
+                target=references[target_key],
+                evidence=tuple(sorted(evidence, key=lambda item: item.sort_key)),
+            )
+        )
     return tuple(sorted(normalized, key=relationship_sort_key))
 
 
@@ -147,15 +165,25 @@ def _project_binding(role: Resource, binding: object) -> Relationship | None:
             return None
         return Relationship(
             source=ResourceRef(
-                service="agentcore", resource_type="runtime-version", account_id=account,
-                region=region, resource_id=f"{runtime_id}:{version}", resource_arn=None,
+                service="agentcore",
+                resource_type="runtime-version",
+                account_id=account,
+                region=region,
+                resource_id=f"{runtime_id}:{version}",
+                resource_arn=None,
             ),
             relationship_type=RelationshipType.RUNS_AS,
             target=ResourceRef(
-                service="iam", resource_type="role", account_id=account, region=None,
-                resource_id=role_id, resource_arn=binding["role_arn"],
+                service="iam",
+                resource_type="role",
+                account_id=account,
+                region=None,
+                resource_id=role_id,
+                resource_arn=binding["role_arn"],
             ),
-            evidence=(RelationshipEvidence(service="iam", fact="identity_bindings", operation=None),),
+            evidence=(
+                RelationshipEvidence(service="iam", fact="identity_bindings", operation=None),
+            ),
         )
     elif binding_keys != legacy_keys:
         return None
@@ -183,7 +211,11 @@ def _project_binding(role: Resource, binding: object) -> Relationship | None:
         "ec2": _EC2_RESOURCE,
         "bedrock": _BEDROCK_AGENT_RESOURCE,
     }[service].fullmatch(source_match["resource"])
-    if role_resource is None or role_resource["resource_id"] != role.resource_id or source_resource is None:
+    if (
+        role_resource is None
+        or role_resource["resource_id"] != role.resource_id
+        or source_resource is None
+    ):
         return None
     source_type = {
         "lambda": "function",
@@ -240,18 +272,29 @@ def _project_bedrock_agent(resource: Resource) -> Relationship | None:
         return None
     return Relationship(
         source=ResourceRef(
-            service="bedrock", resource_type="agent", account_id=resource.account_id,
-            region=resource.region, resource_id=resource.resource_id,
+            service="bedrock",
+            resource_type="agent",
+            account_id=resource.account_id,
+            region=resource.region,
+            resource_id=resource.resource_id,
             resource_arn=resource.resource_arn,
         ),
         relationship_type=RelationshipType.RUNS_AS,
         target=ResourceRef(
-            service="iam", resource_type="role", account_id=resource.account_id,
-            region=None, resource_id=role_resource["resource_id"], resource_arn=role_arn,
+            service="iam",
+            resource_type="role",
+            account_id=resource.account_id,
+            region=None,
+            resource_id=role_resource["resource_id"],
+            resource_arn=role_arn,
         ),
-        evidence=(RelationshipEvidence(
-            service="bedrock", fact="execution_role_arn", operation="GetAgent",
-        ),),
+        evidence=(
+            RelationshipEvidence(
+                service="bedrock",
+                fact="execution_role_arn",
+                operation="GetAgent",
+            ),
+        ),
     )
 
 
@@ -309,17 +352,25 @@ def relationship_to_dict(relationship: Relationship) -> dict:
         "source": resource_ref_to_dict(relationship.source),
         "type": relationship.relationship_type.value,
         "target": resource_ref_to_dict(relationship.target),
-        "evidence": [{
-            "service": item.service,
-            "fact": item.fact,
-            "operation": item.operation,
-        } for item in relationship.evidence],
+        "evidence": [
+            {
+                "service": item.service,
+                "fact": item.fact,
+                "operation": item.operation,
+            }
+            for item in relationship.evidence
+        ],
     }
 
 
 def _resource_ref_from_dict(data: object) -> ResourceRef:
     if not isinstance(data, dict) or set(data) != {
-        "service", "resource_type", "account_id", "region", "resource_id", "resource_arn"
+        "service",
+        "resource_type",
+        "account_id",
+        "region",
+        "resource_id",
+        "resource_arn",
     }:
         raise RelationshipError("Invalid relationship resource reference")
     return ResourceRef(**data)

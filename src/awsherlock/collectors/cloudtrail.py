@@ -1,7 +1,16 @@
 """Trails visible in the configured region, including organization/shadow trails."""
 
 from awsherlock.aws.context import ScanContext
-from awsherlock.collectors.common import AWS_ERRORS, CollectionIssue, CollectionResult, InvalidResponse, collect_fact, error_message, items, text_field
+from awsherlock.collectors.common import (
+    AWS_ERRORS,
+    CollectionIssue,
+    CollectionResult,
+    InvalidResponse,
+    collect_fact,
+    error_message,
+    items,
+    text_field,
+)
 from awsherlock.models import Resource
 from awsherlock.cloudtrail_facts import management_context
 
@@ -9,7 +18,9 @@ from awsherlock.cloudtrail_facts import management_context
 def collect_cloudtrail(context: ScanContext) -> CollectionResult:
     result = CollectionResult()
     if context.region is None:
-        result.issues.append(CollectionIssue(None, "Region", "Configure an AWS region for CloudTrail"))
+        result.issues.append(
+            CollectionIssue(None, "Region", "Configure an AWS region for CloudTrail")
+        )
         return result
     try:
         client = context.client("cloudtrail", region_name=context.region)
@@ -28,15 +39,29 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                     continue
                 seen.add(arn)
                 home = text_field(trail.get("HomeRegion"))
-                resource = Resource(service="cloudtrail", resource_type="trail", account_id=context.account_id,
-                                    region=home, resource_id=name, resource_arn=arn)
+                resource = Resource(
+                    service="cloudtrail",
+                    resource_type="trail",
+                    account_id=context.account_id,
+                    region=home,
+                    resource_id=name,
+                    resource_arn=arn,
+                )
                 result.resources.append(resource)
+
                 def settings():
-                    keys = ("IsMultiRegionTrail", "IncludeGlobalServiceEvents", "LogFileValidationEnabled", "IsOrganizationTrail")
+                    keys = (
+                        "IsMultiRegionTrail",
+                        "IncludeGlobalServiceEvents",
+                        "LogFileValidationEnabled",
+                        "IsOrganizationTrail",
+                    )
                     if any(type(trail.get(key)) is not bool for key in keys):
                         raise InvalidResponse()
                     return {key: trail[key] for key in keys}
+
                 collect_fact(result, resource, "trail_settings", "TrailSettings", settings)
+
                 def status():
                     bucket = text_field(trail.get("S3BucketName"))
                     cache = context.trail_status_cache
@@ -46,14 +71,21 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                         if home not in clients:
                             clients[home] = context.client("cloudtrail", region_name=home)
                         response = clients[home].get_trail_status(Name=arn)
-                        if not isinstance(response, dict) or type(response.get("IsLogging")) is not bool:
+                        if (
+                            not isinstance(response, dict)
+                            or type(response.get("IsLogging")) is not bool
+                        ):
                             raise InvalidResponse()
-                        cached = {"logging": response["IsLogging"],
-                                  "delivery_error": bool(response.get("LatestDeliveryError"))}
+                        cached = {
+                            "logging": response["IsLogging"],
+                            "delivery_error": bool(response.get("LatestDeliveryError")),
+                        }
                         if cache is not None:
                             cache[key] = cached
                     return {**cached, "destination": bucket}
+
                 collect_fact(result, resource, "trail_status", "GetTrailStatus", status)
+
                 def selectors():
                     cache = context.trail_selector_cache
                     key = (context.account_id, context.caller_arn, home, arn)
@@ -61,25 +93,46 @@ def collect_cloudtrail(context: ScanContext) -> CollectionResult:
                     if cached is None:
                         if home not in clients:
                             clients[home] = context.client("cloudtrail", region_name=home)
-                        cached = management_context(clients[home].get_event_selectors(TrailName=arn))
+                        cached = management_context(
+                            clients[home].get_event_selectors(TrailName=arn)
+                        )
                         if cache is not None:
                             cache[key] = cached
-                    resource.data["management_excluded_sources"] = list(cached["management_excluded_sources"])
+                    resource.data["management_excluded_sources"] = list(
+                        cached["management_excluded_sources"]
+                    )
                     resource.data["management_event_types"] = dict(cached["management_event_types"])
                     return cached["management_events"]
+
                 collect_fact(result, resource, "management_events", "GetEventSelectors", selectors)
-                if all(fact in resource.data for fact in ("trail_status", "trail_settings", "management_events")):
+                if all(
+                    fact in resource.data
+                    for fact in ("trail_status", "trail_settings", "management_events")
+                ):
                     status_data = resource.data["trail_status"]
-                    covers_region = home == context.region or resource.data["trail_settings"]["IsMultiRegionTrail"]
-                    usable.append(status_data["logging"] and not status_data["delivery_error"]
-                                  and covers_region and resource.data["management_events"])
+                    covers_region = (
+                        home == context.region
+                        or resource.data["trail_settings"]["IsMultiRegionTrail"]
+                    )
+                    usable.append(
+                        status_data["logging"]
+                        and not status_data["delivery_error"]
+                        and covers_region
+                        and resource.data["management_events"]
+                    )
                 else:
                     unknown = True
             except AWS_ERRORS as error:
                 unknown = True
                 result.issues.append(CollectionIssue(name, "TrailMetadata", error_message(error)))
-        summary = Resource(service="cloudtrail", resource_type="regional_summary", account_id=context.account_id,
-                           region=context.region, resource_id=context.account_id, resource_arn=None)
+        summary = Resource(
+            service="cloudtrail",
+            resource_type="regional_summary",
+            account_id=context.account_id,
+            region=context.region,
+            resource_id=context.account_id,
+            resource_arn=None,
+        )
         if any(usable) or not unknown:
             summary.data["usable_trail"] = any(usable)
         result.resources.append(summary)

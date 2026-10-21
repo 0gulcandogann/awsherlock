@@ -7,20 +7,34 @@ from botocore.exceptions import ClientError
 
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.common import (
-    AWS_ERRORS, CollectionIssue, CollectionResult, InvalidResponse, age_days,
-    error_message, items, text_field,
+    AWS_ERRORS,
+    CollectionIssue,
+    CollectionResult,
+    InvalidResponse,
+    age_days,
+    error_message,
+    items,
+    text_field,
 )
 from awsherlock.iam_facts import policy_statements
 from awsherlock.models import Resource
 
 
 def _resource(context: ScanContext, kind: str, name: str, arn: str | None, data: dict) -> Resource:
-    return Resource(service="iam", resource_type=kind, account_id=context.account_id,
-                    region=None, resource_id=name, resource_arn=arn, data=data)
+    return Resource(
+        service="iam",
+        resource_type=kind,
+        account_id=context.account_id,
+        region=None,
+        resource_id=name,
+        resource_arn=arn,
+        data=data,
+    )
 
 
-def _user_credentials(client: Any, context: ScanContext, user: Resource,
-                      result: CollectionResult, now: datetime) -> None:
+def _user_credentials(
+    client: Any, context: ScanContext, user: Resource, result: CollectionResult, now: datetime
+) -> None:
     name = user.resource_id
     try:
         try:
@@ -58,15 +72,28 @@ def _user_credentials(client: Any, context: ScanContext, user: Resource,
                 if key["Status"] == "Active":
                     try:
                         response = client.get_access_key_last_used(AccessKeyId=key_id)
-                        used = response.get("AccessKeyLastUsed") if isinstance(response, dict) else None
+                        used = (
+                            response.get("AccessKeyLastUsed")
+                            if isinstance(response, dict)
+                            else None
+                        )
                         if not isinstance(used, dict):
                             raise InvalidResponse()
                         last = used.get("LastUsedDate")
                         # AWS returns no date for never-used keys; age provides the lower bound.
-                        data["key_stale"] = {"days": age if last is None else age_days(last, now), "never_used": last is None}
+                        data["key_stale"] = {
+                            "days": age if last is None else age_days(last, now),
+                            "never_used": last is None,
+                        }
                     except AWS_ERRORS as error:
-                        result.issues.append(CollectionIssue(f"{name}/key-{index}", "GetAccessKeyLastUsed", error_message(error)))
-                result.resources.append(_resource(context, "access_key", f"{name}/key-{index}", None, data))
+                        result.issues.append(
+                            CollectionIssue(
+                                f"{name}/key-{index}", "GetAccessKeyLastUsed", error_message(error)
+                            )
+                        )
+                result.resources.append(
+                    _resource(context, "access_key", f"{name}/key-{index}", None, data)
+                )
     except AWS_ERRORS as error:
         result.issues.append(CollectionIssue(name, "ListAccessKeys", error_message(error)))
 
@@ -89,7 +116,10 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
                 ("policy", "Policies", "PolicyName", "PolicyVersionList"),
             ):
                 # AWS can omit empty lists; at least one recognized list must be present.
-                if not any(key in page for key in ("UserDetailList", "GroupDetailList", "RoleDetailList", "Policies")):
+                if not any(
+                    key in page
+                    for key in ("UserDetailList", "GroupDetailList", "RoleDetailList", "Policies")
+                ):
                     raise InvalidResponse()
                 for entry in items({key: page.get(key, [])}, key):
                     name = None
@@ -104,12 +134,24 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
                             raw_entries[(kind, name)] = entry
                         try:
                             if kind != "policy":
-                                resource.data["attached"] = [text_field(p.get("PolicyArn")) if isinstance(p, dict) else text_field(None)
-                                                             for p in items(entry, "AttachedManagedPolicies")]
+                                resource.data["attached"] = [
+                                    (
+                                        text_field(p.get("PolicyArn"))
+                                        if isinstance(p, dict)
+                                        else text_field(None)
+                                    )
+                                    for p in items(entry, "AttachedManagedPolicies")
+                                ]
                             docs = items(entry, inline_key)
                             if kind == "policy":
-                                docs = [p for p in docs if isinstance(p, dict) and p.get("IsDefaultVersion") is True]
-                                if len(docs) != 1 or docs[0].get("VersionId") != entry.get("DefaultVersionId"):
+                                docs = [
+                                    p
+                                    for p in docs
+                                    if isinstance(p, dict) and p.get("IsDefaultVersion") is True
+                                ]
+                                if len(docs) != 1 or docs[0].get("VersionId") != entry.get(
+                                    "DefaultVersionId"
+                                ):
                                     raise InvalidResponse()
                                 statements = policy_statements(docs[0].get("Document"))
                             else:
@@ -117,18 +159,27 @@ def collect_iam(context: ScanContext, *, now: datetime | None = None) -> Collect
                                 for policy in docs:
                                     if not isinstance(policy, dict):
                                         raise InvalidResponse()
-                                    statements.extend(policy_statements(policy.get("PolicyDocument")))
+                                    statements.extend(
+                                        policy_statements(policy.get("PolicyDocument"))
+                                    )
                             resource.data["statements"] = statements
                         except AWS_ERRORS as error:
-                            result.issues.append(CollectionIssue(name, "PolicyNormalization", error_message(error)))
+                            result.issues.append(
+                                CollectionIssue(name, "PolicyNormalization", error_message(error))
+                            )
                         if kind == "user":
                             _user_credentials(client, context, resource, result, now)
                     except AWS_ERRORS as error:
-                        result.issues.append(CollectionIssue(name, "AuthorizationDetails", error_message(error)))
+                        result.issues.append(
+                            CollectionIssue(name, "AuthorizationDetails", error_message(error))
+                        )
     except AWS_ERRORS as error:
-        result.issues.append(CollectionIssue(None, "GetAccountAuthorizationDetails", error_message(error)))
+        result.issues.append(
+            CollectionIssue(None, "GetAccountAuthorizationDetails", error_message(error))
+        )
     if context.identity_options is not None:
         from awsherlock.collectors.identity import enrich_identities
+
         if client is not None:
             enrich_identities(context, result, raw_entries, now, client)
     return result

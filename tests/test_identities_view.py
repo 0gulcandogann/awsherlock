@@ -9,9 +9,7 @@ from typer.testing import CliRunner
 
 from awsherlock.cli import app
 from awsherlock.snapshot import capture_snapshot, write_snapshot
-from test_identity import identity_context, snapshot_at
-from test_s3 import context as s3_context
-from test_iam import context as iam_context
+from test_identity import snapshot_at
 
 
 def forbid_aws_and_writes(monkeypatch):
@@ -114,13 +112,18 @@ def test_help_describes_offline_view():
     assert "--view" in result.output
 
 
-@pytest.mark.parametrize("view,fact,field,value", [
-    ("ai", "identity_approval", "declared_kind", "ai"),
-    ("unowned", "identity_profile", "owner", False),
-    ("stale", "identity_usage", "last_used_days", 91),
-    ("shared", "identity_approval", "shared", True),
-])
-def test_filtered_views_are_evidence_backed(identity_context, monkeypatch, tmp_path, view, fact, field, value):
+@pytest.mark.parametrize(
+    "view,fact,field,value",
+    [
+        ("ai", "identity_approval", "declared_kind", "ai"),
+        ("unowned", "identity_profile", "owner", False),
+        ("stale", "identity_usage", "last_used_days", 91),
+        ("shared", "identity_approval", "shared", True),
+    ],
+)
+def test_filtered_views_are_evidence_backed(
+    identity_context, monkeypatch, tmp_path, view, fact, field, value
+):
     snapshot = snapshot_at(identity_context[0])
     role = next(item for item in snapshot.services["iam"].resources if item.resource_type == "role")
     role.data[fact][field] = value
@@ -175,7 +178,9 @@ def test_old_snapshot_unknown_evidence_stays_incomplete(iam_context, monkeypatch
 
 def test_bad_view_fails_before_snapshot_or_aws(identity_context, monkeypatch, tmp_path):
     guards = forbid_aws_and_writes(monkeypatch)
-    result = CliRunner().invoke(app, ["identities", str(tmp_path / "missing.json"), "--view", "guess"])
+    result = CliRunner().invoke(
+        app, ["identities", str(tmp_path / "missing.json"), "--view", "guess"]
+    )
     assert result.exit_code == 2
     assert "Use all, ai, unowned, stale or shared" in result.output
     for guard in guards:

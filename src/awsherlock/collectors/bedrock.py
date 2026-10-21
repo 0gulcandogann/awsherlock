@@ -14,14 +14,21 @@ from awsherlock.collectors.common import (
 )
 from awsherlock.models import Resource
 
-
 _AGENT_ID = re.compile(r"[0-9A-Za-z]{10}")
 _GUARDRAIL_ID = re.compile(r"[a-z0-9]+")
 _GUARDRAIL_VERSION = re.compile(r"(?:[0-9]{1,8}|DRAFT)")
-_AGENT_STATUSES = frozenset({
-    "CREATING", "PREPARING", "PREPARED", "NOT_PREPARED",
-    "DELETING", "FAILED", "VERSIONING", "UPDATING",
-})
+_AGENT_STATUSES = frozenset(
+    {
+        "CREATING",
+        "PREPARING",
+        "PREPARED",
+        "NOT_PREPARED",
+        "DELETING",
+        "FAILED",
+        "VERSIONING",
+        "UPDATING",
+    }
+)
 _MODALITIES = (
     ("audioDataDeliveryEnabled", "audio"),
     ("embeddingDataDeliveryEnabled", "embedding"),
@@ -32,8 +39,9 @@ _MODALITIES = (
 
 
 def _optional_text(value: object) -> None:
-    if not isinstance(value, str) or any(ord(character) < 32 or ord(character) == 127
-                                         for character in value):
+    if not isinstance(value, str) or any(
+        ord(character) < 32 or ord(character) == 127 for character in value
+    ):
         raise InvalidResponse()
 
 
@@ -87,18 +95,23 @@ def _agent_resource(context: ScanContext, agent_id: str, response: object) -> Re
     agent = response["agent"]
     if agent.get("agentId") != agent_id or agent.get("agentVersion") != "DRAFT":
         raise InvalidResponse()
-    expected_arn = (f"arn:{context.partition}:bedrock:{context.region}:"
-                    f"{context.account_id}:agent/{agent_id}")
+    expected_arn = (
+        f"arn:{context.partition}:bedrock:{context.region}:"
+        f"{context.account_id}:agent/{agent_id}"
+    )
     if agent.get("agentArn") != expected_arn:
         raise InvalidResponse()
     status = agent.get("agentStatus")
     if status not in _AGENT_STATUSES:
         raise InvalidResponse()
     role_arn = text_field(agent.get("agentResourceRoleArn"))
-    if re.fullmatch(
-        rf"arn:{re.escape(context.partition)}:iam::{context.account_id}:role/[^\s*?]+",
-        role_arn,
-    ) is None:
+    if (
+        re.fullmatch(
+            rf"arn:{re.escape(context.partition)}:iam::{context.account_id}:role/[^\s*?]+",
+            role_arn,
+        )
+        is None
+    ):
         raise InvalidResponse()
     guardrail = agent.get("guardrailConfiguration")
     if guardrail is None:
@@ -110,10 +123,14 @@ def _agent_resource(context: ScanContext, agent_id: str, response: object) -> Re
         version = guardrail.get("guardrailVersion")
         if not isinstance(identifier, str) or not isinstance(version, str):
             raise InvalidResponse()
-        identifier_is_arn = identifier == (
-            f"arn:{context.partition}:bedrock:{context.region}:{context.account_id}:"
-            f"guardrail/{identifier.rsplit('/', 1)[-1]}"
-        ) and _GUARDRAIL_ID.fullmatch(identifier.rsplit("/", 1)[-1]) is not None
+        identifier_is_arn = (
+            identifier
+            == (
+                f"arn:{context.partition}:bedrock:{context.region}:{context.account_id}:"
+                f"guardrail/{identifier.rsplit('/', 1)[-1]}"
+            )
+            and _GUARDRAIL_ID.fullmatch(identifier.rsplit("/", 1)[-1]) is not None
+        )
         if (_GUARDRAIL_ID.fullmatch(identifier) is None and not identifier_is_arn) or (
             _GUARDRAIL_VERSION.fullmatch(version) is None
         ):
@@ -138,9 +155,13 @@ def _agent_resource(context: ScanContext, agent_id: str, response: object) -> Re
 def collect_bedrock(context: ScanContext) -> CollectionResult:
     result = CollectionResult()
     if context.region is None:
-        result.issues.append(CollectionIssue(
-            None, "Region", "Configure an AWS region for Amazon Bedrock",
-        ))
+        result.issues.append(
+            CollectionIssue(
+                None,
+                "Region",
+                "Configure an AWS region for Amazon Bedrock",
+            )
+        )
         return result
 
     regional = Resource(
@@ -159,11 +180,13 @@ def collect_bedrock(context: ScanContext) -> CollectionResult:
             client.get_model_invocation_logging_configuration()
         )
     except AWS_ERRORS as error:
-        result.issues.append(CollectionIssue(
-            regional.resource_id,
-            "GetModelInvocationLoggingConfiguration",
-            error_message(error),
-        ))
+        result.issues.append(
+            CollectionIssue(
+                regional.resource_id,
+                "GetModelInvocationLoggingConfiguration",
+                error_message(error),
+            )
+        )
 
     seen: set[str] = set()
     try:
@@ -171,38 +194,60 @@ def collect_bedrock(context: ScanContext) -> CollectionResult:
         for page in client.get_paginator("list_agents").paginate():
             for summary in items(page, "agentSummaries"):
                 if not isinstance(summary, dict):
-                    result.issues.append(CollectionIssue(None, "ListAgents", "Invalid AWS response"))
+                    result.issues.append(
+                        CollectionIssue(None, "ListAgents", "Invalid AWS response")
+                    )
                     continue
                 agent_id = summary.get("agentId")
                 if not isinstance(agent_id, str) or _AGENT_ID.fullmatch(agent_id) is None:
-                    result.issues.append(CollectionIssue(None, "ListAgents", "Invalid AWS response"))
+                    result.issues.append(
+                        CollectionIssue(None, "ListAgents", "Invalid AWS response")
+                    )
                     continue
                 if agent_id in seen:
-                    result.issues.append(CollectionIssue(agent_id, "ListAgents", "Invalid AWS response"))
+                    result.issues.append(
+                        CollectionIssue(agent_id, "ListAgents", "Invalid AWS response")
+                    )
                     continue
                 seen.add(agent_id)
                 try:
-                    result.resources.append(_agent_resource(
-                        context, agent_id, client.get_agent(agentId=agent_id),
-                    ))
+                    result.resources.append(
+                        _agent_resource(
+                            context,
+                            agent_id,
+                            client.get_agent(agentId=agent_id),
+                        )
+                    )
                 except AWS_ERRORS as error:
-                    result.resources.append(Resource(
-                        service="bedrock",
-                        resource_type="agent",
-                        account_id=context.account_id,
-                        region=context.region,
-                        resource_id=agent_id,
-                        resource_arn=None,
-                    ))
-                    result.issues.append(CollectionIssue(agent_id, "GetAgent", error_message(error)))
+                    result.resources.append(
+                        Resource(
+                            service="bedrock",
+                            resource_type="agent",
+                            account_id=context.account_id,
+                            region=context.region,
+                            resource_id=agent_id,
+                            resource_arn=None,
+                        )
+                    )
+                    result.issues.append(
+                        CollectionIssue(agent_id, "GetAgent", error_message(error))
+                    )
         result.completed_operations.append("ListAgents")
     except AWS_ERRORS as error:
         result.issues.append(CollectionIssue(None, "ListAgents", error_message(error)))
 
-    result.resources.sort(key=lambda resource: (
-        resource.resource_type, resource.resource_id, resource.resource_arn or "",
-    ))
-    result.issues.sort(key=lambda issue: (
-        issue.operation, issue.resource_id or "", issue.message,
-    ))
+    result.resources.sort(
+        key=lambda resource: (
+            resource.resource_type,
+            resource.resource_id,
+            resource.resource_arn or "",
+        )
+    )
+    result.issues.sort(
+        key=lambda issue: (
+            issue.operation,
+            issue.resource_id or "",
+            issue.message,
+        )
+    )
     return result

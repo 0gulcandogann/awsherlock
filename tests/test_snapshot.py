@@ -1,11 +1,17 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock
-import json
 import pytest
 from typer.testing import CliRunner
 from awsherlock.cli import app
 from awsherlock.collectors.common import CollectionResult, CollectionIssue
-from awsherlock.models import Relationship, RelationshipEvidence, RelationshipType, Resource, ResourceRef, ScanMetadata
+from awsherlock.models import (
+    Relationship,
+    RelationshipEvidence,
+    RelationshipType,
+    Resource,
+    ResourceRef,
+    ScanMetadata,
+)
 from awsherlock.snapshot import (
     CURRENT_SCHEMA_VERSION,
     SUPPORTED_SCHEMA_VERSIONS,
@@ -19,9 +25,30 @@ from awsherlock.snapshot import (
 
 @pytest.fixture
 def snapshot():
-    metadata = ScanMetadata(scan_id="test", started_at=datetime(2026, 9, 15, tzinfo=timezone.utc), account_id="123456789012", region=None, version="test")
-    resource = Resource(service="s3", resource_type="bucket", account_id=metadata.account_id, region="us-east-1", resource_id="test-bucket", resource_arn=None, data={"public_access_block": None, "account_public_access_block": None})
-    return Snapshot(metadata, {"s3": CollectionResult([resource], [CollectionIssue("test-bucket", "GetBucketLogging", "AccessDenied")])})
+    metadata = ScanMetadata(
+        scan_id="test",
+        started_at=datetime(2026, 9, 15, tzinfo=timezone.utc),
+        account_id="123456789012",
+        region=None,
+        version="test",
+    )
+    resource = Resource(
+        service="s3",
+        resource_type="bucket",
+        account_id=metadata.account_id,
+        region="us-east-1",
+        resource_id="test-bucket",
+        resource_arn=None,
+        data={"public_access_block": None, "account_public_access_block": None},
+    )
+    return Snapshot(
+        metadata,
+        {
+            "s3": CollectionResult(
+                [resource], [CollectionIssue("test-bucket", "GetBucketLogging", "AccessDenied")]
+            )
+        },
+    )
 
 
 def test_round_trip(snapshot, tmp_path):
@@ -46,23 +73,27 @@ def test_snapshot_v1_serialization_matches_pre_registry_contract(snapshot):
         },
         "services": {
             "s3": {
-                "resources": [{
-                    "service": "s3",
-                    "resource_type": "bucket",
-                    "account_id": "123456789012",
-                    "region": "us-east-1",
-                    "resource_id": "test-bucket",
-                    "resource_arn": None,
-                    "data": {
-                        "public_access_block": None,
-                        "account_public_access_block": None,
-                    },
-                }],
-                "issues": [{
-                    "resource_id": "test-bucket",
-                    "operation": "GetBucketLogging",
-                    "message": "AccessDenied",
-                }],
+                "resources": [
+                    {
+                        "service": "s3",
+                        "resource_type": "bucket",
+                        "account_id": "123456789012",
+                        "region": "us-east-1",
+                        "resource_id": "test-bucket",
+                        "resource_arn": None,
+                        "data": {
+                            "public_access_block": None,
+                            "account_public_access_block": None,
+                        },
+                    }
+                ],
+                "issues": [
+                    {
+                        "resource_id": "test-bucket",
+                        "operation": "GetBucketLogging",
+                        "message": "AccessDenied",
+                    }
+                ],
             },
         },
     }
@@ -77,10 +108,20 @@ def test_legacy_constructor_remains_v1_without_relationship_capability(snapshot)
 
 
 def test_v1_cannot_contain_relationships(snapshot):
-    reference = ResourceRef(service="lambda", resource_type="function", account_id="123456789012",
-                            region="us-east-1", resource_id="worker", resource_arn=None)
-    edge = Relationship(source=reference, relationship_type=RelationshipType.USES, target=reference,
-                        evidence=(RelationshipEvidence(service="iam", fact="identity_bindings"),))
+    reference = ResourceRef(
+        service="lambda",
+        resource_type="function",
+        account_id="123456789012",
+        region="us-east-1",
+        resource_id="worker",
+        resource_arn=None,
+    )
+    edge = Relationship(
+        source=reference,
+        relationship_type=RelationshipType.USES,
+        target=reference,
+        evidence=(RelationshipEvidence(service="iam", fact="identity_bindings"),),
+    )
     with pytest.raises(SnapshotError, match="version 1"):
         Snapshot(snapshot.metadata, snapshot.services, (edge,)).to_dict()
 
@@ -99,39 +140,66 @@ def test_v2_empty_relationships_round_trip(snapshot):
 
 
 def test_v2_relationship_round_trip_uses_stable_json_keys(snapshot):
-    source = ResourceRef(service="lambda", resource_type="function", account_id="123456789012",
-                         region="us-east-1", resource_id="worker",
-                         resource_arn="arn:aws:lambda:us-east-1:123456789012:function:worker")
-    target = ResourceRef(service="iam", resource_type="role", account_id="123456789012",
-                         region=None, resource_id="worker-role",
-                         resource_arn="arn:aws:iam::123456789012:role/worker-role")
-    edge = Relationship(source=source, relationship_type=RelationshipType.RUNS_AS, target=target,
-                        evidence=(RelationshipEvidence(service="iam", fact="identity_bindings"),))
+    source = ResourceRef(
+        service="lambda",
+        resource_type="function",
+        account_id="123456789012",
+        region="us-east-1",
+        resource_id="worker",
+        resource_arn="arn:aws:lambda:us-east-1:123456789012:function:worker",
+    )
+    target = ResourceRef(
+        service="iam",
+        resource_type="role",
+        account_id="123456789012",
+        region=None,
+        resource_id="worker-role",
+        resource_arn="arn:aws:iam::123456789012:role/worker-role",
+    )
+    edge = Relationship(
+        source=source,
+        relationship_type=RelationshipType.RUNS_AS,
+        target=target,
+        evidence=(RelationshipEvidence(service="iam", fact="identity_bindings"),),
+    )
     document = Snapshot(snapshot.metadata, snapshot.services, (edge,), 2).to_dict()
-    assert document["relationships"] == [{
-        "source": {
-            "service": "lambda",
-            "resource_type": "function",
-            "account_id": "123456789012",
-            "region": "us-east-1",
-            "resource_id": "worker",
-            "resource_arn": "arn:aws:lambda:us-east-1:123456789012:function:worker",
-        },
-        "type": "RUNS_AS",
-        "target": {
-            "service": "iam",
-            "resource_type": "role",
-            "account_id": "123456789012",
-            "region": None,
-            "resource_id": "worker-role",
-            "resource_arn": "arn:aws:iam::123456789012:role/worker-role",
-        },
-        "evidence": [{"service": "iam", "fact": "identity_bindings", "operation": None}],
-    }]
+    assert document["relationships"] == [
+        {
+            "source": {
+                "service": "lambda",
+                "resource_type": "function",
+                "account_id": "123456789012",
+                "region": "us-east-1",
+                "resource_id": "worker",
+                "resource_arn": "arn:aws:lambda:us-east-1:123456789012:function:worker",
+            },
+            "type": "RUNS_AS",
+            "target": {
+                "service": "iam",
+                "resource_type": "role",
+                "account_id": "123456789012",
+                "region": None,
+                "resource_id": "worker-role",
+                "resource_arn": "arn:aws:iam::123456789012:role/worker-role",
+            },
+            "evidence": [{"service": "iam", "fact": "identity_bindings", "operation": None}],
+        }
+    ]
     assert snapshot_from_dict(document).to_dict() == document
 
 
-@pytest.mark.parametrize("field", ["Credentials", "AccessKeyId", "SecretAccessKey", "SessionToken", "SecretString", "PrivateKey", "Environment"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "Credentials",
+        "AccessKeyId",
+        "SecretAccessKey",
+        "SessionToken",
+        "SecretString",
+        "PrivateKey",
+        "Environment",
+    ],
+)
 def test_forbidden_fields(snapshot, field):
     snapshot.services["s3"].resources[0].data["public_access_block"] = {field: "secret-marker"}
     with pytest.raises(SnapshotError) as error:

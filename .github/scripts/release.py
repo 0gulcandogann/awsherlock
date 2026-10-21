@@ -1,4 +1,5 @@
 """Package release checks; AWS credentials are never needed."""
+
 import argparse
 from datetime import datetime, timedelta, timezone
 from email.parser import Parser
@@ -17,7 +18,6 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 import zipfile
-
 
 PROJECT_LOGO_URL = (
     "https://raw.githubusercontent.com/0gulcandogann/awsherlock/"
@@ -58,17 +58,27 @@ def artifacts(dist: Path) -> tuple[str, dict[str, str]]:
         raise ValueError("Expected exactly one wheel and one source archive")
     with zipfile.ZipFile(wheels[0]) as archive:
         names = archive.namelist()
-        metadata = Parser().parsestr(archive.read(next(n for n in names if n.endswith("/METADATA"))).decode())
-        entrypoint = archive.read(next(n for n in names if n.endswith("/entry_points.txt"))).decode()
+        metadata = Parser().parsestr(
+            archive.read(next(n for n in names if n.endswith("/METADATA"))).decode()
+        )
+        entrypoint = archive.read(
+            next(n for n in names if n.endswith("/entry_points.txt"))
+        ).decode()
     version = stable_version(metadata["Version"])
     if metadata["Name"] != "awsherlock" or metadata["License-Expression"] != "MIT":
         raise ValueError("Unexpected package name/license")
-    if metadata["Requires-Python"] != ">=3.11" or metadata["Description-Content-Type"] != "text/markdown":
+    if (
+        metadata["Requires-Python"] != ">=3.11"
+        or metadata["Description-Content-Type"] != "text/markdown"
+    ):
         raise ValueError("Unexpected Python/README metadata")
     validate_project_description(metadata.get_payload())
     if "awsherlock = awsherlock.cli:app" not in entrypoint:
         raise ValueError("Missing CLI entrypoint")
-    if wheels[0].name != f"awsherlock-{version}-py3-none-any.whl" or sources[0].name != f"awsherlock-{version}.tar.gz":
+    if (
+        wheels[0].name != f"awsherlock-{version}-py3-none-any.whl"
+        or sources[0].name != f"awsherlock-{version}.tar.gz"
+    ):
         raise ValueError("Artifact filenames do not match metadata")
     with tarfile.open(sources[0]) as archive:
         source_names = archive.getnames()
@@ -83,6 +93,11 @@ def artifacts(dist: Path) -> tuple[str, dict[str, str]]:
         "/lead_delta.py",
         "/investigation.py",
         "/coverage_intelligence.py",
+        "/investigation_models.py",
+        "/investigation_engine.py",
+        "/investigation_graph.py",
+        "/templates/contextual.html",
+        "/templates/contextual_report.html",
         "/LICENSE",
     }
     for members in (names, source_names):
@@ -90,9 +105,19 @@ def artifacts(dist: Path) -> tuple[str, dict[str, str]]:
             raise ValueError("Missing required runtime module/template/license")
         for name in members:
             path = Path(name)
-            if set(path.parts) & {"tests", "reports", ".aws", ".git", ".github", ".venv", "__pycache__"} or path.name in {".env", ".pypirc", "credentials"}:
+            if set(path.parts) & {
+                "tests",
+                "reports",
+                ".aws",
+                ".git",
+                ".github",
+                ".venv",
+                "__pycache__",
+            } or path.name in {".env", ".pypirc", "credentials"}:
                 raise ValueError("Unexpected local/private file in distribution")
-    return version, {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (wheels[0], sources[0])}
+    return version, {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (wheels[0], sources[0])
+    }
 
 
 def verify_index(dist: Path, index: str, destination: Path) -> None:
@@ -101,7 +126,9 @@ def verify_index(dist: Path, index: str, destination: Path) -> None:
     data = None
     for attempt in range(6):
         try:
-            with urllib.request.urlopen(f"https://{host}/pypi/awsherlock/{version}/json", timeout=15) as response:
+            with urllib.request.urlopen(
+                f"https://{host}/pypi/awsherlock/{version}/json", timeout=15
+            ) as response:
                 data = json.load(response)
             break
         except urllib.error.HTTPError as error:
@@ -129,7 +156,9 @@ def verify_index(dist: Path, index: str, destination: Path) -> None:
 class OfflineAssets(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
-        if (tag in {"script", "img", "iframe"} and "src" in attributes) or (tag == "link" and "href" in attributes):
+        if (tag in {"script", "img", "iframe"} and "src" in attributes) or (
+            tag == "link" and "href" in attributes
+        ):
             raise ValueError("Report depends on an external asset")
 
 
@@ -153,8 +182,12 @@ def smoke(dist: Path) -> None:
                 installed = Path(awsherlock.__file__).parent.parent / name
                 if installed.read_bytes() != archive.read(name):
                     raise ValueError("Installed code/template differs from wheel")
-    executable = Path(sys.executable).with_name("awsherlock.exe" if sys.platform == "win32" else "awsherlock")
-    result = subprocess.run([str(executable), "--version"], check=True, capture_output=True, text=True)
+    executable = Path(sys.executable).with_name(
+        "awsherlock.exe" if sys.platform == "win32" else "awsherlock"
+    )
+    result = subprocess.run(
+        [str(executable), "--version"], check=True, capture_output=True, text=True
+    )
     if version not in result.stdout:
         raise ValueError("Installed CLI entrypoint failed")
     result = subprocess.run([str(executable), "-h"], capture_output=True, text=True)
@@ -167,109 +200,302 @@ def smoke(dist: Path) -> None:
     socket.socket = forbidden
     boto3.Session = forbidden
     runner = CliRunner()
-    for args, marker in [(["--version"], version), (["--help"], "Quick start"),
-                         (["scan", "--help"], "--identity-governance"), (["--list-checks"], "AWSH-IAM-012")]:
-        result = runner.invoke(app, args, terminal_width=160,
-                               env={"COLUMNS": "160", "NO_COLOR": "1", "TERM": "dumb"})
+    for args, marker in [
+        (["--version"], version),
+        (["--help"], "Quick start"),
+        (["scan", "--help"], "--identity-governance"),
+        (["--list-checks"], "AWSH-IAM-012"),
+    ]:
+        result = runner.invoke(
+            app, args, terminal_width=160, env={"COLUMNS": "160", "NO_COLOR": "1", "TERM": "dumb"}
+        )
         if result.exit_code != 0 or marker not in result.output:
-            raise ValueError(f"CLI smoke failed: {args}; exit={result.exit_code}; output={result.output!r}")
+            raise ValueError(
+                f"CLI smoke failed: {args}; exit={result.exit_code}; output={result.output!r}"
+            )
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
         planned = work / "preview.html"
-        result = runner.invoke(app, ["scan", "--preview", "--profile", "synthetic-profile",
-                                     "--output", "html", "--report-file", str(planned)])
-        if result.exit_code != 0 or "Identity and credential availability: unverified" not in result.output or planned.exists():
+        result = runner.invoke(
+            app,
+            [
+                "scan",
+                "--preview",
+                "--profile",
+                "synthetic-profile",
+                "--output",
+                "html",
+                "--report-file",
+                str(planned),
+            ],
+        )
+        if (
+            result.exit_code != 0
+            or "Identity and credential availability: unverified" not in result.output
+            or planned.exists()
+        ):
             raise ValueError("Local preview smoke failed or created an output file")
-        metadata = ScanMetadata(scan_id="release-smoke", started_at=datetime(2026, 9, 17, tzinfo=timezone.utc),
-                                account_id="123456789012", region="us-east-1", version=version)
-        bucket = Resource(service="s3", resource_type="bucket", account_id=metadata.account_id,
-                          region=metadata.region, resource_id="synthetic-test-bucket", resource_arn=None,
-                          data={"public_access_block": None, "account_public_access_block": None})
-        snapshot = Snapshot(metadata, {"s3": CollectionResult([bucket], [CollectionIssue(bucket.resource_id, "GetBucketLogging", "AccessDenied")])})
+        metadata = ScanMetadata(
+            scan_id="release-smoke",
+            started_at=datetime(2026, 9, 17, tzinfo=timezone.utc),
+            account_id="123456789012",
+            region="us-east-1",
+            version=version,
+        )
+        bucket = Resource(
+            service="s3",
+            resource_type="bucket",
+            account_id=metadata.account_id,
+            region=metadata.region,
+            resource_id="synthetic-test-bucket",
+            resource_arn=None,
+            data={"public_access_block": None, "account_public_access_block": None},
+        )
+        snapshot = Snapshot(
+            metadata,
+            {
+                "s3": CollectionResult(
+                    [bucket],
+                    [CollectionIssue(bucket.resource_id, "GetBucketLogging", "AccessDenied")],
+                )
+            },
+        )
         path = work / "snapshot.json"
         write_snapshot(snapshot, path)
         result = runner.invoke(app, ["scan", str(path), "--output", "json"])
-        if result.exit_code != 1 or not json.loads(result.stdout)["findings"] or "AccessDenied" not in result.stdout:
+        if (
+            result.exit_code != 1
+            or not json.loads(result.stdout)["findings"]
+            or "AccessDenied" not in result.stdout
+        ):
             raise ValueError("Offline JSON/denial smoke failed")
         output = work / "report.html"
-        result = runner.invoke(app, ["scan", str(path), "--output", "html", "--report-file", str(output)])
+        result = runner.invoke(
+            app, ["scan", str(path), "--output", "html", "--report-file", str(output)]
+        )
         html = output.read_text(encoding="utf-8")
-        if result.exit_code != 1 or "Incomplete scan coverage" not in html or "AccessDenied" not in html:
+        if (
+            result.exit_code != 1
+            or "Incomplete scan coverage" not in html
+            or "AccessDenied" not in html
+        ):
             raise ValueError("Offline HTML/denial smoke failed")
         OfflineAssets().feed(html)
-        trail = Resource(service="cloudtrail", resource_type="trail", account_id=metadata.account_id,
-                         region=metadata.region, resource_id="synthetic-trail", resource_arn=None,
-                         data={"management_events": True})
+        trail = Resource(
+            service="cloudtrail",
+            resource_type="trail",
+            account_id=metadata.account_id,
+            region=metadata.region,
+            resource_id="synthetic-trail",
+            resource_arn=None,
+            data={"management_events": True},
+        )
         trail_snapshot = Snapshot(metadata, {"cloudtrail": CollectionResult([trail], [])})
         trail_path = work / "cloudtrail.json"
         write_snapshot(trail_snapshot, trail_path)
         result = runner.invoke(app, ["scan", str(trail_path), "--output", "json"])
         if result.exit_code != 1 or not any(
-            issue["operation"] == "RequiredFact" and
-            "AWSH-CT-004 requires management_excluded_sources" in issue["message"]
-            for entry in json.loads(result.stdout)["coverage"] for issue in entry["issues"]
+            issue["operation"] == "RequiredFact"
+            and "AWSH-CT-004 requires management_excluded_sources" in issue["message"]
+            for entry in json.loads(result.stdout)["coverage"]
+            for issue in entry["issues"]
         ):
             raise ValueError("Offline CloudTrail missing-fact smoke failed")
-        before_meta = ScanMetadata(scan_id="release-before", started_at=metadata.started_at,
-                                   account_id=metadata.account_id, region=metadata.region, version=version)
-        after_meta = ScanMetadata(scan_id="release-after", started_at=metadata.started_at + timedelta(days=1),
-                                  account_id=metadata.account_id, region=metadata.region, version=version)
-        safe_volume = Resource(service="ec2", resource_type="volume", account_id=metadata.account_id,
-                               region=metadata.region, resource_id="vol-smoke", resource_arn=None,
-                               data={"encrypted": True})
-        unsafe_volume = Resource(service="ec2", resource_type="volume", account_id=metadata.account_id,
-                                 region=metadata.region, resource_id="vol-smoke", resource_arn=None,
-                                 data={"encrypted": False})
+        before_meta = ScanMetadata(
+            scan_id="release-before",
+            started_at=metadata.started_at,
+            account_id=metadata.account_id,
+            region=metadata.region,
+            version=version,
+        )
+        after_meta = ScanMetadata(
+            scan_id="release-after",
+            started_at=metadata.started_at + timedelta(days=1),
+            account_id=metadata.account_id,
+            region=metadata.region,
+            version=version,
+        )
+        safe_volume = Resource(
+            service="ec2",
+            resource_type="volume",
+            account_id=metadata.account_id,
+            region=metadata.region,
+            resource_id="vol-smoke",
+            resource_arn=None,
+            data={"encrypted": True},
+        )
+        unsafe_volume = Resource(
+            service="ec2",
+            resource_type="volume",
+            account_id=metadata.account_id,
+            region=metadata.region,
+            resource_id="vol-smoke",
+            resource_arn=None,
+            data={"encrypted": False},
+        )
         before_path, after_path = work / "before.json", work / "after.json"
-        write_snapshot(Snapshot(before_meta, {"ec2": CollectionResult([safe_volume], [])}), before_path)
-        write_snapshot(Snapshot(after_meta, {"ec2": CollectionResult([unsafe_volume], [])}), after_path)
-        result = runner.invoke(app, ["diff", str(before_path), str(after_path), "--output", "json", "--fail-on", "new"])
+        write_snapshot(
+            Snapshot(before_meta, {"ec2": CollectionResult([safe_volume], [])}), before_path
+        )
+        write_snapshot(
+            Snapshot(after_meta, {"ec2": CollectionResult([unsafe_volume], [])}), after_path
+        )
+        result = runner.invoke(
+            app, ["diff", str(before_path), str(after_path), "--output", "json", "--fail-on", "new"]
+        )
         if result.exit_code != 3 or json.loads(result.stdout)["summary"]["NEW"] != 1:
             raise ValueError("Installed diff/new-threshold smoke failed")
-        result = runner.invoke(app, ["history", str(before_path), str(after_path), "--output", "json"])
-        if result.exit_code != 0 or json.loads(result.stdout)["findings"][0]["first_scan_id"] != "release-after":
+        result = runner.invoke(
+            app, ["history", str(before_path), str(after_path), "--output", "json"]
+        )
+        if (
+            result.exit_code != 0
+            or json.loads(result.stdout)["findings"][0]["first_scan_id"] != "release-after"
+        ):
             raise ValueError("Installed finding-history smoke failed")
-        result = runner.invoke(app, ["scan", str(after_path), "--output", "json", "--fail-on", "high"])
+        result = runner.invoke(
+            app, ["scan", str(after_path), "--output", "json", "--fail-on", "high"]
+        )
         if result.exit_code != 3 or json.loads(result.stdout)["summary"]["findings"] != 1:
             raise ValueError("Installed scan threshold smoke failed")
         suppressions = work / "suppressions.json"
-        suppressions.write_text(json.dumps({"schema_version": 1, "suppressions": [{
-            "check_id": "AWSH-EC2-006", "account_id": metadata.account_id, "region": metadata.region,
-            "resource_id": "vol-smoke", "owner": "release-smoke", "reason": "Synthetic exception",
-            "expires_on": "2099-12-31"}]}), encoding="utf-8")
-        result = runner.invoke(app, ["scan", str(after_path), "--output", "json", "--fail-on", "high",
-                                     "--suppressions-file", str(suppressions)])
+        suppressions.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "suppressions": [
+                        {
+                            "check_id": "AWSH-EC2-006",
+                            "account_id": metadata.account_id,
+                            "region": metadata.region,
+                            "resource_id": "vol-smoke",
+                            "owner": "release-smoke",
+                            "reason": "Synthetic exception",
+                            "expires_on": "2099-12-31",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            [
+                "scan",
+                str(after_path),
+                "--output",
+                "json",
+                "--fail-on",
+                "high",
+                "--suppressions-file",
+                str(suppressions),
+            ],
+        )
         if result.exit_code != 0 or json.loads(result.stdout)["summary"]["suppressed"] != 1:
             raise ValueError("Installed suppression smoke failed")
-        function_arn = f"arn:aws:lambda:{metadata.region}:{metadata.account_id}:function:release-smoke"
-        function = Resource(service="lambda", resource_type="function", account_id=metadata.account_id,
-                            region=metadata.region, resource_id="release-smoke", resource_arn=function_arn,
-                            data={"urls": [{"arn": function_arn, "auth": "NONE"}],
-                                  "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
-                                  "runtime": {"name": "python3.13", "deprecated": False,
-                                              "catalog_date": "2026-09-15", "evaluated_on": "2026-09-17"}})
+        function_arn = (
+            f"arn:aws:lambda:{metadata.region}:{metadata.account_id}:function:release-smoke"
+        )
+        function = Resource(
+            service="lambda",
+            resource_type="function",
+            account_id=metadata.account_id,
+            region=metadata.region,
+            resource_id="release-smoke",
+            resource_arn=function_arn,
+            data={
+                "urls": [{"arn": function_arn, "auth": "NONE"}],
+                "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
+                "runtime": {
+                    "name": "python3.13",
+                    "deprecated": False,
+                    "catalog_date": "2026-09-15",
+                    "evaluated_on": "2026-09-17",
+                },
+            },
+        )
         function_path = work / "function.json"
-        write_snapshot(Snapshot(after_meta, {"lambda": CollectionResult([function], [])}), function_path)
+        write_snapshot(
+            Snapshot(after_meta, {"lambda": CollectionResult([function], [])}), function_path
+        )
         result = runner.invoke(app, ["leads", str(function_path), "--output", "json"])
         leads_document = json.loads(result.stdout)
         if result.exit_code != 0 or leads_document["summary"]["leads"] != 1:
             raise ValueError("Installed investigation-leads smoke failed")
-        result = runner.invoke(app, ["diff", str(before_path), str(function_path),
-                                     "--include-leads", "--output", "json"])
+        result = runner.invoke(
+            app,
+            ["diff", str(before_path), str(function_path), "--include-leads", "--output", "json"],
+        )
         lead_delta = json.loads(result.stdout)
-        if result.exit_code != 0 or lead_delta.get("schema_version") != 2 or "lead_delta" not in lead_delta:
+        if (
+            result.exit_code != 0
+            or lead_delta.get("schema_version") != 2
+            or "lead_delta" not in lead_delta
+        ):
             raise ValueError("Installed Lead Delta smoke failed")
         lead_id = leads_document["leads"][0]["lead_id"]
-        result = runner.invoke(app, ["investigate", str(function_path), "--lead-id", lead_id,
-                                     "--output", "json"])
+        result = runner.invoke(
+            app, ["investigate", str(function_path), "--lead-id", lead_id, "--output", "json"]
+        )
         evidence_pack = json.loads(result.stdout)
-        if result.exit_code not in {0, 1} or evidence_pack.get("kind") != "investigation-evidence-pack":
+        if (
+            result.exit_code not in {0, 1}
+            or evidence_pack.get("kind") != "investigation-evidence-pack"
+        ):
             raise ValueError("Installed Investigation Evidence Pack JSON smoke failed")
         pack_path = work / "evidence-pack.html"
-        result = runner.invoke(app, ["investigate", str(function_path), "--lead-id", lead_id,
-                                     "--output", "html", "--report-file", str(pack_path)])
-        if result.exit_code not in {0, 1} or "Investigation Evidence Pack" not in pack_path.read_text(encoding="utf-8"):
+        result = runner.invoke(
+            app,
+            [
+                "investigate",
+                str(function_path),
+                "--lead-id",
+                lead_id,
+                "--output",
+                "html",
+                "--report-file",
+                str(pack_path),
+            ],
+        )
+        if result.exit_code not in {
+            0,
+            1,
+        } or "Investigation Evidence Pack" not in pack_path.read_text(encoding="utf-8"):
             raise ValueError("Installed Investigation Evidence Pack HTML smoke failed")
+        result = runner.invoke(
+            app, ["investigate", str(function_path), "--contextual", "--output", "json"]
+        )
+        contextual = json.loads(result.stdout)
+        if (
+            result.exit_code != 1
+            or contextual.get("kind") != "contextual-investigations"
+            or contextual.get("schema_version") != 1
+            or len(contextual["investigations"]) != 1
+            or contextual["investigations"][0]["priority_status"] != "PROVISIONAL"
+            or contextual["investigations"][0]["priority_score"] != 4
+        ):
+            raise ValueError("Installed contextual JSON/historical-v1 coverage smoke failed")
+        context_path = work / "contextual.html"
+        result = runner.invoke(
+            app,
+            [
+                "investigate",
+                str(function_path),
+                "--contextual",
+                "--output",
+                "html",
+                "--report-file",
+                str(context_path),
+            ],
+        )
+        contextual_html = context_path.read_text(encoding="utf-8")
+        if (
+            result.exit_code != 1
+            or "Investigation Graph" not in contextual_html
+            or "Unknown" not in contextual_html
+        ):
+            raise ValueError("Installed contextual HTML smoke failed")
+        OfflineAssets().feed(contextual_html)
         result = runner.invoke(app, ["coverage", str(function_path), "--output", "json"])
         coverage = json.loads(result.stdout)
         if result.exit_code not in {0, 1} or coverage.get("kind") != "coverage-diagnostics":
@@ -277,7 +503,9 @@ def smoke(dist: Path) -> None:
         result = runner.invoke(app, ["coverage", str(function_path)])
         if result.exit_code not in {0, 1} or "Coverage Intelligence" not in result.stdout:
             raise ValueError("Installed Coverage Intelligence console smoke failed")
-    print(f"PASS: installed {version} CLI, offline reports, M1-M4 artifacts and thresholds")
+    print(
+        f"PASS: installed {version} CLI, offline reports, evidence/contextual artifacts and thresholds"
+    )
 
 
 def main() -> None:

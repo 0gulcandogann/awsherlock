@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = {
     "s3.py": ("tests/test_s3.py",),
@@ -41,7 +40,11 @@ def commands_for(event: object) -> list[str]:
     if path is None:
         return [".github/scripts/ci_checks.py"]
     parts = Path(path.replace("\\", "/")).parts
-    if len(parts) < 4 or tuple(parts[-4:-2]) != ("src", "awsherlock") or parts[-2] not in {"rules", "collectors"}:
+    if (
+        len(parts) < 4
+        or tuple(parts[-4:-2]) != ("src", "awsherlock")
+        or parts[-2] not in {"rules", "collectors"}
+    ):
         return [".github/scripts/ci_checks.py"]
     candidates = TESTS.get(parts[-1], ())
     existing = [name for name in candidates if (ROOT / name).is_file()]
@@ -62,7 +65,10 @@ def main() -> int:
     if targets[0].startswith("tests/"):
         command = [sys.executable, "-m", "pytest", *targets, "-q"]
     else:
-        print("WARNING: no focused local test found; synthetic scanner smoke does not validate the changed file.", flush=True)
+        print(
+            "WARNING: no focused local test found; synthetic scanner smoke does not validate the changed file.",
+            flush=True,
+        )
         command = [sys.executable, targets[0]]
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 

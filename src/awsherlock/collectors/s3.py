@@ -49,7 +49,9 @@ def _normalize(name: str, response: object) -> JSONValue:
             raise InvalidResponse()
         value = []
         for rule in config["Rules"]:
-            default = rule.get("ApplyServerSideEncryptionByDefault") if isinstance(rule, dict) else None
+            default = (
+                rule.get("ApplyServerSideEncryptionByDefault") if isinstance(rule, dict) else None
+            )
             if not isinstance(default, dict):
                 raise InvalidResponse()
             value.append(default.get("SSEAlgorithm"))
@@ -64,7 +66,10 @@ def _normalize(name: str, response: object) -> JSONValue:
             config = response["LoggingEnabled"]
             if not isinstance(config, dict):
                 raise InvalidResponse()
-            value = {"TargetBucket": config.get("TargetBucket"), "TargetPrefix": config.get("TargetPrefix")}
+            value = {
+                "TargetBucket": config.get("TargetBucket"),
+                "TargetPrefix": config.get("TargetPrefix"),
+            }
     else:
         config = response.get("PolicyStatus")
         if not isinstance(config, dict) or type(config.get("IsPublic")) is not bool:
@@ -77,14 +82,31 @@ def _normalize(name: str, response: object) -> JSONValue:
     return value
 
 
-def _bucket_facts(client: Any, name: str, account_id: str, result: S3Collection) -> dict[str, JSONValue]:
+def _bucket_facts(
+    client: Any, name: str, account_id: str, result: S3Collection
+) -> dict[str, JSONValue]:
     # Missing facts are omitted; confirmed absence is None. Each API is read once.
     requests = (
-        ("public_access_block", "get_public_access_block", "GetPublicAccessBlock", "NoSuchPublicAccessBlockConfiguration"),
-        ("encryption", "get_bucket_encryption", "GetBucketEncryption", "ServerSideEncryptionConfigurationNotFoundError"),
+        (
+            "public_access_block",
+            "get_public_access_block",
+            "GetPublicAccessBlock",
+            "NoSuchPublicAccessBlockConfiguration",
+        ),
+        (
+            "encryption",
+            "get_bucket_encryption",
+            "GetBucketEncryption",
+            "ServerSideEncryptionConfigurationNotFoundError",
+        ),
         ("versioning", "get_bucket_versioning", "GetBucketVersioning", None),
         ("logging", "get_bucket_logging", "GetBucketLogging", None),
-        ("policy_public", "get_bucket_policy_status", "GetBucketPolicyStatus", "NoSuchBucketPolicy"),
+        (
+            "policy_public",
+            "get_bucket_policy_status",
+            "GetBucketPolicyStatus",
+            "NoSuchBucketPolicy",
+        ),
     )
     facts: dict[str, JSONValue] = {}
     for fact, method, operation, missing_code in requests:
@@ -117,7 +139,9 @@ def collect_s3(context: ScanContext) -> S3Collection:
             for bucket in page["Buckets"]:
                 name = bucket.get("Name") if isinstance(bucket, dict) else None
                 if not isinstance(name, str) or not re.fullmatch(r"[a-zA-Z0-9_.-]{3,255}", name):
-                    result.issues.append(CollectionIssue(None, "ListBuckets", "Invalid bucket name"))
+                    result.issues.append(
+                        CollectionIssue(None, "ListBuckets", "Invalid bucket name")
+                    )
                     continue
                 if name in seen:
                     continue
@@ -125,32 +149,60 @@ def collect_s3(context: ScanContext) -> S3Collection:
                 if not account_read:
                     account_read = True
                     try:
-                        response = context.client("s3control").get_public_access_block(AccountId=context.account_id)
-                        account_facts["account_public_access_block"] = _normalize("public_access_block", response)
+                        response = context.client("s3control").get_public_access_block(
+                            AccountId=context.account_id
+                        )
+                        account_facts["account_public_access_block"] = _normalize(
+                            "public_access_block", response
+                        )
                     except ClientError as error:
-                        if error.response.get("Error", {}).get("Code") == "NoSuchPublicAccessBlockConfiguration":
+                        if (
+                            error.response.get("Error", {}).get("Code")
+                            == "NoSuchPublicAccessBlockConfiguration"
+                        ):
                             account_facts["account_public_access_block"] = None
                         else:
-                            result.issues.append(CollectionIssue(None, "GetAccountPublicAccessBlock", _message(error)))
+                            result.issues.append(
+                                CollectionIssue(
+                                    None, "GetAccountPublicAccessBlock", _message(error)
+                                )
+                            )
                     except (BotoCoreError, InvalidResponse) as error:
-                        result.issues.append(CollectionIssue(None, "GetAccountPublicAccessBlock", _message(error)))
+                        result.issues.append(
+                            CollectionIssue(None, "GetAccountPublicAccessBlock", _message(error))
+                        )
                 operation = "GetBucketLocation"
                 try:
-                    location = client.get_bucket_location(Bucket=name, ExpectedBucketOwner=context.account_id)
+                    location = client.get_bucket_location(
+                        Bucket=name, ExpectedBucketOwner=context.account_id
+                    )
                     if not isinstance(location, dict) or "LocationConstraint" not in location:
                         raise InvalidResponse()
                     region = location["LocationConstraint"]
-                    region = "us-east-1" if region is None else "eu-west-1" if region == "EU" else region
-                    if not isinstance(region, str) or not re.fullmatch(r"[a-z]{2}(?:-[a-z]+)+-[0-9]+", region):
+                    region = (
+                        "us-east-1" if region is None else "eu-west-1" if region == "EU" else region
+                    )
+                    if not isinstance(region, str) or not re.fullmatch(
+                        r"[a-z]{2}(?:-[a-z]+)+-[0-9]+", region
+                    ):
                         raise InvalidResponse()
                     operation = "CreateRegionalClient"
                     if region not in clients:
                         clients[region] = context.client("s3", region_name=region)
-                    result.resources.append(Resource(
-                        service="s3", resource_type="bucket", account_id=context.account_id,
-                        region=region, resource_id=name, resource_arn=f"arn:{context.partition}:s3:::{name}",
-                        data={**_bucket_facts(clients[region], name, context.account_id, result), **account_facts},
-                    ))
+                    result.resources.append(
+                        Resource(
+                            service="s3",
+                            resource_type="bucket",
+                            account_id=context.account_id,
+                            region=region,
+                            resource_id=name,
+                            resource_arn=f"arn:{context.partition}:s3:::{name}",
+                            data={
+                                **_bucket_facts(clients[region], name, context.account_id, result),
+                                **account_facts,
+                            },
+                        )
+                    )
                 except (ClientError, BotoCoreError, InvalidResponse) as error:
                     result.issues.append(CollectionIssue(name, operation, _message(error)))
     except (ClientError, BotoCoreError, InvalidResponse) as error:

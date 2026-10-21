@@ -12,17 +12,26 @@ from awsherlock.reporting import render_console
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.snapshot import write_snapshot
 from awsherlock.terminal import RED, field, message
-from test_snapshot import snapshot
 
 
-@pytest.mark.parametrize("args", [["--version"], ["--doctor"], ["--list-checks"], ["--list-services"]])
+@pytest.mark.parametrize(
+    "args", [["--version"], ["--doctor"], ["--list-checks"], ["--list-services"]]
+)
 def test_informational_commands_use_palette_and_plain_redirect(monkeypatch, args):
     plain = CliRunner().invoke(app, args)
     assert plain.exit_code == 0 and "\x1b" not in plain.stdout
     stream = StringIO()
-    monkeypatch.setattr("awsherlock.terminal.Console", lambda **kwargs: Console(
-        file=stream, force_terminal=True, color_system="truecolor", width=200,
-        legacy_windows=False, _environ={"TERM": "xterm"}))
+    monkeypatch.setattr(
+        "awsherlock.terminal.Console",
+        lambda **kwargs: Console(
+            file=stream,
+            force_terminal=True,
+            color_system="truecolor",
+            width=200,
+            legacy_windows=False,
+            _environ={"TERM": "xterm"},
+        ),
+    )
     colored = CliRunner().invoke(app, args)
     assert colored.exit_code == 0
     assert "\x1b[" in stream.getvalue()
@@ -32,11 +41,22 @@ def test_informational_commands_use_palette_and_plain_redirect(monkeypatch, args
 def test_typer_help_and_usage_errors_use_palette(monkeypatch, args):
     from typer import rich_utils
     from rich.style import Style
+
     Style.parse.cache_clear()
     stream = StringIO()
-    monkeypatch.setattr(rich_utils, "Console", lambda **kwargs: Console(
-        **{**kwargs, "file": stream, "legacy_windows": False,
-           "_environ": {"TERM": "xterm"}, "no_color": False}))
+    monkeypatch.setattr(
+        rich_utils,
+        "Console",
+        lambda **kwargs: Console(
+            **{
+                **kwargs,
+                "file": stream,
+                "legacy_windows": False,
+                "_environ": {"TERM": "xterm"},
+                "no_color": False,
+            }
+        ),
+    )
     monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", True)
     monkeypatch.setattr(rich_utils, "COLOR_SYSTEM", "truecolor")
     result = CliRunner().invoke(app, args, color=True)
@@ -44,8 +64,11 @@ def test_typer_help_and_usage_errors_use_palette(monkeypatch, args):
     assert "\x1b[" in stream.getvalue()
     assert rich_utils.STYLE_USAGE == "#ff7e55"
     assert rich_utils.STYLE_USAGE_COMMAND == "bold #ff9de2"
-    assert (rich_utils.STYLE_OPTIONS_PANEL_BORDER == "#650f78" if "--help" in args
-            else rich_utils.STYLE_ERRORS_PANEL_BORDER == "#ff0000")
+    assert (
+        rich_utils.STYLE_OPTIONS_PANEL_BORDER == "#650f78"
+        if "--help" in args
+        else rich_utils.STYLE_ERRORS_PANEL_BORDER == "#ff0000"
+    )
 
 
 def test_typer_help_uses_distinct_semantic_styles():
@@ -60,9 +83,17 @@ def test_typer_help_uses_distinct_semantic_styles():
 def test_shared_messages_no_color_and_terminal_escaping(monkeypatch):
     monkeypatch.setenv("NO_COLOR", "1")
     stream = StringIO()
-    monkeypatch.setattr("awsherlock.terminal.Console", lambda **kwargs: Console(
-        file=stream, force_terminal=True, color_system="truecolor", width=200,
-        legacy_windows=False, _environ={"TERM": "xterm", "NO_COLOR": "1"}))
+    monkeypatch.setattr(
+        "awsherlock.terminal.Console",
+        lambda **kwargs: Console(
+            file=stream,
+            force_terminal=True,
+            color_system="truecolor",
+            width=200,
+            legacy_windows=False,
+            _environ={"TERM": "xterm", "NO_COLOR": "1"},
+        ),
+    )
     message("failure\x1b[2J", style=RED, err=True)
     field("Launcher", "[red]literal[/red]\rFAKE")
     assert "38;2;" not in stream.getvalue() and "48;2;" not in stream.getvalue()
@@ -72,9 +103,17 @@ def test_shared_messages_no_color_and_terminal_escaping(monkeypatch):
 
 def test_scan_console_palette_preserves_denied_coverage(snapshot, monkeypatch):
     stdout, stderr = StringIO(), StringIO()
-    monkeypatch.setattr("awsherlock.reporting.Console", lambda **kwargs: Console(
-        file=stderr if kwargs.get("stderr") else stdout, force_terminal=True,
-        color_system="truecolor", width=200, legacy_windows=False, _environ={"TERM": "xterm"}))
+    monkeypatch.setattr(
+        "awsherlock.reporting.Console",
+        lambda **kwargs: Console(
+            file=stderr if kwargs.get("stderr") else stdout,
+            force_terminal=True,
+            color_system="truecolor",
+            width=200,
+            legacy_windows=False,
+            _environ={"TERM": "xterm"},
+        ),
+    )
     report = evaluate_snapshot(snapshot)
     before = report.to_dict()
     render_console(report)
@@ -86,6 +125,8 @@ def test_scan_console_palette_preserves_denied_coverage(snapshot, monkeypatch):
 def test_json_stdout_is_unstyled_with_palette(snapshot, tmp_path):
     path = tmp_path / "snapshot.json"
     write_snapshot(snapshot, path)
-    result = CliRunner().invoke(app, ["scan", str(path), "--output", "json", "--no-progress"], color=True)
+    result = CliRunner().invoke(
+        app, ["scan", str(path), "--output", "json", "--no-progress"], color=True
+    )
     assert result.exit_code == 1 and "\x1b" not in result.stdout
     assert json.loads(result.stdout) == evaluate_snapshot(snapshot).to_dict()

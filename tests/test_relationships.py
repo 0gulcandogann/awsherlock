@@ -16,9 +16,12 @@ from awsherlock.models import (
     ResourceRef,
     ScanMetadata,
 )
-from awsherlock.relationships import RelationshipError, normalize_relationships, project_relationships
+from awsherlock.relationships import (
+    RelationshipError,
+    normalize_relationships,
+    project_relationships,
+)
 from awsherlock.snapshot import Snapshot, SnapshotError, capture_snapshot, snapshot_from_dict
-
 
 ACCOUNT = "123456789012"
 OTHER_ACCOUNT = "999999999999"
@@ -157,7 +160,9 @@ def test_resource_ref_rejects_malformed_fields(field, value):
 
 def test_resource_refs_support_arnless_global_regional_and_cross_account_endpoints():
     global_source = ref("iam", "role", ACCOUNT, None, "worker-role", None)
-    regional_target = ref("future-service", "future_type", OTHER_ACCOUNT, "us-east-2", "target", None)
+    regional_target = ref(
+        "future-service", "future_type", OTHER_ACCOUNT, "us-east-2", "target", None
+    )
     edge = Relationship(
         source=global_source,
         relationship_type=RelationshipType.USES,
@@ -217,7 +222,10 @@ def test_normalization_rejects_conflicting_non_null_arns():
     conflicting = "arn:aws:lambda:eu-west-1:123456789012:function:different-locator"
     with pytest.raises(RelationshipError, match="ARN"):
         normalize_relationships(
-            (relationship(source=ref(resource_arn=LAMBDA_ARN)), relationship(source=ref(resource_arn=conflicting))),
+            (
+                relationship(source=ref(resource_arn=LAMBDA_ARN)),
+                relationship(source=ref(resource_arn=conflicting)),
+            ),
             services_with_s3(),
         )
 
@@ -265,11 +273,19 @@ def test_collected_resource_identity_is_enforced_when_arn_resolves():
 
 def test_conflicting_collected_arns_for_referenced_identity_are_rejected():
     first = Resource(
-        service="lambda", resource_type="function", account_id=ACCOUNT, region=REGION,
-        resource_id="worker", resource_arn=LAMBDA_ARN, data={},
+        service="lambda",
+        resource_type="function",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id="worker",
+        resource_arn=LAMBDA_ARN,
+        data={},
     )
     second = Resource(
-        service="lambda", resource_type="function", account_id=ACCOUNT, region=REGION,
+        service="lambda",
+        resource_type="function",
+        account_id=ACCOUNT,
+        region=REGION,
         resource_id="worker",
         resource_arn=f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:conflicting-locator",
         data={},
@@ -297,7 +313,10 @@ def test_projection_creates_supported_runs_as_relationships_and_skips_legacy_age
         },
     ]
     projected = project_relationships(iam_services(bindings))
-    assert [(edge.source.service, edge.source.resource_type, edge.source.resource_id) for edge in projected] == [
+    assert [
+        (edge.source.service, edge.source.resource_type, edge.source.resource_id)
+        for edge in projected
+    ] == [
         ("bedrock", "agent", "ABCDEFGHIJ"),
         ("ec2", "instance", "i-0123456789abcdef0"),
         ("lambda", "function", "worker"),
@@ -312,7 +331,12 @@ def test_projection_creates_supported_runs_as_relationships_and_skips_legacy_age
     "binding",
     [
         {"service": "lambda", "region": REGION, "resource_arn": "not-an-arn", "role_arn": ROLE_ARN},
-        {"service": "lambda", "region": "us-east-1", "resource_arn": LAMBDA_ARN, "role_arn": ROLE_ARN},
+        {
+            "service": "lambda",
+            "region": "us-east-1",
+            "resource_arn": LAMBDA_ARN,
+            "role_arn": ROLE_ARN,
+        },
         {
             "service": "lambda",
             "region": REGION,
@@ -411,8 +435,11 @@ def test_relationships_do_not_change_findings_or_coverage():
 
 def test_mixed_v1_v2_diff_and_history_remain_finding_based():
     before = Snapshot(metadata(), services_with_s3())
-    later_metadata = replace(metadata(), scan_id="relationships-later",
-                             started_at=metadata().started_at + timedelta(minutes=1))
+    later_metadata = replace(
+        metadata(),
+        scan_id="relationships-later",
+        started_at=metadata().started_at + timedelta(minutes=1),
+    )
     after = Snapshot(later_metadata, services_with_s3(), (relationship(),), 2)
     comparison = compare_snapshots(before, after)
     history = finding_history([before, after])
@@ -422,16 +449,24 @@ def test_mixed_v1_v2_diff_and_history_remain_finding_based():
 
 
 def test_live_capture_explicitly_writes_v2_and_projects_existing_bindings(monkeypatch):
-    services = iam_services([{
-        "service": "lambda",
-        "region": REGION,
-        "resource_arn": LAMBDA_ARN,
-        "role_arn": ROLE_ARN,
-    }])
+    services = iam_services(
+        [
+            {
+                "service": "lambda",
+                "region": REGION,
+                "resource_arn": LAMBDA_ARN,
+                "role_arn": ROLE_ARN,
+            }
+        ]
+    )
     collector = Mock(return_value=services["iam"])
     monkeypatch.setattr("awsherlock.snapshot.service_components", lambda service: (collector, ()))
-    context = Mock(account_id=ACCOUNT, region=REGION, caller_arn="arn:aws:iam::123456789012:user/test",
-                   measurements=None)
+    context = Mock(
+        account_id=ACCOUNT,
+        region=REGION,
+        caller_arn="arn:aws:iam::123456789012:user/test",
+        measurements=None,
+    )
     captured = capture_snapshot(context, ["iam"])
     assert captured.schema_version == 2
     assert captured.relationships == project_relationships(services)

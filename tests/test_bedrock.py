@@ -20,7 +20,6 @@ from awsherlock.sarif import render_sarif
 from awsherlock.scanner import DEFAULT_SERVICES, parse_services
 from awsherlock.snapshot import Snapshot, SnapshotError, snapshot_from_dict
 
-
 ACCOUNT = "123456789012"
 OTHER_ACCOUNT = "999999999999"
 REGION = "eu-west-1"
@@ -85,8 +84,15 @@ def active_logging(*, destination="cloudwatch", modality="text"):
     return {"loggingConfig": config}
 
 
-def agent_detail(agent_id=AGENT_A, *, status="PREPARED", guardrail="absent",
-                 account=ACCOUNT, arn_agent_id=None, version="DRAFT"):
+def agent_detail(
+    agent_id=AGENT_A,
+    *,
+    status="PREPARED",
+    guardrail="absent",
+    account=ACCOUNT,
+    arn_agent_id=None,
+    version="DRAFT",
+):
     arn_agent_id = arn_agent_id or agent_id
     detail = {
         "agentId": agent_id,
@@ -111,14 +117,18 @@ def collect(agent_client, bedrock_client, *, region=REGION):
         assert options == {"region_name": region}
         return {"bedrock-agent": agent_client, "bedrock": bedrock_client}[service]
 
-    context = SimpleNamespace(account_id=ACCOUNT, partition="aws", region=region,
-                              client=get_client)
+    context = SimpleNamespace(account_id=ACCOUNT, partition="aws", region=region, client=get_client)
     return collect_bedrock(context), calls
 
 
 def snapshot_for(result):
-    metadata = ScanMetadata(scan_id="bedrock-test", started_at=datetime.now(timezone.utc),
-                            account_id=ACCOUNT, region=REGION, version="test")
+    metadata = ScanMetadata(
+        scan_id="bedrock-test",
+        started_at=datetime.now(timezone.utc),
+        account_id=ACCOUNT,
+        region=REGION,
+        version="test",
+    )
     return Snapshot(metadata, {"bedrock": result}, (), 2)
 
 
@@ -132,8 +142,12 @@ def finding_ids(report):
 
 
 def test_missing_region_does_not_create_clients():
-    context = SimpleNamespace(account_id=ACCOUNT, partition="aws", region=None,
-                              client=Mock(side_effect=AssertionError("no client")))
+    context = SimpleNamespace(
+        account_id=ACCOUNT,
+        partition="aws",
+        region=None,
+        client=Mock(side_effect=AssertionError("no client")),
+    )
     result = collect_bedrock(context)
     assert result.resources == [] and result.completed_operations == []
     assert [(issue.operation, issue.message) for issue in result.issues] == [
@@ -153,7 +167,9 @@ def test_empty_agent_inventory_and_absent_runtime_logging_are_definitive():
     assert [resource.resource_type for resource in result.resources] == ["regional-settings"]
     assert result.resources[0].data == {
         "model_invocation_logging_configuration": {
-            "configured": False, "destinations": [], "modalities": [],
+            "configured": False,
+            "destinations": [],
+            "modalities": [],
         }
     }
     assert finding_ids(report) == ["AWSH-BEDROCK-002"]
@@ -162,8 +178,7 @@ def test_empty_agent_inventory_and_absent_runtime_logging_are_definitive():
 
 
 def test_agent_without_guardrail_is_draft_scoped_and_sensitive_fields_are_not_stored():
-    agents = AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}],
-                         {AGENT_A: agent_detail()})
+    agents = AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: agent_detail()})
     result, _ = collect(agents, BedrockClient(active_logging()))
     report, _ = report_for(result)
     resource = next(item for item in result.resources if item.resource_type == "agent")
@@ -176,9 +191,14 @@ def test_agent_without_guardrail_is_draft_scoped_and_sensitive_fields_are_not_st
         "guardrail_configuration": {"identifier": None, "version": None},
     }
     serialized = json.dumps(resource.data)
-    assert all(marker not in serialized for marker in (
-        "prompt-secret-marker", "description-secret-marker", "failure-secret-marker",
-    ))
+    assert all(
+        marker not in serialized
+        for marker in (
+            "prompt-secret-marker",
+            "description-secret-marker",
+            "failure-secret-marker",
+        )
+    )
     assert finding_ids(report) == ["AWSH-BEDROCK-001"]
     finding = report.findings[0]
     assert "DRAFT" in finding.title and "DRAFT" in finding.description
@@ -186,39 +206,57 @@ def test_agent_without_guardrail_is_draft_scoped_and_sensitive_fields_are_not_st
     assert "exploitable" not in finding.description.lower()
 
 
-@pytest.mark.parametrize("status", [
-    "CREATING", "PREPARING", "PREPARED", "NOT_PREPARED", "UPDATING",
-    "VERSIONING", "FAILED", "DELETING",
-])
+@pytest.mark.parametrize(
+    "status",
+    [
+        "CREATING",
+        "PREPARING",
+        "PREPARED",
+        "NOT_PREPARED",
+        "UPDATING",
+        "VERSIONING",
+        "FAILED",
+        "DELETING",
+    ],
+)
 def test_agent_lifecycle_does_not_suppress_valid_guardrail_evaluation(status):
     guardrail = {"guardrailIdentifier": "guardrail123", "guardrailVersion": "1"}
     result, _ = collect(
-        AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}],
-                    {AGENT_A: agent_detail(status=status, guardrail=guardrail)}),
+        AgentClient(
+            [{"agentSummaries": [{"agentId": AGENT_A}]}],
+            {AGENT_A: agent_detail(status=status, guardrail=guardrail)},
+        ),
         BedrockClient(active_logging()),
     )
     report, _ = report_for(result)
     agent = next(item for item in result.resources if item.resource_type == "agent")
     assert agent.data["agent_status"] == status
     assert agent.data["guardrail_configuration"] == {
-        "identifier": "guardrail123", "version": "1",
+        "identifier": "guardrail123",
+        "version": "1",
     }
     assert "AWSH-BEDROCK-001" not in finding_ids(report)
     assert report.coverage[0]["status"] == "COMPLETE"
 
 
-@pytest.mark.parametrize("guardrail", [
-    {"identifier": "guardrail123", "version": "1"},
-    {"identifier": None, "version": None},
-])
+@pytest.mark.parametrize(
+    "guardrail",
+    [
+        {"identifier": "guardrail123", "version": "1"},
+        {"identifier": None, "version": None},
+    ],
+)
 def test_snapshot_rejects_guardrail_evidence_detached_from_draft_context(guardrail):
     result, _ = collect(
         AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: agent_detail()}),
         BedrockClient(active_logging()),
     )
     raw = snapshot_for(result).to_dict()
-    data = next(resource["data"] for resource in raw["services"]["bedrock"]["resources"]
-                if resource["resource_type"] == "agent")
+    data = next(
+        resource["data"]
+        for resource in raw["services"]["bedrock"]["resources"]
+        if resource["resource_type"] == "agent"
+    )
     data.clear()
     data["guardrail_configuration"] = guardrail
     with pytest.raises(SnapshotError):
@@ -228,24 +266,36 @@ def test_snapshot_rejects_guardrail_evidence_detached_from_draft_context(guardra
 def test_guardrail_rule_defensively_requires_draft_context_and_preserves_valid_results():
     rule = service_spec("bedrock").evaluators[0]
     detached = Resource(
-        service="bedrock", resource_type="agent", account_id=ACCOUNT, region=REGION,
-        resource_id=AGENT_A, resource_arn=None,
+        service="bedrock",
+        resource_type="agent",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id=AGENT_A,
+        resource_arn=None,
         data={"guardrail_configuration": {"identifier": "guardrail123", "version": "1"}},
     )
     with pytest.raises(ValueError, match="DRAFT"):
         rule.evaluate(detached)
 
     guarded = Resource(
-        service="bedrock", resource_type="agent", account_id=ACCOUNT, region=REGION,
-        resource_id=AGENT_A, resource_arn=None,
+        service="bedrock",
+        resource_type="agent",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id=AGENT_A,
+        resource_arn=None,
         data={
             "agent_version": "DRAFT",
             "guardrail_configuration": {"identifier": "guardrail123", "version": "1"},
         },
     )
     unguarded = Resource(
-        service="bedrock", resource_type="agent", account_id=ACCOUNT, region=REGION,
-        resource_id=AGENT_A, resource_arn=None,
+        service="bedrock",
+        resource_type="agent",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id=AGENT_A,
+        resource_arn=None,
         data={
             "agent_version": "DRAFT",
             "guardrail_configuration": {"identifier": None, "version": None},
@@ -255,14 +305,21 @@ def test_guardrail_rule_defensively_requires_draft_context_and_preserves_valid_r
     assert [finding.id for finding in rule.evaluate(unguarded)] == ["AWSH-BEDROCK-001"]
 
 
-@pytest.mark.parametrize("response", [
-    {"loggingConfig": {"cloudWatchConfig": {
-        "logGroupName": "/aws/bedrock/modelinvocations",
-        "roleArn": f"arn:aws:iam::{ACCOUNT}:role/LoggingRole",
-    }}},
-    {"loggingConfig": {"textDataDeliveryEnabled": True}},
-    {"loggingConfig": {}},
-])
+@pytest.mark.parametrize(
+    "response",
+    [
+        {
+            "loggingConfig": {
+                "cloudWatchConfig": {
+                    "logGroupName": "/aws/bedrock/modelinvocations",
+                    "roleArn": f"arn:aws:iam::{ACCOUNT}:role/LoggingRole",
+                }
+            }
+        },
+        {"loggingConfig": {"textDataDeliveryEnabled": True}},
+        {"loggingConfig": {}},
+    ],
+)
 def test_valid_but_inert_runtime_logging_configuration_is_a_finding(response):
     result, _ = collect(AgentClient([{"agentSummaries": []}]), BedrockClient(response))
     report, _ = report_for(result)
@@ -271,35 +328,48 @@ def test_valid_but_inert_runtime_logging_configuration_is_a_finding(response):
     assert "AWSH-BEDROCK-002" in finding_ids(report)
     finding = next(item for item in report.findings if item.id == "AWSH-BEDROCK-002")
     assert "Bedrock Runtime" in finding.title
-    assert "does not assess logging or observability for every Bedrock inference endpoint" in finding.description
+    assert (
+        "does not assess logging or observability for every Bedrock inference endpoint"
+        in finding.description
+    )
     assert "all Bedrock invocation activity is unlogged" not in finding.description
 
 
-@pytest.mark.parametrize(("destination", "modality"), [
-    ("cloudwatch", "text"), ("s3", "image"), ("s3", "embedding"),
-    ("cloudwatch", "video"), ("cloudwatch", "audio"),
-])
+@pytest.mark.parametrize(
+    ("destination", "modality"),
+    [
+        ("cloudwatch", "text"),
+        ("s3", "image"),
+        ("s3", "embedding"),
+        ("cloudwatch", "video"),
+        ("cloudwatch", "audio"),
+    ],
+)
 def test_active_runtime_logging_configuration_passes(destination, modality):
-    result, _ = collect(AgentClient([{"agentSummaries": []}]),
-                        BedrockClient(active_logging(destination=destination, modality=modality)))
+    result, _ = collect(
+        AgentClient([{"agentSummaries": []}]),
+        BedrockClient(active_logging(destination=destination, modality=modality)),
+    )
     report, _ = report_for(result)
     assert "AWSH-BEDROCK-002" not in finding_ids(report)
     assert report.coverage[0]["status"] == "COMPLETE"
 
 
 def test_logging_destinations_and_modalities_are_canonical_without_identifiers():
-    response = {"loggingConfig": {
-        "s3Config": {"bucketName": "private-sensitive-bucket", "keyPrefix": "private-prefix"},
-        "cloudWatchConfig": {
-            "logGroupName": "/private/log/group",
-            "roleArn": f"arn:aws:iam::{ACCOUNT}:role/PrivateLoggingRole",
-        },
-        "videoDataDeliveryEnabled": True,
-        "textDataDeliveryEnabled": True,
-        "audioDataDeliveryEnabled": False,
-        "imageDataDeliveryEnabled": True,
-        "embeddingDataDeliveryEnabled": False,
-    }}
+    response = {
+        "loggingConfig": {
+            "s3Config": {"bucketName": "private-sensitive-bucket", "keyPrefix": "private-prefix"},
+            "cloudWatchConfig": {
+                "logGroupName": "/private/log/group",
+                "roleArn": f"arn:aws:iam::{ACCOUNT}:role/PrivateLoggingRole",
+            },
+            "videoDataDeliveryEnabled": True,
+            "textDataDeliveryEnabled": True,
+            "audioDataDeliveryEnabled": False,
+            "imageDataDeliveryEnabled": True,
+            "embeddingDataDeliveryEnabled": False,
+        }
+    }
     result, _ = collect(AgentClient([{"agentSummaries": []}]), BedrockClient(response))
     fact = result.resources[0].data["model_invocation_logging_configuration"]
     assert fact == {
@@ -308,23 +378,31 @@ def test_logging_destinations_and_modalities_are_canonical_without_identifiers()
         "modalities": ["image", "text", "video"],
     }
     serialized = json.dumps(fact)
-    assert all(value not in serialized for value in (
-        "private-sensitive-bucket", "private-prefix", "/private/log/group", "PrivateLoggingRole",
-    ))
+    assert all(
+        value not in serialized
+        for value in (
+            "private-sensitive-bucket",
+            "private-prefix",
+            "/private/log/group",
+            "PrivateLoggingRole",
+        )
+    )
 
 
 def test_cloudwatch_large_data_s3_is_not_a_top_level_s3_destination():
-    response = {"loggingConfig": {
-        "cloudWatchConfig": {
-            "logGroupName": "/aws/bedrock/modelinvocations",
-            "roleArn": f"arn:aws:iam::{ACCOUNT}:role/LoggingRole",
-            "largeDataDeliveryS3Config": {
-                "bucketName": "large-payloads",
-                "keyPrefix": "bedrock/",
+    response = {
+        "loggingConfig": {
+            "cloudWatchConfig": {
+                "logGroupName": "/aws/bedrock/modelinvocations",
+                "roleArn": f"arn:aws:iam::{ACCOUNT}:role/LoggingRole",
+                "largeDataDeliveryS3Config": {
+                    "bucketName": "large-payloads",
+                    "keyPrefix": "bedrock/",
+                },
             },
-        },
-        "textDataDeliveryEnabled": True,
-    }}
+            "textDataDeliveryEnabled": True,
+        }
+    }
     result, _ = collect(AgentClient([{"agentSummaries": []}]), BedrockClient(response))
     assert result.resources[0].data["model_invocation_logging_configuration"] == {
         "configured": True,
@@ -333,20 +411,29 @@ def test_cloudwatch_large_data_s3_is_not_a_top_level_s3_destination():
     }
 
 
-@pytest.mark.parametrize("response", [
-    {"loggingConfig": "enabled"},
-    {"loggingConfig": {"textDataDeliveryEnabled": "true"}},
-    {"loggingConfig": {"s3Config": {"bucketName": 1}, "textDataDeliveryEnabled": True}},
-    {"loggingConfig": {"cloudWatchConfig": {"logGroupName": "missing-role"},
-                       "textDataDeliveryEnabled": True}},
-])
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"loggingConfig": "enabled"},
+        {"loggingConfig": {"textDataDeliveryEnabled": "true"}},
+        {"loggingConfig": {"s3Config": {"bucketName": 1}, "textDataDeliveryEnabled": True}},
+        {
+            "loggingConfig": {
+                "cloudWatchConfig": {"logGroupName": "missing-role"},
+                "textDataDeliveryEnabled": True,
+            }
+        },
+    ],
+)
 def test_malformed_runtime_logging_is_incomplete_not_a_finding(response):
     result, _ = collect(AgentClient([{"agentSummaries": []}]), BedrockClient(response))
     report, _ = report_for(result)
     assert "model_invocation_logging_configuration" not in result.resources[0].data
     assert "AWSH-BEDROCK-002" not in finding_ids(report)
     assert report.coverage[0]["status"] != "COMPLETE"
-    assert any(issue.operation == "GetModelInvocationLoggingConfiguration" for issue in result.issues)
+    assert any(
+        issue.operation == "GetModelInvocationLoggingConfiguration" for issue in result.issues
+    )
 
 
 def test_multiple_agents_paginate_sort_and_duplicate_or_malformed_ids_are_issues():
@@ -364,14 +451,38 @@ def test_multiple_agents_paginate_sort_and_duplicate_or_malformed_ids_are_issues
 
 def test_agent_issue_order_is_canonical_across_equivalent_summary_permutations():
     details = {AGENT_A: agent_detail(AGENT_A), AGENT_B: agent_detail(AGENT_B)}
-    first, _ = collect(AgentClient([{"agentSummaries": [
-        {"agentId": AGENT_A}, {"agentId": AGENT_B},
-        {"agentId": AGENT_A}, {"agentId": AGENT_B},
-    ]}], details), BedrockClient(active_logging()))
-    second, _ = collect(AgentClient([{"agentSummaries": [
-        {"agentId": AGENT_B}, {"agentId": AGENT_A},
-        {"agentId": AGENT_B}, {"agentId": AGENT_A},
-    ]}], details), BedrockClient(active_logging()))
+    first, _ = collect(
+        AgentClient(
+            [
+                {
+                    "agentSummaries": [
+                        {"agentId": AGENT_A},
+                        {"agentId": AGENT_B},
+                        {"agentId": AGENT_A},
+                        {"agentId": AGENT_B},
+                    ]
+                }
+            ],
+            details,
+        ),
+        BedrockClient(active_logging()),
+    )
+    second, _ = collect(
+        AgentClient(
+            [
+                {
+                    "agentSummaries": [
+                        {"agentId": AGENT_B},
+                        {"agentId": AGENT_A},
+                        {"agentId": AGENT_B},
+                        {"agentId": AGENT_A},
+                    ]
+                }
+            ],
+            details,
+        ),
+        BedrockClient(active_logging()),
+    )
 
     first_snapshot = snapshot_for(first)
     second_snapshot = Snapshot(first_snapshot.metadata, {"bedrock": second}, (), 2)
@@ -382,10 +493,13 @@ def test_agent_issue_order_is_canonical_across_equivalent_summary_permutations()
     assert evaluate_snapshot(first_snapshot).coverage == evaluate_snapshot(second_snapshot).coverage
 
 
-@pytest.mark.parametrize("failure", [
-    aws_error("AccessDeniedException", "GetAgent"),
-    aws_error("ResourceNotFoundException", "GetAgent"),
-])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        aws_error("AccessDeniedException", "GetAgent"),
+        aws_error("ResourceNotFoundException", "GetAgent"),
+    ],
+)
 def test_failed_get_agent_retains_skeleton_and_is_incomplete(failure):
     result, _ = collect(
         AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: failure}),
@@ -398,14 +512,17 @@ def test_failed_get_agent_retains_skeleton_and_is_incomplete(failure):
     assert report.coverage[0]["status"] == "PARTIAL"
 
 
-@pytest.mark.parametrize("detail", [
-    agent_detail(agent_id=AGENT_B),
-    agent_detail(account=OTHER_ACCOUNT),
-    agent_detail(arn_agent_id=AGENT_B),
-    agent_detail(version="1"),
-    agent_detail(guardrail={"guardrailIdentifier": "guardrail123"}),
-    agent_detail(guardrail={"guardrailIdentifier": 1, "guardrailVersion": "1"}),
-])
+@pytest.mark.parametrize(
+    "detail",
+    [
+        agent_detail(agent_id=AGENT_B),
+        agent_detail(account=OTHER_ACCOUNT),
+        agent_detail(arn_agent_id=AGENT_B),
+        agent_detail(version="1"),
+        agent_detail(guardrail={"guardrailIdentifier": "guardrail123"}),
+        agent_detail(guardrail={"guardrailIdentifier": 1, "guardrailVersion": "1"}),
+    ],
+)
 def test_inconsistent_agent_identity_version_or_guardrail_is_incomplete(detail):
     result, _ = collect(
         AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: detail}),
@@ -423,8 +540,9 @@ def test_partial_listing_retains_agents_without_completion_marker():
         {"agentSummaries": [{"agentId": AGENT_A}]},
         aws_error("ThrottlingException", "ListAgents"),
     ]
-    result, _ = collect(AgentClient(pages, {AGENT_A: agent_detail()}),
-                        BedrockClient(active_logging()))
+    result, _ = collect(
+        AgentClient(pages, {AGENT_A: agent_detail()}), BedrockClient(active_logging())
+    )
     report, _ = report_for(result)
     assert any(resource.resource_id == AGENT_A for resource in result.resources)
     assert result.completed_operations == []
@@ -486,15 +604,29 @@ def test_selected_logging_check_preserves_relevant_logging_failure():
 
 @pytest.mark.parametrize("failed_family", ["agents", "logging"])
 def test_both_selected_bedrock_checks_preserve_either_family_failure(failed_family):
-    agents = (AgentClient([aws_error("AccessDeniedException", "ListAgents")])
-              if failed_family == "agents" else AgentClient([{"agentSummaries": []}]))
-    logging = (BedrockClient(aws_error(
-        "AccessDeniedException", "GetModelInvocationLoggingConfiguration",
-    )) if failed_family == "logging" else BedrockClient({}))
+    agents = (
+        AgentClient([aws_error("AccessDeniedException", "ListAgents")])
+        if failed_family == "agents"
+        else AgentClient([{"agentSummaries": []}])
+    )
+    logging = (
+        BedrockClient(
+            aws_error(
+                "AccessDeniedException",
+                "GetModelInvocationLoggingConfiguration",
+            )
+        )
+        if failed_family == "logging"
+        else BedrockClient({})
+    )
     result, _ = collect(agents, logging)
-    report, _ = report_for(result, selected_checks=[
-        "AWSH-BEDROCK-001", "AWSH-BEDROCK-002",
-    ])
+    report, _ = report_for(
+        result,
+        selected_checks=[
+            "AWSH-BEDROCK-001",
+            "AWSH-BEDROCK-002",
+        ],
+    )
     assert report.incomplete is True
     assert report.coverage[0]["status"] in {"PARTIAL", "ACCESS_DENIED"}
 
@@ -514,7 +646,8 @@ def test_unsupported_region_endpoint_failures_never_become_passes():
     assert finding_ids(report) == []
     assert report.coverage[0]["status"] == "ERROR"
     assert {issue.operation for issue in result.issues} == {
-        "GetModelInvocationLoggingConfiguration", "ListAgents",
+        "GetModelInvocationLoggingConfiguration",
+        "ListAgents",
     }
     assert all(issue.message == "AWS endpoint connection failed" for issue in result.issues)
 
@@ -524,14 +657,14 @@ def test_missing_inventory_marker_does_not_block_selected_logging_check():
     result.completed_operations.clear()
     report, _ = report_for(result, selected_checks=["AWSH-BEDROCK-002"])
     assert finding_ids(report) == ["AWSH-BEDROCK-002"]
-    assert not any(issue["operation"] == "RequiredCollection" for issue in report.coverage[0]["issues"])
+    assert not any(
+        issue["operation"] == "RequiredCollection" for issue in report.coverage[0]["issues"]
+    )
 
 
 def test_execution_role_path_is_preserved():
     detail = agent_detail()
-    detail["agent"]["agentResourceRoleArn"] = (
-        f"arn:aws:iam::{ACCOUNT}:role/team/agents/BedrockRole"
-    )
+    detail["agent"]["agentResourceRoleArn"] = f"arn:aws:iam::{ACCOUNT}:role/team/agents/BedrockRole"
     result, _ = collect(
         AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: detail}),
         BedrockClient(active_logging()),
@@ -544,7 +677,9 @@ def test_execution_role_path_is_preserved():
 
 def test_collector_matches_installed_botocore_request_and_response_contract():
     session = boto3.Session(
-        aws_access_key_id="test", aws_secret_access_key="test", region_name=REGION,
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+        region_name=REGION,
     )
     agent_client = session.client("bedrock-agent")
     bedrock_client = session.client("bedrock")
@@ -564,14 +699,24 @@ def test_collector_matches_installed_botocore_request_and_response_contract():
     }
     with Stubber(agent_client) as agent_stub, Stubber(bedrock_client) as bedrock_stub:
         bedrock_stub.add_response(
-            "get_model_invocation_logging_configuration", active_logging(), {},
+            "get_model_invocation_logging_configuration",
+            active_logging(),
+            {},
         )
-        agent_stub.add_response("list_agents", {"agentSummaries": [{
-            "agentId": AGENT_A,
-            "agentName": "agent-a",
-            "agentStatus": "PREPARED",
-            "updatedAt": now,
-        }]}, {})
+        agent_stub.add_response(
+            "list_agents",
+            {
+                "agentSummaries": [
+                    {
+                        "agentId": AGENT_A,
+                        "agentName": "agent-a",
+                        "agentStatus": "PREPARED",
+                        "updatedAt": now,
+                    }
+                ]
+            },
+            {},
+        )
         agent_stub.add_response("get_agent", agent_response, {"agentId": AGENT_A})
 
         context = SimpleNamespace(
@@ -608,36 +753,49 @@ def test_snapshot_roundtrip_offline_reports_and_no_relationships(monkeypatch):
     assert offline_report.coverage == live_report.coverage
     assert replay.relationships == () and len(CORRELATION_RULES) == 5
     factory.assert_not_called()
-    for rendered in (render_json(offline_report), render_sarif(offline_report), render_html(offline_report)):
+    for rendered in (
+        render_json(offline_report),
+        render_sarif(offline_report),
+        render_html(offline_report),
+    ):
         assert "AWSH-BEDROCK-001" in rendered and "AWSH-BEDROCK-002" in rendered
 
 
-@pytest.mark.parametrize("mutate", [
-    lambda data: data.update({"agent_version": "1"}),
-    lambda data: data.update({"agent_status": "UNKNOWN"}),
-    lambda data: data.update({"execution_role_arn": "arn:aws:iam::999999999999:role/wrong"}),
-    lambda data: data.update({"guardrail_configuration": {"identifier": None, "version": "1"}}),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda data: data.update({"agent_version": "1"}),
+        lambda data: data.update({"agent_status": "UNKNOWN"}),
+        lambda data: data.update({"execution_role_arn": "arn:aws:iam::999999999999:role/wrong"}),
+        lambda data: data.update({"guardrail_configuration": {"identifier": None, "version": "1"}}),
+    ],
+)
 def test_snapshot_rejects_invalid_agent_facts(mutate):
     result, _ = collect(
         AgentClient([{"agentSummaries": [{"agentId": AGENT_A}]}], {AGENT_A: agent_detail()}),
         BedrockClient(active_logging()),
     )
     raw = snapshot_for(result).to_dict()
-    data = next(resource["data"] for resource in raw["services"]["bedrock"]["resources"]
-                if resource["resource_type"] == "agent")
+    data = next(
+        resource["data"]
+        for resource in raw["services"]["bedrock"]["resources"]
+        if resource["resource_type"] == "agent"
+    )
     mutate(data)
     with pytest.raises(Exception):
         snapshot_from_dict(raw)
 
 
-@pytest.mark.parametrize("fact", [
-    {"configured": "true", "destinations": [], "modalities": []},
-    {"configured": False, "destinations": ["s3"], "modalities": []},
-    {"configured": True, "destinations": ["s3", "s3"], "modalities": ["text"]},
-    {"configured": True, "destinations": ["unknown"], "modalities": ["text"]},
-    {"configured": True, "destinations": ["s3"], "modalities": ["unknown"]},
-])
+@pytest.mark.parametrize(
+    "fact",
+    [
+        {"configured": "true", "destinations": [], "modalities": []},
+        {"configured": False, "destinations": ["s3"], "modalities": []},
+        {"configured": True, "destinations": ["s3", "s3"], "modalities": ["text"]},
+        {"configured": True, "destinations": ["unknown"], "modalities": ["text"]},
+        {"configured": True, "destinations": ["s3"], "modalities": ["unknown"]},
+    ],
+)
 def test_snapshot_rejects_invalid_logging_facts(fact):
     result, _ = collect(AgentClient([{"agentSummaries": []}]), BedrockClient({}))
     raw = snapshot_for(result).to_dict()
@@ -657,10 +815,12 @@ def test_registry_counts_opt_in_order_and_metadata():
     assert service_spec("bedrock").default_enabled is False
     assert service_spec("bedrock").completed_operations == ("ListAgents",)
     assert [check.identifier for check in service_spec("bedrock").checks] == [
-        "AWSH-BEDROCK-001", "AWSH-BEDROCK-002",
+        "AWSH-BEDROCK-001",
+        "AWSH-BEDROCK-002",
     ]
     assert [check.severity for check in service_spec("bedrock").checks] == [
-        Severity.MEDIUM, Severity.LOW,
+        Severity.MEDIUM,
+        Severity.LOW,
     ]
     assert "bedrock" not in parse_services(None)
     assert parse_services("iam,bedrock") == ["iam", "bedrock"]

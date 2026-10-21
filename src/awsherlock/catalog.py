@@ -13,7 +13,12 @@ def describe_check(check_id: str) -> dict[str, str] | None:
     requested = check_id.strip().upper()
     for spec in check_specs():
         if spec.identifier == requested:
-            return {"Check": spec.identifier, "Title": spec.title, "Service": spec.service,
-                    "Required fact": spec.required_fact, "Remediation": spec.remediation,
-                    "Scope": spec.scope_limitations}
+            return {
+                "Check": spec.identifier,
+                "Title": spec.title,
+                "Service": spec.service,
+                "Required fact": spec.required_fact,
+                "Remediation": spec.remediation,
+                "Scope": spec.scope_limitations,
+            }
     return None

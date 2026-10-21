@@ -151,25 +151,38 @@ def test_scan_help() -> None:
 
 
 @pytest.mark.parametrize("profile", [None, "production"])
-def test_scan_defaults_to_all_services(context_factory: Mock, profile: str | None, monkeypatch) -> None:
+def test_scan_defaults_to_all_services(
+    context_factory: Mock, profile: str | None, monkeypatch
+) -> None:
     context_factory.side_effect = None
     context_factory.return_value = ScanContext(
         account_id="123456789012",
         caller_arn="arn:aws:iam::123456789012:user/test",
-        partition="aws", profile=profile, region=None, session=Mock(),
+        partition="aws",
+        profile=profile,
+        region=None,
+        session=Mock(),
     )
     args = ["scan"] + (["--profile", profile] if profile else [])
     capture = Mock()
     monkeypatch.setattr("awsherlock.cli.capture_snapshot", capture)
-    monkeypatch.setattr("awsherlock.cli.evaluate_snapshot", Mock(return_value=Report({"account_id": "123456789012"}, [], [])))
+    monkeypatch.setattr(
+        "awsherlock.cli.evaluate_snapshot",
+        Mock(return_value=Report({"account_id": "123456789012"}, [], [])),
+    )
     result = runner.invoke(app, args)
 
     assert result.exit_code == 0
     context_factory.assert_called_once_with(
-        profile=profile, role=None, role_session_name=None, external_id=None,
+        profile=profile,
+        role=None,
+        role_session_name=None,
+        external_id=None,
     )
     assert "Account: 123456789012" in result.output
-    capture.assert_called_once_with(context_factory.return_value, list(DEFAULT_SERVICES), progress=ANY)
+    capture.assert_called_once_with(
+        context_factory.return_value, list(DEFAULT_SERVICES), progress=ANY
+    )
 
 
 def test_scan_error(context_factory: Mock) -> None:
@@ -187,19 +200,37 @@ def test_scan_role_options(context_factory: Mock, monkeypatch) -> None:
     context_factory.return_value = ScanContext(
         account_id="999999999999",
         caller_arn="arn:aws:sts::999999999999:assumed-role/Audit/audit-session",
-        partition="aws", profile="production", region="eu-central-1", session=Mock(),
+        partition="aws",
+        profile="production",
+        region="eu-central-1",
+        session=Mock(),
     )
     role = "arn:aws:iam::999999999999:role/Audit"
     monkeypatch.setattr("awsherlock.cli.capture_snapshot", Mock())
-    monkeypatch.setattr("awsherlock.cli.evaluate_snapshot", Mock(return_value=Report({"account_id": "999999999999"}, [], [])))
-    result = runner.invoke(app, [
-        "scan", "--profile", "production", "--role", role,
-        "--role-session-name", "audit-session", "--external-id", "external-marker",
-    ])
+    monkeypatch.setattr(
+        "awsherlock.cli.evaluate_snapshot",
+        Mock(return_value=Report({"account_id": "999999999999"}, [], [])),
+    )
+    result = runner.invoke(
+        app,
+        [
+            "scan",
+            "--profile",
+            "production",
+            "--role",
+            role,
+            "--role-session-name",
+            "audit-session",
+            "--external-id",
+            "external-marker",
+        ],
+    )
     assert result.exit_code == 0
     context_factory.assert_called_once_with(
-        profile="production", role=role,
-        role_session_name="audit-session", external_id="external-marker",
+        profile="production",
+        role=role,
+        role_session_name="audit-session",
+        external_id="external-marker",
     )
     assert "Account: 999999999999" in result.output
     assert "external-marker" not in result.output

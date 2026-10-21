@@ -2,6 +2,12 @@
 
 # AWSherlock
 
+**Source release preparation: v0.5.1 — Contextual Investigation Engine.**
+The published-version badges below remain v0.5.0 until an authorized release.
+Despite its patch version number, **v0.5.1 contains substantial feature
+additions**: the complete investigation engine, contextual priority and offline
+graph are official v0.5.1 features. This numbering does not reduce their scope.
+
 [![Release v0.5.0](https://img.shields.io/badge/release-v0.5.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.5.0)
 [![PyPI v0.5.0](https://img.shields.io/badge/PyPI-v0.5.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.5.0/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
@@ -10,6 +16,18 @@
 [![License MIT](https://img.shields.io/badge/license-MIT-64748B?style=flat-square)](https://github.com/0gulcandogann/awsherlock/blob/main/LICENSE)
 
 AWSherlock is a command-line scanner for AWS security configuration. It has 42 registered checks across 11 supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks, three opt-in RDS checks, one opt-in GuardDuty check, one opt-in DynamoDB check and two opt-in Amazon Bedrock checks. Reports appear in your terminal, as JSON, or as a standalone investigation-oriented HTML file. Snapshot schema v2 records positive workload relationships, and five conservative Lead patterns connect exact supporting findings and relationships without claiming effective access or an attack path.
+
+The v0.5.1 source adds evidence-aware contextual investigations over those same
+five patterns: separate observed, inferred and unknown conditions, explained
+review priority, visible coverage limitations and an offline Investigation Graph.
+No Finding severity, Lead identity or snapshot schema changes are required.
+See [contextual investigations](docs/contextual-investigations.md),
+[architecture](docs/architecture.md) and [release notes](docs/releases/v0.5.1.md).
+The [changelog](docs/changelog.md) records this release strategy and the
+additional graph, coverage, AWS error-handling and validation improvements.
+The [final readiness report](docs/releases/v0.5.1-readiness.md) distinguishes
+passed local checks, user-reported Chrome validation, Codex IPC restrictions and
+untested live AWS.
 
 > [!TIP]
 > **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
@@ -78,11 +96,11 @@ See Kiro's [specs](https://kiro.dev/docs/specs/), [steering](https://kiro.dev/do
 
 Pull requests and pushes to `main` run the separate scanner CI workflow. It
 builds a wheel/source archive, installs the wheel in a fresh Python environment
-on Linux, Windows and macOS, then runs synthetic EC2 secure/insecure/denied
-checks and the installed offline CLI/JSON/HTML smoke. The checks use no AWS
-credentials or real AWS calls. The larger local test suite remains local;
-this CI gate is a focused public smoke, not a replacement for full local
-regression. Tag-triggered package publishing remains a separate workflow.
+on Linux, Windows and macOS, then runs the public non-browser regression suite,
+synthetic EC2 secure/insecure/denied checks and installed offline CLI/JSON/HTML
+smoke. A dedicated Linux/Python 3.13 job runs all browser-marked tests, including
+the Investigation Graph, using Chrome. The checks use no AWS credentials or
+real AWS calls. Tag-triggered package publishing remains a separate workflow.
 
 ### Windows
 
@@ -573,6 +591,38 @@ required evidence or provenance was unavailable; it never upgrades uncertainty
 to an absence or security conclusion. JSON writes to stdout unless
 `--report-file` is supplied; HTML requires a new report file and remains
 self-contained.
+
+### Explain contextual investigations
+
+Save a snapshot with an authorized scan, then investigate it without credentials:
+
+```bash
+awsherlock scan --profile audit --region eu-west-1 --services ec2,iam,lambda --save-snapshot facts.json --output json --report-file findings.json --no-progress
+awsherlock investigate facts.json --contextual --output json --report-file investigations.json
+awsherlock investigate facts.json --contextual --output html --report-file investigations.html
+awsherlock scan facts.json --output html --report-file report.html --no-progress
+```
+
+Contextual JSON is a separate schema-v1 artifact with stable IDs, supporting
+references, `observed`, `inferred`, `unknown`, `coverage_gaps`, explained priority
+factors and manual actions. Priority is review urgency, independent from Finding
+severity or impact. It remains PROVISIONAL because effective permissions,
+reachability and asset criticality are unverified. Identity conflicts produce
+UNASSESSED/BLOCKED. Missing evidence never subtracts points or means safety.
+
+The HTML graph supports investigation selection, node highlighting and inferred
+association filtering. Solid edges describe observed configuration/support;
+dashed edges describe inferred associations, never a verified attack path.
+All essential evidence remains readable as text. Graph limits and omitted counts
+prevent unbounded rendering. No backend, CDN, network request or AWS call is used.
+
+Add `--lead-id` to contextual mode to select one exact Lead. Existing
+`investigate facts.json --lead-id PATTERN:FULL_SHA256` still exports Evidence Pack
+v1. JSON defaults to stdout; HTML requires `--report-file`. Existing paths are
+refused. Incomplete exports exit 1; usage errors exit 2. Provisional priority
+alone does not indicate an export error. See the
+[schema and priority methodology](docs/contextual-investigations.md) and
+[validation procedure](docs/investigation-validation.md).
 
 ### Record expiring suppressions
 
@@ -1456,6 +1506,13 @@ For a suspected vulnerability in AWSherlock, use the repository's private securi
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
 ## Release notes
+
+Version [0.5.1](docs/releases/v0.5.1.md) is prepared in source, pending authorized
+publication. It derives contextual investigations from all existing Leads,
+separates observations/inferences/unknowns, explains bounded priority and adds an
+offline SVG graph to scoped HTML reports. Existing scan JSON, Evidence Packs,
+Lead Delta, five Lead rules and snapshot v1/v2 compatibility remain intact.
+Live AWS validation has not been executed for this release preparation.
 
 Version [0.5.0](docs/releases/v0.5.0.md) adds evidence-aware Lead Delta with
 `diff --include-leads`, minimized Investigation Evidence Packs, opt-in AgentCore

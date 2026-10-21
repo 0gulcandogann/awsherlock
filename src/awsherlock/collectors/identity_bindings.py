@@ -5,7 +5,14 @@ import re
 from awsherlock.aws.context import ScanContext
 from awsherlock.collectors.common import CollectionResult
 
-from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, CollectionIssue, items, text_field, error_message
+from awsherlock.collectors.common import (
+    AWS_ERRORS,
+    InvalidResponse,
+    CollectionIssue,
+    items,
+    text_field,
+    error_message,
+)
 from awsherlock.identity_config import IDENTITY_ARN
 from awsherlock.identity_validation import (
     agentcore_binding_identity,
@@ -17,9 +24,20 @@ from awsherlock.identity_validation import (
 from awsherlock.models import ResourceRef, Relationship, RelationshipEvidence, RelationshipType
 
 
-def _collect_agentcore_endpoints(context, result, client, region, runtime_id,
-                                runtime_arn, latest, check, binding, production_issues):
+def _collect_agentcore_endpoints(
+    context,
+    result,
+    client,
+    region,
+    runtime_id,
+    runtime_arn,
+    latest,
+    check,
+    binding,
+    production_issues,
+):
     """Read control-plane routes only; no runtime content is retained."""
+
     def issue(operation, error):
         production_issues.append(CollectionIssue(None, operation, error_message(error)))
 
@@ -54,32 +72,61 @@ def _collect_agentcore_endpoints(context, result, client, region, runtime_id,
                     continue
                 seen[name] = signature
                 try:
-                    detail = read("get_agent_runtime_endpoint", agentRuntimeId=runtime_id, endpointName=name)
+                    detail = read(
+                        "get_agent_runtime_endpoint", agentRuntimeId=runtime_id, endpointName=name
+                    )
                     if agentcore_endpoint_identity(detail, runtime_arn) != identity:
                         raise InvalidResponse()
-                    source = ResourceRef(service="agentcore", resource_type="runtime-endpoint",
-                                         account_id=context.account_id, region=region,
-                                         resource_id=f"{runtime_id}:{name}",
-                                         resource_arn=detail["agentRuntimeEndpointArn"])
+                    source = ResourceRef(
+                        service="agentcore",
+                        resource_type="runtime-endpoint",
+                        account_id=context.account_id,
+                        region=region,
+                        resource_id=f"{runtime_id}:{name}",
+                        resource_arn=detail["agentRuntimeEndpointArn"],
+                    )
                     routes = []
-                    for field, fact in (("liveVersion", "live_version"), ("targetVersion", "target_version")):
+                    for field, fact in (
+                        ("liveVersion", "live_version"),
+                        ("targetVersion", "target_version"),
+                    ):
                         version = detail.get(field)
                         if not is_agentcore_runtime_version(version):
                             issue("GetAgentRuntimeEndpoint", InvalidResponse())
                             continue
-                        routes.append(Relationship(source=source, relationship_type=RelationshipType.USES,
-                            target=ResourceRef(service="agentcore", resource_type="runtime-version",
-                                account_id=context.account_id, region=region, resource_id=f"{runtime_id}:{version}"),
-                            evidence=(RelationshipEvidence(service="agentcore", fact=fact,
-                                                           operation="GetAgentRuntimeEndpoint"),)))
+                        routes.append(
+                            Relationship(
+                                source=source,
+                                relationship_type=RelationshipType.USES,
+                                target=ResourceRef(
+                                    service="agentcore",
+                                    resource_type="runtime-version",
+                                    account_id=context.account_id,
+                                    region=region,
+                                    resource_id=f"{runtime_id}:{version}",
+                                ),
+                                evidence=(
+                                    RelationshipEvidence(
+                                        service="agentcore",
+                                        fact=fact,
+                                        operation="GetAgentRuntimeEndpoint",
+                                    ),
+                                ),
+                            )
+                        )
                     observed[name] = routes
                 except AWS_ERRORS as error:
                     issue("GetAgentRuntimeEndpoint", error)
             token = page.get("nextToken")
             if token is None:
                 break
-            if (not isinstance(token, str) or not token or len(token) > 2048
-                    or any(c.isspace() for c in token) or token in tokens):
+            if (
+                not isinstance(token, str)
+                or not token
+                or len(token) > 2048
+                or any(c.isspace() for c in token)
+                or token in tokens
+            ):
                 raise InvalidResponse()
             tokens.add(token)
     except AWS_ERRORS as error:
@@ -90,31 +137,73 @@ def _collect_agentcore_endpoints(context, result, client, region, runtime_id,
     versions = sorted({edge.target.resource_id.rsplit(":", 1)[1] for edge in routes}, key=int)
     for version in versions:
         try:
-            detail = latest if latest is not None and latest["agentRuntimeVersion"] == version else read(
-                "get_agent_runtime", agentRuntimeId=runtime_id, agentRuntimeVersion=version)
-            if (not isinstance(detail, dict) or detail.get("agentRuntimeId") != runtime_id
-                    or detail.get("agentRuntimeArn") != runtime_arn
-                    or detail.get("agentRuntimeVersion") != version):
+            detail = (
+                latest
+                if latest is not None and latest["agentRuntimeVersion"] == version
+                else read(
+                    "get_agent_runtime", agentRuntimeId=runtime_id, agentRuntimeVersion=version
+                )
+            )
+            if (
+                not isinstance(detail, dict)
+                or detail.get("agentRuntimeId") != runtime_id
+                or detail.get("agentRuntimeArn") != runtime_arn
+                or detail.get("agentRuntimeVersion") != version
+            ):
                 raise InvalidResponse()
-            record = {"service": "agentcore", "region": region, "resource_arn": runtime_arn,
-                      "resource_version": version, "role_arn": detail.get("roleArn")}
+            record = {
+                "service": "agentcore",
+                "region": region,
+                "resource_arn": runtime_arn,
+                "resource_version": version,
+                "role_arn": detail.get("roleArn"),
+            }
             identity = agentcore_binding_identity(record)
             if identity is None:
                 raise InvalidResponse()
-            role = next((r for r in result.resources if r.service == "iam" and r.resource_type == "role"
-                         and r.resource_arn == record["role_arn"] and r.resource_id == identity[4]
-                         and r.account_id == context.account_id and r.region is None), None)
+            role = next(
+                (
+                    r
+                    for r in result.resources
+                    if r.service == "iam"
+                    and r.resource_type == "role"
+                    and r.resource_arn == record["role_arn"]
+                    and r.resource_id == identity[4]
+                    and r.account_id == context.account_id
+                    and r.region is None
+                ),
+                None,
+            )
             if role is None:
                 raise InvalidResponse()
             binding("agentcore", region, runtime_arn, record["role_arn"], resource_version=version)
-            result.relationship_observations.append(Relationship(
-                source=ResourceRef(service="agentcore", resource_type="runtime-version",
-                    account_id=context.account_id, region=region, resource_id=f"{runtime_id}:{version}"),
-                relationship_type=RelationshipType.RUNS_AS,
-                target=ResourceRef(service="iam", resource_type="role", account_id=context.account_id,
-                    region=None, resource_id=identity[4], resource_arn=record["role_arn"]),
-                evidence=(RelationshipEvidence(service="agentcore", fact="execution_role_arn",
-                                               operation="GetAgentRuntime"),)))
+            result.relationship_observations.append(
+                Relationship(
+                    source=ResourceRef(
+                        service="agentcore",
+                        resource_type="runtime-version",
+                        account_id=context.account_id,
+                        region=region,
+                        resource_id=f"{runtime_id}:{version}",
+                    ),
+                    relationship_type=RelationshipType.RUNS_AS,
+                    target=ResourceRef(
+                        service="iam",
+                        resource_type="role",
+                        account_id=context.account_id,
+                        region=None,
+                        resource_id=identity[4],
+                        resource_arn=record["role_arn"],
+                    ),
+                    evidence=(
+                        RelationshipEvidence(
+                            service="agentcore",
+                            fact="execution_role_arn",
+                            operation="GetAgentRuntime",
+                        ),
+                    ),
+                )
+            )
         except AWS_ERRORS as error:
             issue("GetAgentRuntime", error)
 
@@ -143,17 +232,28 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
             except StopIteration:
                 return
             yield from items(page, key)
-            if not any(page.get(token) for token in ("NextToken", "nextToken", "NextMarker", "Marker")):
+            if not any(
+                page.get(token) for token in ("NextToken", "nextToken", "NextMarker", "Marker")
+            ):
                 return
 
     def binding(service, region, arn, role, *, resource_version=None):
         arn, role = text_field(arn), text_field(role)
         match = IDENTITY_ARN.fullmatch(role)
-        if match is None or match[2] != context.account_id or match[3] != "role" or match[1] != context.partition:
+        if (
+            match is None
+            or match[2] != context.account_id
+            or match[3] != "role"
+            or match[1] != context.partition
+        ):
             raise InvalidResponse()
         resource = identities.get(role)
         if resource is None:
-            result.issues.append(CollectionIssue(arn, "IdentityBinding", "Workload role is absent from the IAM inventory"))
+            result.issues.append(
+                CollectionIssue(
+                    arn, "IdentityBinding", "Workload role is absent from the IAM inventory"
+                )
+            )
             return
         record = {"service": service, "region": region, "resource_arn": arn, "role_arn": role}
         if resource_version is not None:
@@ -166,7 +266,11 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
     for resource in identities.values():
         resource.data["identity_bindings"] = []
     if not regions:
-        result.issues.append(CollectionIssue(None, "IdentityBindings", "Configure regions for workload/AI role bindings"))
+        result.issues.append(
+            CollectionIssue(
+                None, "IdentityBindings", "Configure regions for workload/AI role bindings"
+            )
+        )
     for region in regions:
         operations = ["lambda", "ec2", *(["bedrock", "agentcore"] if options.ai_services else [])]
         for service in operations:
@@ -189,19 +293,38 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
                             if not isinstance(profile, dict):
                                 raise InvalidResponse()
                             profile_arn = text_field(profile.get("Arn"))
-                            if not re.fullmatch(r"arn:" + re.escape(context.partition) + r":iam::" + context.account_id + r":instance-profile/[^\s*?]+", profile_arn):
+                            if not re.fullmatch(
+                                r"arn:"
+                                + re.escape(context.partition)
+                                + r":iam::"
+                                + context.account_id
+                                + r":instance-profile/[^\s*?]+",
+                                profile_arn,
+                            ):
                                 raise InvalidResponse()
                             if profile_arn not in profiles:
                                 check()
-                                response = context.client("iam").get_instance_profile(InstanceProfileName=profile_arn.rsplit("/", 1)[-1])
-                                if not isinstance(response, dict) or not isinstance(response.get("InstanceProfile"), dict):
+                                response = context.client("iam").get_instance_profile(
+                                    InstanceProfileName=profile_arn.rsplit("/", 1)[-1]
+                                )
+                                if not isinstance(response, dict) or not isinstance(
+                                    response.get("InstanceProfile"), dict
+                                ):
                                     raise InvalidResponse()
                                 if response["InstanceProfile"].get("Arn") != profile_arn:
                                     raise InvalidResponse()
-                                profiles[profile_arn] = [text_field(role.get("Arn")) for role in items(response["InstanceProfile"], "Roles")]
+                                profiles[profile_arn] = [
+                                    text_field(role.get("Arn"))
+                                    for role in items(response["InstanceProfile"], "Roles")
+                                ]
                             instance_id = text_field(instance.get("InstanceId"))
                             for role in profiles[profile_arn]:
-                                binding(service, region, f"arn:{context.partition}:ec2:{region}:{context.account_id}:instance/{instance_id}", role)
+                                binding(
+                                    service,
+                                    region,
+                                    f"arn:{context.partition}:ec2:{region}:{context.account_id}:instance/{instance_id}",
+                                    role,
+                                )
                 elif service == "bedrock":
                     client = context.client("bedrock-agent", region_name=region)
                     for agent in pages(client, "list_agents", "agentSummaries"):
@@ -212,7 +335,12 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
                         detail = response.get("agent") if isinstance(response, dict) else None
                         if not isinstance(detail, dict):
                             raise InvalidResponse()
-                        binding(service, region, detail.get("agentArn"), detail.get("agentResourceRoleArn"))
+                        binding(
+                            service,
+                            region,
+                            detail.get("agentArn"),
+                            detail.get("agentResourceRoleArn"),
+                        )
                 else:
                     client = context.client("bedrock-agentcore-control", region_name=region)
                     for runtime in pages(client, "list_agent_runtimes", "agentRuntimes"):
@@ -221,11 +349,12 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
                         runtime_id = text_field(runtime.get("agentRuntimeId"))
                         runtime_arn = text_field(runtime.get("agentRuntimeArn"))
                         runtime_version = text_field(runtime.get("agentRuntimeVersion"))
-                        if (
-                            agentcore_runtime_arn_identity(runtime_arn)
-                            != (context.partition, region, context.account_id, runtime_id)
-                            or not is_agentcore_runtime_version(runtime_version)
-                        ):
+                        if agentcore_runtime_arn_identity(runtime_arn) != (
+                            context.partition,
+                            region,
+                            context.account_id,
+                            runtime_id,
+                        ) or not is_agentcore_runtime_version(runtime_version):
                             raise InvalidResponse()
                         detail = None
                         try:
@@ -234,28 +363,61 @@ def collect_identity_bindings(context: ScanContext, result: CollectionResult) ->
                                 agentRuntimeId=runtime_id,
                                 agentRuntimeVersion=runtime_version,
                             )
-                            if (not isinstance(response, dict)
-                                    or response.get("agentRuntimeId") != runtime_id
-                                    or response.get("agentRuntimeArn") != runtime_arn
-                                    or response.get("agentRuntimeVersion") != runtime_version):
+                            if (
+                                not isinstance(response, dict)
+                                or response.get("agentRuntimeId") != runtime_id
+                                or response.get("agentRuntimeArn") != runtime_arn
+                                or response.get("agentRuntimeVersion") != runtime_version
+                            ):
                                 raise InvalidResponse()
                             binding(
-                                service, region, runtime_arn, response.get("roleArn"),
+                                service,
+                                region,
+                                runtime_arn,
+                                response.get("roleArn"),
                                 resource_version=runtime_version,
                             )
                             detail = response
                         except AWS_ERRORS as error:
                             if not options.ai_production:
                                 raise
-                            production_issues.append(CollectionIssue(None, "GetAgentRuntime", error_message(error)))
+                            production_issues.append(
+                                CollectionIssue(None, "GetAgentRuntime", error_message(error))
+                            )
                         if options.ai_production:
-                            _collect_agentcore_endpoints(context, result, client, region, runtime_id,
-                                                        runtime_arn, detail, check, binding, production_issues)
+                            _collect_agentcore_endpoints(
+                                context,
+                                result,
+                                client,
+                                region,
+                                runtime_id,
+                                runtime_arn,
+                                detail,
+                                check,
+                                binding,
+                                production_issues,
+                            )
             except AWS_ERRORS as error:
-                result.issues.append(CollectionIssue(None, "IdentityBindings:" + service + ":" + region,
-                                                     "Metadata page/time budget exhausted or invalid AWS response" if isinstance(error, InvalidResponse) else error_message(error)))
-    result.issues.extend(sorted(production_issues, key=lambda issue: (
-        issue.operation, issue.resource_id or "", issue.message,
-    )))
+                result.issues.append(
+                    CollectionIssue(
+                        None,
+                        "IdentityBindings:" + service + ":" + region,
+                        (
+                            "Metadata page/time budget exhausted or invalid AWS response"
+                            if isinstance(error, InvalidResponse)
+                            else error_message(error)
+                        ),
+                    )
+                )
+    result.issues.extend(
+        sorted(
+            production_issues,
+            key=lambda issue: (
+                issue.operation,
+                issue.resource_id or "",
+                issue.message,
+            ),
+        )
+    )
     for resource in identities.values():
         resource.data["identity_bindings"].sort(key=identity_binding_sort_key)

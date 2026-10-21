@@ -42,8 +42,7 @@ _LETTERS = {
     "K": ("#   #", "#  # ", "###  ", "#  # ", "#   #"),
 }
 ASCII_WORDMARK = "\n".join(
-    " ".join(_LETTERS[letter][row] for letter in "AWSHERLOCK").rstrip()
-    for row in range(5)
+    " ".join(_LETTERS[letter][row] for letter in "AWSHERLOCK").rstrip() for row in range(5)
 )
 
 
@@ -60,15 +59,19 @@ def terminal_banner(*, width: int | None = None, encoding: str | None = None) ->
         return compact
     if width >= max(map(len, BANNER.splitlines())):
         return BANNER
-    portrait = "\n".join(re.split(r" {4,}", line, maxsplit=1)[0].rstrip(" \u2800")
-                         for line in BANNER.splitlines())
+    portrait = "\n".join(
+        re.split(r" {4,}", line, maxsplit=1)[0].rstrip(" \u2800") for line in BANNER.splitlines()
+    )
     return portrait + "\n\n" + compact
 
 
 def terminal_text(value: str, *, multiline: bool = False) -> str:
     """Show untrusted terminal controls as visible escapes, never instructions."""
     return "".join(
-        char if (multiline and char in "\n\t") or unicodedata.category(char) not in {"Cc", "Cf"}
-        else char.encode("unicode_escape").decode("ascii")
+        (
+            char
+            if (multiline and char in "\n\t") or unicodedata.category(char) not in {"Cc", "Cf"}
+            else char.encode("unicode_escape").decode("ascii")
+        )
         for char in value
     )

@@ -10,9 +10,7 @@ from awsherlock.cli import app
 from awsherlock.collectors.common import CollectionIssue
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.snapshot import capture_snapshot, read_snapshot, write_snapshot
-from test_iam import context
 from test_s3 import aws_error
-
 
 FACT_CASES = (
     ("alice", "attached", "PolicyNormalization", ("AWSH-IAM-001",)),
@@ -32,14 +30,21 @@ def resource(snapshot, name):
 
 
 @pytest.mark.parametrize("name,fact,operation,check_ids", FACT_CASES)
-def test_missing_fact_names_check_and_matching_safe_issue(context, name, fact, operation, check_ids):
-    snapshot = capture_snapshot(context, ["iam"])
+def test_missing_fact_names_check_and_matching_safe_issue(
+    iam_context, name, fact, operation, check_ids
+):
+    snapshot = capture_snapshot(iam_context, ["iam"])
     resource(snapshot, name).data.pop(fact)
-    snapshot.services["iam"].issues.append(CollectionIssue(name, operation, "AccessDenied: private-marker"))
+    snapshot.services["iam"].issues.append(
+        CollectionIssue(name, operation, "AccessDenied: private-marker")
+    )
     report = evaluate_snapshot(snapshot)
     messages = [issue["message"] for issue in required(report)]
-    reason = ("a related collection issue is recorded separately" if fact != "key_age" else
-              "the fact is absent from this snapshot")
+    reason = (
+        "a related collection issue is recorded separately"
+        if fact != "key_age"
+        else "the fact is absent from this snapshot"
+    )
     assert messages == [f"{check_id} requires {fact}; {reason}." for check_id in check_ids]
     assert all(issue["resource_id"] == name for issue in required(report))
     assert "private-marker" not in " ".join(messages)
@@ -48,22 +53,27 @@ def test_missing_fact_names_check_and_matching_safe_issue(context, name, fact, o
 
 
 @pytest.mark.parametrize("name,fact,operation,check_ids", FACT_CASES)
-def test_old_snapshot_does_not_blame_unrelated_resource(context, tmp_path, name, fact, operation, check_ids):
-    snapshot = capture_snapshot(context, ["iam"])
+def test_old_snapshot_does_not_blame_unrelated_resource(
+    iam_context, tmp_path, name, fact, operation, check_ids
+):
+    snapshot = capture_snapshot(iam_context, ["iam"])
     resource(snapshot, name).data.pop(fact)
-    snapshot.services["iam"].issues.append(CollectionIssue("different-resource", operation, "AccessDenied"))
+    snapshot.services["iam"].issues.append(
+        CollectionIssue("different-resource", operation, "AccessDenied")
+    )
     path = tmp_path / "old.json"
     write_snapshot(snapshot, path)
     assert [issue["message"] for issue in required(evaluate_snapshot(read_snapshot(path)))] == [
-        f"{check_id} requires {fact}; the fact is absent from this snapshot." for check_id in check_ids
+        f"{check_id} requires {fact}; the fact is absent from this snapshot."
+        for check_id in check_ids
     ]
 
 
-def test_actual_denied_reads_map_to_console_and_key_checks(context):
-    client = context.session.client.return_value
+def test_actual_denied_reads_map_to_console_and_key_checks(iam_context):
+    client = iam_context.session.client.return_value
     client.get_login_profile.side_effect = aws_error("AccessDenied")
     client.get_access_key_last_used.side_effect = aws_error("AccessDenied")
-    report = evaluate_snapshot(capture_snapshot(context, ["iam"]))
+    report = evaluate_snapshot(capture_snapshot(iam_context, ["iam"]))
     messages = [issue["message"] for issue in required(report)]
     assert messages == [
         "AWSH-IAM-004 requires console_mfa; a related collection issue is recorded separately.",
@@ -72,12 +82,14 @@ def test_actual_denied_reads_map_to_console_and_key_checks(context):
     assert report.coverage[0]["status"] == "PARTIAL"
 
 
-def test_policy_resource_and_inactive_key_exceptions(context):
-    snapshot = capture_snapshot(context, ["iam"])
+def test_policy_resource_and_inactive_key_exceptions(iam_context):
+    snapshot = capture_snapshot(iam_context, ["iam"])
     resource(snapshot, "managed").data.pop("statements")
     resource(snapshot, "alice/key-1").data["key_age"]["active"] = False
     resource(snapshot, "alice/key-1").data.pop("key_stale")
-    snapshot.services["iam"].issues.append(CollectionIssue("managed", "PolicyNormalization", "Invalid AWS response"))
+    snapshot.services["iam"].issues.append(
+        CollectionIssue("managed", "PolicyNormalization", "Invalid AWS response")
+    )
     report = evaluate_snapshot(snapshot)
     assert [issue["message"] for issue in required(report)] == [
         "AWSH-IAM-002 requires statements; a related collection issue is recorded separately.",
@@ -86,8 +98,8 @@ def test_policy_resource_and_inactive_key_exceptions(context):
     assert report.coverage[0]["not_scanned"] == 2
 
 
-def test_selection_and_missing_only_keep_coverage_incomplete(context):
-    snapshot = capture_snapshot(context, ["iam"])
+def test_selection_and_missing_only_keep_coverage_incomplete(iam_context):
+    snapshot = capture_snapshot(iam_context, ["iam"])
     resource(snapshot, "alice").data.clear()
     report = evaluate_snapshot(snapshot)
     assert len(required(report)) == 4
@@ -98,8 +110,8 @@ def test_selection_and_missing_only_keep_coverage_incomplete(context):
     assert not required(excluded)
 
 
-def test_secure_and_insecure_results_unchanged(context):
-    snapshot = capture_snapshot(context, ["iam"])
+def test_secure_and_insecure_results_unchanged(iam_context):
+    snapshot = capture_snapshot(iam_context, ["iam"])
     secure = evaluate_snapshot(snapshot)
     assert secure.coverage[0]["status"] == "COMPLETE"
     assert not required(secure)
@@ -110,10 +122,12 @@ def test_secure_and_insecure_results_unchanged(context):
     assert not required(insecure)
 
 
-def test_offline_json_console_html_explain_without_authenticating(context, monkeypatch, tmp_path):
-    client = context.session.client.return_value
+def test_offline_json_console_html_explain_without_authenticating(
+    iam_context, monkeypatch, tmp_path
+):
+    client = iam_context.session.client.return_value
     client.get_access_key_last_used.side_effect = aws_error("AccessDenied")
-    snapshot = capture_snapshot(context, ["iam"])
+    snapshot = capture_snapshot(iam_context, ["iam"])
     path = tmp_path / "facts.json"
     write_snapshot(snapshot, path)
     factory = Mock(side_effect=AssertionError("offline replay must not authenticate"))
@@ -122,9 +136,12 @@ def test_offline_json_console_html_explain_without_authenticating(context, monke
     result = runner.invoke(app, ["scan", str(path), "--output", "json"])
     assert result.exit_code == 1
     issues = json.loads(result.stdout)["coverage"][0]["issues"]
-    assert any(issue["operation"] == "RequiredFact" and
-               issue["message"] == "AWSH-IAM-006 requires key_stale; a related collection issue is recorded separately."
-               for issue in issues)
+    assert any(
+        issue["operation"] == "RequiredFact"
+        and issue["message"]
+        == "AWSH-IAM-006 requires key_stale; a related collection issue is recorded separately."
+        for issue in issues
+    )
     assert "synthetic-key-marker" not in result.stdout
     console = runner.invoke(app, ["scan", str(path), "--no-progress"])
     assert console.exit_code == 1 and "AWSH-IAM-006 requires key_stale" in console.output

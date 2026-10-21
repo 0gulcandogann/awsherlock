@@ -14,7 +14,6 @@ from awsherlock.sarif import render_sarif
 from awsherlock.scanner import parse_services
 from awsherlock.snapshot import Snapshot, snapshot_from_dict
 
-
 ACCOUNT = "123456789012"
 REGION = "eu-west-1"
 
@@ -46,38 +45,54 @@ class DynamoClient:
             raise ClientError({"Error": {"Code": "AccessDenied"}}, "DescribeContinuousBackups")
         if status == "MALFORMED":
             return {"ContinuousBackupsDescription": {"ContinuousBackupsStatus": "ENABLED"}}
-        return {"ContinuousBackupsDescription": {
-            "ContinuousBackupsStatus": "ENABLED",
-            "PointInTimeRecoveryDescription": {"PointInTimeRecoveryStatus": status}}}
+        return {
+            "ContinuousBackupsDescription": {
+                "ContinuousBackupsStatus": "ENABLED",
+                "PointInTimeRecoveryDescription": {"PointInTimeRecoveryStatus": status},
+            }
+        }
 
 
 def collect(client):
     def get_client(service, **options):
         assert service == "dynamodb" and options == {"region_name": REGION}
         return client
-    context = SimpleNamespace(account_id=ACCOUNT, partition="aws", region=REGION,
-                              client=get_client)
+
+    context = SimpleNamespace(account_id=ACCOUNT, partition="aws", region=REGION, client=get_client)
     return collect_dynamodb(context)
 
 
 def report_for(result):
-    metadata = ScanMetadata(scan_id="test", started_at=datetime.now(timezone.utc),
-                            account_id=ACCOUNT, region=REGION, version="test")
+    metadata = ScanMetadata(
+        scan_id="test",
+        started_at=datetime.now(timezone.utc),
+        account_id=ACCOUNT,
+        region=REGION,
+        version="test",
+    )
     snapshot = Snapshot(metadata, {"dynamodb": result})
     return evaluate_snapshot(snapshot), snapshot
 
 
 def test_secure_and_insecure_tables_paginate_and_replay(capsys):
-    result = collect(DynamoClient([{"TableNames": ["private-table"]},
-                                   {"TableNames": ["unprotected-table"]}],
-                                  {"private-table": "ENABLED", "unprotected-table": "DISABLED"}))
+    result = collect(
+        DynamoClient(
+            [{"TableNames": ["private-table"]}, {"TableNames": ["unprotected-table"]}],
+            {"private-table": "ENABLED", "unprotected-table": "DISABLED"},
+        )
+    )
     report, snapshot = report_for(result)
     assert not result.issues and report.coverage[0]["status"] == "COMPLETE"
     assert [(f.id, f.resource_id, f.evidence) for f in report.findings] == [
-        ("AWSH-DDB-001", "table:unprotected-table", {"pitr_enabled": False})]
-    assert result.resources[0].resource_arn == f"arn:aws:dynamodb:{REGION}:{ACCOUNT}:table/private-table"
-    assert [f.to_dict() for f in evaluate_snapshot(snapshot_from_dict(snapshot.to_dict())).findings] == [
-        f.to_dict() for f in report.findings]
+        ("AWSH-DDB-001", "table:unprotected-table", {"pitr_enabled": False})
+    ]
+    assert (
+        result.resources[0].resource_arn
+        == f"arn:aws:dynamodb:{REGION}:{ACCOUNT}:table/private-table"
+    )
+    assert [
+        f.to_dict() for f in evaluate_snapshot(snapshot_from_dict(snapshot.to_dict())).findings
+    ] == [f.to_dict() for f in report.findings]
     for rendered in (render_json(report), render_html(report), render_sarif(report)):
         assert "AWSH-DDB-001" in rendered
         assert "unprotected-table" in rendered
@@ -93,13 +108,19 @@ def test_empty_successful_listing_is_complete():
 
 
 def test_denied_detail_is_incomplete_and_other_table_still_evaluates():
-    result = collect(DynamoClient([{"TableNames": ["unknown-table", "bad-table"]}],
-                                  {"unknown-table": "DENIED", "bad-table": "DISABLED"}))
+    result = collect(
+        DynamoClient(
+            [{"TableNames": ["unknown-table", "bad-table"]}],
+            {"unknown-table": "DENIED", "bad-table": "DISABLED"},
+        )
+    )
     report, _ = report_for(result)
     assert {f.resource_id for f in report.findings} == {"table:bad-table"}
     assert report.coverage[0]["status"] == "PARTIAL"
-    assert any(issue["operation"] == "RequiredFact" and issue["resource_id"] == "table:unknown-table"
-               for issue in report.coverage[0]["issues"])
+    assert any(
+        issue["operation"] == "RequiredFact" and issue["resource_id"] == "table:unknown-table"
+        for issue in report.coverage[0]["issues"]
+    )
 
 
 @pytest.mark.parametrize("status", ["MALFORMED", "ENABLING", None])
@@ -107,7 +128,9 @@ def test_missing_or_unknown_status_never_passes(status):
     result = collect(DynamoClient([{"TableNames": ["unknown-table"]}], {"unknown-table": status}))
     report, _ = report_for(result)
     assert not report.findings and report.coverage[0]["status"] != "COMPLETE"
-    assert any(issue["operation"] == "DescribeContinuousBackups" for issue in report.coverage[0]["issues"])
+    assert any(
+        issue["operation"] == "DescribeContinuousBackups" for issue in report.coverage[0]["issues"]
+    )
 
 
 def test_partial_listing_keeps_observed_finding_but_not_complete():
@@ -115,13 +138,19 @@ def test_partial_listing_keeps_observed_finding_but_not_complete():
     report, _ = report_for(result)
     assert [f.id for f in report.findings] == ["AWSH-DDB-001"]
     assert report.coverage[0]["status"] == "PARTIAL"
-    assert any(issue["operation"] == "ListTables" and issue["message"] == "AccessDenied"
-               for issue in report.coverage[0]["issues"])
+    assert any(
+        issue["operation"] == "ListTables" and issue["message"] == "AccessDenied"
+        for issue in report.coverage[0]["issues"]
+    )
 
 
 def test_malformed_and_duplicate_names_are_issues_without_duplicate_findings():
-    result = collect(DynamoClient([{"TableNames": ["bad-table", "bad-table", "x", "slash/name"]}],
-                                  {"bad-table": "DISABLED"}))
+    result = collect(
+        DynamoClient(
+            [{"TableNames": ["bad-table", "bad-table", "x", "slash/name"]}],
+            {"bad-table": "DISABLED"},
+        )
+    )
     report, _ = report_for(result)
     assert [f.id for f in report.findings] == ["AWSH-DDB-001"]
     assert report.coverage[0]["status"] == "PARTIAL"
@@ -129,8 +158,9 @@ def test_malformed_and_duplicate_names_are_issues_without_duplicate_findings():
 
 
 def test_old_or_invalid_snapshot_fact_is_not_a_pass():
-    _, snapshot = report_for(collect(DynamoClient([{"TableNames": ["one-table"]}],
-                                                  {"one-table": "ENABLED"})))
+    _, snapshot = report_for(
+        collect(DynamoClient([{"TableNames": ["one-table"]}], {"one-table": "ENABLED"}))
+    )
     raw = snapshot.to_dict()
     raw["services"]["dynamodb"]["resources"][0]["data"]["pitr_enabled"] = "false"
     with pytest.raises(ValueError):

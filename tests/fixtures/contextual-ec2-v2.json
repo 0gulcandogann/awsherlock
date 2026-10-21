@@ -1,0 +1,125 @@
+{
+  "metadata": {
+    "account_id": "123456789012",
+    "region": "eu-west-1",
+    "scan_id": "contextual-ec2-synthetic",
+    "started_at": "2026-10-07T00:00:00+00:00",
+    "version": "synthetic-v0.5.0"
+  },
+  "relationships": [
+    {
+      "evidence": [
+        {
+          "fact": "identity_bindings",
+          "operation": null,
+          "service": "iam"
+        }
+      ],
+      "source": {
+        "account_id": "123456789012",
+        "region": "eu-west-1",
+        "resource_arn": "arn:aws:ec2:eu-west-1:123456789012:instance/i-0123456789abcdef0",
+        "resource_id": "i-0123456789abcdef0",
+        "resource_type": "instance",
+        "service": "ec2"
+      },
+      "target": {
+        "account_id": "123456789012",
+        "region": null,
+        "resource_arn": "arn:aws:iam::123456789012:role/worker",
+        "resource_id": "worker",
+        "resource_type": "role",
+        "service": "iam"
+      },
+      "type": "RUNS_AS"
+    }
+  ],
+  "schema_version": 2,
+  "services": {
+    "ec2": {
+      "issues": [],
+      "resources": [
+        {
+          "account_id": "123456789012",
+          "data": {
+            "addresses": [
+              "198.51.100.10"
+            ],
+            "metadata": {
+              "endpoint": "enabled",
+              "tokens": "optional"
+            }
+          },
+          "region": "eu-west-1",
+          "resource_arn": "arn:aws:ec2:eu-west-1:123456789012:instance/i-0123456789abcdef0",
+          "resource_id": "i-0123456789abcdef0",
+          "resource_type": "instance",
+          "service": "ec2"
+        }
+      ]
+    },
+    "iam": {
+      "issues": [],
+      "resources": [
+        {
+          "account_id": "123456789012",
+          "data": {
+            "attached": [
+              "arn:aws:iam::aws:policy/AdministratorAccess"
+            ],
+            "identity_approval": {
+              "allowed_principals": [
+                "lambda.amazonaws.com"
+              ],
+              "declared_kind": "workload",
+              "external_id_required": false,
+              "owner": true,
+              "purpose": true,
+              "shared": false,
+              "source_identity_required": false,
+              "status": "registered"
+            },
+            "identity_policy_context": {
+              "complete": true,
+              "managed_sources": []
+            },
+            "identity_profile": {
+              "boundary": null,
+              "declared_kind": "workload",
+              "owner": true,
+              "purpose": true,
+              "service_linked": false
+            },
+            "identity_requested": true,
+            "identity_trust": {
+              "broad": false,
+              "external_id_condition": false,
+              "mechanisms": [
+                "aws_service"
+              ],
+              "principals": [
+                {
+                  "kind": "Service",
+                  "value": "lambda.amazonaws.com"
+                }
+              ],
+              "source_identity_condition": false,
+              "status": "supported"
+            },
+            "identity_usage": {
+              "created_days": 200,
+              "last_used_days": 2,
+              "status": "recorded"
+            },
+            "statements": []
+          },
+          "region": null,
+          "resource_arn": "arn:aws:iam::123456789012:role/worker",
+          "resource_id": "worker",
+          "resource_type": "role",
+          "service": "iam"
+        }
+      ]
+    }
+  }
+}

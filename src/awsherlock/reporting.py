@@ -24,18 +24,58 @@ def write_report(content: str, path: Path) -> None:
 
 
 def render_html(report: Report, *, scopes: Iterable[HtmlScope] = ()) -> str:
-    environment = Environment(loader=PackageLoader("awsherlock", "templates"),
-                              autoescape=select_autoescape(default=True), undefined=StrictUndefined)
+    environment = Environment(
+        loader=PackageLoader("awsherlock", "templates"),
+        autoescape=select_autoescape(default=True),
+        undefined=StrictUndefined,
+    )
     investigation = build_html_view(report, scopes)
     data = investigation["report"]
-    accounts = sorted({data["metadata"]["account_id"], *(entry["account_id"] for entry in data["metadata"].get("accounts", [])), *(finding["account_id"] for finding in data["findings"])})
+    accounts = sorted(
+        {
+            data["metadata"]["account_id"],
+            *(entry["account_id"] for entry in data["metadata"].get("accounts", [])),
+            *(finding["account_id"] for finding in data["findings"]),
+        }
+    )
     services = sorted({entry["service"] for entry in data["coverage"]})
     return environment.get_template("report.html").render(
-        report=data, accounts=accounts, services=services, investigation=investigation,
+        report=data,
+        accounts=accounts,
+        services=services,
+        investigation=investigation,
     )
 
 
-SEVERITY_STYLES = {"CRITICAL": f"bold {RED}", "HIGH": ORANGE, "MEDIUM": YELLOW, "LOW": CYAN, "INFO": GREEN}
+def render_contextual_html(result) -> str:
+    """Render only derived references, with all conditions accessible as text."""
+    from awsherlock.investigation_graph import build_investigation_graph
+
+    environment = Environment(
+        loader=PackageLoader("awsherlock", "templates"),
+        autoescape=select_autoescape(default=True),
+        undefined=StrictUndefined,
+    )
+    document = result.to_dict()
+    return (
+        environment.get_template("contextual_report.html").render(
+            result=document,
+            investigation={
+                "contextual": document["investigations"],
+                "graph": build_investigation_graph(document["investigations"]),
+            },
+        )
+        + "\n"
+    )
+
+
+SEVERITY_STYLES = {
+    "CRITICAL": f"bold {RED}",
+    "HIGH": ORANGE,
+    "MEDIUM": YELLOW,
+    "LOW": CYAN,
+    "INFO": GREEN,
+}
 
 
 def render_check_description(details: dict[str, str]) -> None:
@@ -64,57 +104,122 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     summary = data["summary"]
     console.print()
     console.print("AWSherlock / Scan results", style=f"bold {ORANGE}", markup=False)
-    console.print(f"Account: {terminal_text(report.metadata['account_id'])}", style=CYAN, markup=False)
-    region_label = ", ".join(report.metadata["regions"]) if "regions" in report.metadata else (report.metadata.get("region") or "Global / not configured")
+    console.print(
+        f"Account: {terminal_text(report.metadata['account_id'])}", style=CYAN, markup=False
+    )
+    region_label = (
+        ", ".join(report.metadata["regions"])
+        if "regions" in report.metadata
+        else (report.metadata.get("region") or "Global / not configured")
+    )
     console.print(f"Region: {terminal_text(region_label)}", style=CYAN, markup=False)
     console.print()
     console.print(
         f"{summary['findings']} findings   /   {summary['resources']} resources   /   "
-        f"{summary['checks_evaluated']} checks evaluated", style=f"bold {CYAN}", markup=False,
+        f"{summary['checks_evaluated']} checks evaluated",
+        style=f"bold {CYAN}",
+        markup=False,
     )
     severity_line = Text()
     for severity, count in summary["severity"].items():
         severity_line.append(f"{severity} {count}   ", style=SEVERITY_STYLES[severity])
     console.print(severity_line)
     if report.suppression_audit is not None:
-        console.print(f"Suppressed findings: {summary['suppressed']} / Expired suppression records: {summary['expired_suppressions']}",
-                      style=YELLOW)
+        console.print(
+            f"Suppressed findings: {summary['suppressed']} / Expired suppression records: {summary['expired_suppressions']}",
+            style=YELLOW,
+        )
     if report.incomplete:
-        console.print(Panel("Some checks could not run. Review coverage and collection issues below. "
-                            "Zero findings do not mean the account is secure.",
-                            title="Incomplete scan coverage", border_style=YELLOW, style=YELLOW))
+        console.print(
+            Panel(
+                "Some checks could not run. Review coverage and collection issues below. "
+                "Zero findings do not mean the account is secure.",
+                title="Incomplete scan coverage",
+                border_style=YELLOW,
+                style=YELLOW,
+            )
+        )
     accounts = report.metadata.get("accounts", [])
     if accounts:
-        table = Table(title="Organization accounts", box=box.SIMPLE, expand=True,
-                      title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}", style=CYAN)
+        table = Table(
+            title="Organization accounts",
+            box=box.SIMPLE,
+            expand=True,
+            title_style=f"bold {ORANGE}",
+            header_style=f"bold {YELLOW}",
+            style=CYAN,
+        )
         for label in ("Account", "Name", "State", "Scan status"):
             table.add_column(label)
         for account in accounts:
-            table.add_row(*(Text(terminal_text(str(account[key]))) for key in ("account_id", "name", "state", "scan_status")))
+            table.add_row(
+                *(
+                    Text(terminal_text(str(account[key])))
+                    for key in ("account_id", "name", "state", "scan_status")
+                )
+            )
         console.print(table)
     if report.identities:
-        table = Table(title="Identity governance", box=box.SIMPLE, expand=True,
-                      title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}")
-        for label in ("Account / identity", "AI attribution", "Approval", "Observed connection", "Scope"):
+        table = Table(
+            title="Identity governance",
+            box=box.SIMPLE,
+            expand=True,
+            title_style=f"bold {ORANGE}",
+            header_style=f"bold {YELLOW}",
+        )
+        for label in (
+            "Account / identity",
+            "AI attribution",
+            "Approval",
+            "Observed connection",
+            "Scope",
+        ):
             table.add_column(label)
         for identity in report.identities:
-            values = (identity["account_id"] + " / " + identity["name"], identity["ai_attribution"],
-                      identity["approval_status"], ", ".join(identity["observed_mechanisms"]) or "unknown / not observed",
-                      identity["evaluation_scope"])
+            values = (
+                identity["account_id"] + " / " + identity["name"],
+                identity["ai_attribution"],
+                identity["approval_status"],
+                ", ".join(identity["observed_mechanisms"]) or "unknown / not observed",
+                identity["evaluation_scope"],
+            )
             table.add_row(*(Text(terminal_text(value)) for value in values))
         console.print(table)
-    coverage = Table(title="Scan coverage", box=box.SIMPLE, expand=True,
-                     title_style=f"bold {ORANGE}", header_style=f"bold {YELLOW}", style=CYAN)
+    coverage = Table(
+        title="Scan coverage",
+        box=box.SIMPLE,
+        expand=True,
+        title_style=f"bold {ORANGE}",
+        header_style=f"bold {YELLOW}",
+        style=CYAN,
+    )
     multi_region = "regions" in report.metadata
-    labels = ("Account / Service",) + (("Region / Scope",) if multi_region else ()) + ("Status", "Resources", "Checks", "Not scanned", "Findings")
+    labels = (
+        ("Account / Service",)
+        + (("Region / Scope",) if multi_region else ())
+        + ("Status", "Resources", "Checks", "Not scanned", "Findings")
+    )
     for label in labels:
-        coverage.add_column(label, justify="right" if label in {"Resources", "Checks", "Not scanned", "Findings"} else "left")
+        coverage.add_column(
+            label,
+            justify=(
+                "right" if label in {"Resources", "Checks", "Not scanned", "Findings"} else "left"
+            ),
+        )
     for entry in report.coverage:
         status_style = GREEN if entry["status"] == "COMPLETE" else YELLOW
-        coverage.add_row(Text(f"{terminal_text(entry['account_id'])} / {terminal_text(entry['service'].upper())}"),
-                         *((Text(terminal_text(entry.get("region") or entry.get("scope") or "global")),) if multi_region else ()),
-                         Text(terminal_text(entry["status"]), style=status_style),
-                         *(str(entry[key]) for key in ("resources", "evaluated", "not_scanned", "findings")))
+        coverage.add_row(
+            Text(
+                f"{terminal_text(entry['account_id'])} / {terminal_text(entry['service'].upper())}"
+            ),
+            *(
+                (Text(terminal_text(entry.get("region") or entry.get("scope") or "global")),)
+                if multi_region
+                else ()
+            ),
+            Text(terminal_text(entry["status"]), style=status_style),
+            *(str(entry[key]) for key in ("resources", "evaluated", "not_scanned", "findings")),
+        )
     console.print(coverage)
     rank = {severity: index for index, severity in enumerate(SEVERITY_STYLES)}
     findings = sorted(report.findings, key=lambda finding: rank[finding.severity])
@@ -123,44 +228,104 @@ def render_console(report: Report, *, summary_only: bool = False) -> None:
     for index, finding in enumerate([] if summary_only else findings, 1):
         title = Text(f"{index:02d}  {finding.severity}", style=SEVERITY_STYLES[finding.severity])
         body = Text(f"{terminal_text(finding.title)}\n", style=f"bold {ORANGE}")
-        body.append(f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n", style=CYAN)
+        body.append(
+            f"{terminal_text(finding.id)} / {terminal_text(finding.service.upper())} / {terminal_text(finding.account_id)}\n",
+            style=CYAN,
+        )
         body.append(f"Resource: {terminal_text(finding.resource_id)}\n", style=CYAN)
         body.append(f"{terminal_text(finding.description, multiline=True)}\n\n", style=YELLOW)
         body.append("Normalized evidence:\n", style=f"bold {CYAN}")
-        body.append(terminal_text(json.dumps(finding.evidence, indent=2, ensure_ascii=False, allow_nan=False),
-                                  multiline=True) + "\n\n", style=CYAN)
+        body.append(
+            terminal_text(
+                json.dumps(finding.evidence, indent=2, ensure_ascii=False, allow_nan=False),
+                multiline=True,
+            )
+            + "\n\n",
+            style=CYAN,
+        )
         body.append("Risk: ", style=f"bold {YELLOW}")
         body.append(terminal_text(finding.risk, multiline=True) + "\n\n", style=YELLOW)
         if index - 1 in report.suppression_matches:
             suppression = report.suppression_matches[index - 1]
-            body.append("Suppressed until " + terminal_text(suppression["expires_on"]) +
-                        " by " + terminal_text(suppression["owner"]) + ": " +
-                        terminal_text(suppression["reason"], multiline=True) + "\n\n", style=YELLOW)
+            body.append(
+                "Suppressed until "
+                + terminal_text(suppression["expires_on"])
+                + " by "
+                + terminal_text(suppression["owner"])
+                + ": "
+                + terminal_text(suppression["reason"], multiline=True)
+                + "\n\n",
+                style=YELLOW,
+            )
         body.append("Remediation: ", style=f"bold {GREEN}")
         body.append(terminal_text(finding.remediation, multiline=True), style=GREEN)
-        body.append("\n\nVerification limit: observed configuration only; effective access was not tested.", style=YELLOW)
-        console.print(Panel(body, title=title, title_align="left", border_style=PURPLE, padding=(1, 2)))
+        body.append(
+            "\n\nVerification limit: observed configuration only; effective access was not tested.",
+            style=YELLOW,
+        )
+        console.print(
+            Panel(body, title=title, title_align="left", border_style=PURPLE, padding=(1, 2))
+        )
     if not findings:
-        console.print("No findings were produced by the evaluated checks. Review scan coverage.", style=YELLOW, markup=False)
+        console.print(
+            "No findings were produced by the evaluated checks. Review scan coverage.",
+            style=YELLOW,
+            markup=False,
+        )
     if report.suppression_audit is not None:
         console.print("Suppression audit", style=f"bold {ORANGE}")
         for entry in report.suppression_audit:
-            console.print(f"{entry['status']} {terminal_text(entry['check_id'])} / {terminal_text(entry['account_id'])} / "
-                          f"{terminal_text(entry['resource_id'])} / expires {terminal_text(entry['expires_on'])} / "
-                          f"owner {terminal_text(entry['owner'])} / reason {terminal_text(entry['reason'], multiline=True)}",
-                          style=YELLOW, markup=False)
+            console.print(
+                f"{entry['status']} {terminal_text(entry['check_id'])} / {terminal_text(entry['account_id'])} / "
+                f"{terminal_text(entry['resource_id'])} / expires {terminal_text(entry['expires_on'])} / "
+                f"owner {terminal_text(entry['owner'])} / reason {terminal_text(entry['reason'], multiline=True)}",
+                style=YELLOW,
+                markup=False,
+            )
     issues = [(entry, issue) for entry in report.coverage for issue in entry["issues"]]
     if issues:
-        has_exclusions = any(issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection"} for _, issue in issues)
+        has_exclusions = any(
+            issue["operation"]
+            in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection"}
+            for _, issue in issues
+        )
         has_missing_facts = any(issue["operation"] == "RequiredFact" for _, issue in issues)
-        errors.print("Scan issues and exclusions" if has_exclusions else "Scan issues" if has_missing_facts else "Collection issues",
-                     style=f"bold {RED}")
+        errors.print(
+            (
+                "Scan issues and exclusions"
+                if has_exclusions
+                else "Scan issues" if has_missing_facts else "Collection issues"
+            ),
+            style=f"bold {RED}",
+        )
         for entry, issue in issues:
-            label = "NOT_SCANNED" if issue["operation"] in {"CheckSelection", "AccountSelection", "OUSelection", "ResourceSelection", "AccountPublicAccessContext", "RequiredFact"} else "ERROR"
-            message = Text(f"{label} {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
-                           f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n", style=RED)
+            label = (
+                "NOT_SCANNED"
+                if issue["operation"]
+                in {
+                    "CheckSelection",
+                    "AccountSelection",
+                    "OUSelection",
+                    "ResourceSelection",
+                    "AccountPublicAccessContext",
+                    "RequiredFact",
+                }
+                else "ERROR"
+            )
+            message = Text(
+                f"{label} {terminal_text(entry['account_id'])} {terminal_text(entry['service'].upper())} / "
+                f"{terminal_text(issue['resource_id'] or 'account')} / {terminal_text(issue['operation'])}\n",
+                style=RED,
+            )
             if multi_region:
-                message.append(f"Region / scope: {terminal_text(entry.get('region') or entry.get('scope') or 'global')}\n", style=CYAN)
+                message.append(
+                    f"Region / scope: {terminal_text(entry.get('region') or entry.get('scope') or 'global')}\n",
+                    style=CYAN,
+                )
             message.append(terminal_text(issue["message"], multiline=True), style=YELLOW)
             errors.print(message)
-    console.print("Scope: configuration risk indicators; effective access is not determined.", style=YELLOW, markup=False)
+    console.print(
+        "Scope: configuration risk indicators; effective access is not determined.",
+        style=YELLOW,
+        markup=False,
+    )

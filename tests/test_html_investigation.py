@@ -20,21 +20,34 @@ from awsherlock.cli import app
 from typer.testing import CliRunner
 from unittest.mock import Mock
 
-
 ACCOUNT = "123456789012"
 REGION = "us-east-1"
 
 
 def role(name: str = "worker", *, broad: bool = True) -> Resource:
     return Resource(
-        service="iam", resource_type="role", account_id=ACCOUNT, region=None,
-        resource_id=name, resource_arn=f"arn:aws:iam::{ACCOUNT}:role/{name}",
+        service="iam",
+        resource_type="role",
+        account_id=ACCOUNT,
+        region=None,
+        resource_id=name,
+        resource_arn=f"arn:aws:iam::{ACCOUNT}:role/{name}",
         data={
             "attached": (["arn:aws:iam::aws:policy/AdministratorAccess"] if broad else []),
-            "statements": ([{"effect": "Allow", "conditional": False,
-                             "actions": ["*"], "resources": ["*"],
-                             "not_actions": False, "not_resources": False}]
-                           if broad else []),
+            "statements": (
+                [
+                    {
+                        "effect": "Allow",
+                        "conditional": False,
+                        "actions": ["*"],
+                        "resources": ["*"],
+                        "not_actions": False,
+                        "not_resources": False,
+                    }
+                ]
+                if broad
+                else []
+            ),
         },
     )
 
@@ -42,15 +55,25 @@ def role(name: str = "worker", *, broad: bool = True) -> Resource:
 def snapshot(*, version: int = 2, reverse: bool = False) -> Snapshot:
     target = role()
     source = ResourceRef(
-        service="agentcore", resource_type="runtime-version", account_id=ACCOUNT,
-        region=REGION, resource_id="Runtime_Example-abcdefghij:2", resource_arn=None,
+        service="agentcore",
+        resource_type="runtime-version",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id="Runtime_Example-abcdefghij:2",
+        resource_arn=None,
     )
     target_ref = ResourceRef(
-        service="iam", resource_type="role", account_id=ACCOUNT, region=None,
-        resource_id="worker", resource_arn=target.resource_arn,
+        service="iam",
+        resource_type="role",
+        account_id=ACCOUNT,
+        region=None,
+        resource_id="worker",
+        resource_arn=target.resource_arn,
     )
     edge = Relationship(
-        source=source, relationship_type=RelationshipType.RUNS_AS, target=target_ref,
+        source=source,
+        relationship_type=RelationshipType.RUNS_AS,
+        target=target_ref,
         evidence=(RelationshipEvidence(service="iam", fact="identity_bindings"),),
     )
     resources = [target, role("observer", broad=False)]
@@ -58,9 +81,16 @@ def snapshot(*, version: int = 2, reverse: bool = False) -> Snapshot:
         resources.reverse()
     services = {"iam": CollectionResult(resources=resources)}
     return Snapshot(
-        ScanMetadata(scan_id="m6", started_at=datetime(2026, 10, 8, tzinfo=timezone.utc),
-                     account_id=ACCOUNT, region=REGION, version="test"),
-        services, (edge,) if version == 2 else (), version,
+        ScanMetadata(
+            scan_id="m6",
+            started_at=datetime(2026, 10, 8, tzinfo=timezone.utc),
+            account_id=ACCOUNT,
+            region=REGION,
+            version="test",
+        ),
+        services,
+        (edge,) if version == 2 else (),
+        version,
     )
 
 
@@ -115,13 +145,21 @@ def test_selected_check_report_cannot_supply_excluded_lead_findings():
 def test_v1_finding_only_lambda_lead_remains_eligible():
     arn = f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:classic"
     function = Resource(
-        service="lambda", resource_type="function", account_id=ACCOUNT, region=REGION,
-        resource_id="classic", resource_arn=arn,
+        service="lambda",
+        resource_type="function",
+        account_id=ACCOUNT,
+        region=REGION,
+        resource_id="classic",
+        resource_arn=arn,
         data={
             "urls": [{"arn": arn, "auth": "NONE"}],
             "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
-            "runtime": {"name": "python3.13", "deprecated": False,
-                        "catalog_date": "2026-09-15", "evaluated_on": "2026-10-08"},
+            "runtime": {
+                "name": "python3.13",
+                "deprecated": False,
+                "catalog_date": "2026-09-15",
+                "evaluated_on": "2026-10-08",
+            },
         },
     )
     value = Snapshot(snapshot().metadata, {"lambda": CollectionResult(resources=[function])}, (), 1)
@@ -193,17 +231,26 @@ def test_multi_account_scopes_do_not_cross_link_same_named_roles():
     second_account = "999999999999"
     second = snapshot()
     second.metadata = replace(second.metadata, account_id=second_account, scan_id="m6-other")
-    second.services["iam"].resources = [replace(
-        item, account_id=second_account,
-        resource_arn=item.resource_arn.replace(ACCOUNT, second_account),
-    ) for item in second.services["iam"].resources]
+    second.services["iam"].resources = [
+        replace(
+            item,
+            account_id=second_account,
+            resource_arn=item.resource_arn.replace(ACCOUNT, second_account),
+        )
+        for item in second.services["iam"].resources
+    ]
     original_edge = second.relationships[0]
-    second.relationships = (replace(
-        original_edge,
-        source=replace(original_edge.source, account_id=second_account),
-        target=replace(original_edge.target, account_id=second_account,
-                       resource_arn=original_edge.target.resource_arn.replace(ACCOUNT, second_account)),
-    ),)
+    second.relationships = (
+        replace(
+            original_edge,
+            source=replace(original_edge.source, account_id=second_account),
+            target=replace(
+                original_edge.target,
+                account_id=second_account,
+                resource_arn=original_edge.target.resource_arn.replace(ACCOUNT, second_account),
+            ),
+        ),
+    )
     reports = (evaluate_snapshot(first), evaluate_snapshot(second))
     aggregate = Report(
         {**reports[0].metadata, "region": None, "regions": [REGION]},
@@ -214,10 +261,13 @@ def test_multi_account_scopes_do_not_cross_link_same_named_roles():
     assert len(view["leads"]) == 2
     assert len({item["anchor"] for item in view["leads"]}) == 2
     assert {item["subjects"][0]["account_id"] for item in view["leads"]} == {
-        ACCOUNT, second_account,
+        ACCOUNT,
+        second_account,
     }
-    assert all(item["findings"] and all(ref["resolved"] for ref in item["findings"])
-               for item in view["leads"])
+    assert all(
+        item["findings"] and all(ref["resolved"] for ref in item["findings"])
+        for item in view["leads"]
+    )
 
 
 def test_html_view_and_rendering_are_permutation_stable():
@@ -234,9 +284,15 @@ def test_html_escapes_investigation_text_and_allows_only_https_references():
     value = snapshot()
     report = evaluate_snapshot(value)
     report.findings[0] = replace(
-        report.findings[0], title='</script><svg onload="alert(1)">',
-        references=["https://docs.aws.amazon.com/example", "javascript:alert(1)",
-                    "//evil.example", "https://bad host/example", "https://example.com:443/x"],
+        report.findings[0],
+        title='</script><svg onload="alert(1)">',
+        references=[
+            "https://docs.aws.amazon.com/example",
+            "javascript:alert(1)",
+            "//evil.example",
+            "https://bad host/example",
+            "https://example.com:443/x",
+        ],
     )
     html = render_html(report, scopes=(HtmlScope(value, report),))
     assert '<svg onload="alert(1)">' not in html
@@ -267,9 +323,17 @@ def test_offline_html_cli_supplies_snapshot_investigation_context(monkeypatch, t
     write_snapshot(snapshot(), source)
     factory = Mock(side_effect=AssertionError("offline HTML created an AWS session"))
     monkeypatch.setattr("awsherlock.cli.create_scan_context", factory)
-    result = CliRunner().invoke(app, [
-        "scan", str(source), "--output", "html", "--report-file", str(output),
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "scan",
+            str(source),
+            "--output",
+            "html",
+            "--report-file",
+            str(output),
+        ],
+    )
     assert result.exit_code == 0
     html = output.read_text(encoding="utf-8")
     assert "AI-WORKLOAD-BROAD-EXECUTION-ROLE" in html

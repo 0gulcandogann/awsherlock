@@ -1,5 +1,9 @@
 # Real-AWS pilot
 
+For v0.5.1 contextual investigations, use the supplemental
+[read-only validation procedure](investigation-validation.md). Its live ledger
+starts NOT EXECUTED; historical results below do not validate the new engine.
+
 [README](../README.md) · [42-check matrix](validation-matrix.md)
 
 This guide accompanies the 42-check validation matrix and prepares a read-only pilot. A bounded v0.3.0 pilot scanned existing

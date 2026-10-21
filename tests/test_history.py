@@ -15,8 +15,14 @@ from test_diff import sample
 
 
 def later(snapshot, *, scan_id="second"):
-    return replace(snapshot, metadata=replace(snapshot.metadata, scan_id=scan_id,
-                                              started_at=snapshot.metadata.started_at + timedelta(days=1)))
+    return replace(
+        snapshot,
+        metadata=replace(
+            snapshot.metadata,
+            scan_id=scan_id,
+            started_at=snapshot.metadata.started_at + timedelta(days=1),
+        ),
+    )
 
 
 def test_first_last_observed_and_coverage_without_resolution_claim():
@@ -42,12 +48,15 @@ def test_multiple_observations_and_zero_findings():
     assert finding_history([sample(True), later(sample(True))])["findings"] == []
 
 
-@pytest.mark.parametrize("snapshots", [
-    [sample(False)],
-    [sample(False), sample(False)],
-    [sample(False), later(sample(False, region="us-east-1"))],
-    [sample(False), later(sample(False, account="999999999999"))],
-])
+@pytest.mark.parametrize(
+    "snapshots",
+    [
+        [sample(False)],
+        [sample(False), sample(False)],
+        [sample(False), later(sample(False, region="us-east-1"))],
+        [sample(False), later(sample(False, account="999999999999"))],
+    ],
+)
 def test_invalid_history_scope_or_order(snapshots):
     with pytest.raises(HistoryError):
         finding_history(snapshots)
@@ -66,6 +75,8 @@ def test_offline_cli_json_no_aws_and_invalid_inputs(monkeypatch, tmp_path):
     assert data["findings"][0]["first_scan_id"] == "sample"
     assert "SecretAccessKey" not in result.stdout
     assert runner.invoke(app, ["history", str(before)]).exit_code == 2
-    assert runner.invoke(app, ["history", str(before), str(after), "--output", "xml"]).exit_code == 2
+    assert (
+        runner.invoke(app, ["history", str(before), str(after), "--output", "xml"]).exit_code == 2
+    )
     assert runner.invoke(app, ["history", str(before), str(tmp_path / "missing")]).exit_code == 1
     session.assert_not_called()

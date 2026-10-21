@@ -20,15 +20,27 @@ class RootHelpGroup(TyperGroup):
         for command, description in (
             ("awsherlock profiles list", "List local profiles; no AWS calls."),
             ("awsherlock guide", "Choose profile, region and services locally."),
-            ("awsherlock whoami --profile production", "Verify the effective account and principal live."),
+            (
+                "awsherlock whoami --profile production",
+                "Verify the effective account and principal live.",
+            ),
             ("awsherlock scan", "Scan with existing AWS credentials."),
             ("awsherlock scan --profile production", "Use your AWS profile."),
             ("awsherlock scan --preview", "Inspect a local plan without AWS calls."),
             ("awsherlock scan facts.json", "Evaluate saved facts offline."),
-            ("awsherlock diff before.json after.json", "Compare saved findings with coverage checks."),
-            ("awsherlock history first.json latest.json", "Review first and last observed findings offline."),
+            (
+                "awsherlock diff before.json after.json",
+                "Compare saved findings with coverage checks.",
+            ),
+            (
+                "awsherlock history first.json latest.json",
+                "Review first and last observed findings offline.",
+            ),
             ("awsherlock leads facts.json", "Correlate saved security signals as review hints."),
-            ("awsherlock coverage facts.json", "Explain recorded evidence and uncertainty offline."),
+            (
+                "awsherlock coverage facts.json",
+                "Explain recorded evidence and uncertainty offline.",
+            ),
             ("awsherlock identities facts.json", "Inspect saved IAM identities offline."),
             ("awsherlock --describe-check AWSH-CT-001", "Explain a check offline."),
             ("awsherlock --update", "Update from GitHub main; internet required."),
@@ -45,5 +57,12 @@ class RootHelpGroup(TyperGroup):
             "Full reference: https://github.com/0gulcandogann/awsherlock#command-reference",
             style=YELLOW,
         )
-        console.print(Panel(Group(table, notes), title=Text("Quick start", style=f"bold {ORANGE}"),
-                            title_align="left", border_style=PURPLE, box=box.ROUNDED))
+        console.print(
+            Panel(
+                Group(table, notes),
+                title=Text("Quick start", style=f"bold {ORANGE}"),
+                title_align="left",
+                border_style=PURPLE,
+                box=box.ROUNDED,
+            )
+        )

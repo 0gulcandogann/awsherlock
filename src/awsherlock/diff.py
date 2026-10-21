@@ -7,13 +7,17 @@ from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.models import Finding
 from awsherlock.snapshot import Snapshot
 
-
 SCHEMA_VERSION = 1
 
 
 def finding_key(finding: Finding) -> tuple[str, str, str, str, str]:
-    return (finding.id, finding.service, finding.account_id,
-            finding.region or "", finding.resource_id)
+    return (
+        finding.id,
+        finding.service,
+        finding.account_id,
+        finding.region or "",
+        finding.resource_id,
+    )
 
 
 def compare_snapshots(before: Snapshot, after: Snapshot, *, include_leads: bool = False) -> dict:
@@ -25,8 +29,10 @@ def compare_snapshots(before: Snapshot, after: Snapshot, *, include_leads: bool 
     details = {finding_key(finding): finding for finding in (*previous.findings, *current.findings)}
     old_coverage = {row["service"]: row["status"] for row in previous.coverage}
     new_coverage = {row["service"]: row["status"] for row in current.coverage}
-    same_scope = (before.metadata.account_id == after.metadata.account_id and
-                  before.metadata.region == after.metadata.region)
+    same_scope = (
+        before.metadata.account_id == after.metadata.account_id
+        and before.metadata.region == after.metadata.region
+    )
     changes = []
     for key in sorted(old.keys() | new.keys()):
         finding = details[key]
@@ -39,23 +45,47 @@ def compare_snapshots(before: Snapshot, after: Snapshot, *, include_leads: bool 
             status = "NEW" if old_coverage.get(finding.service) == "COMPLETE" else "UNKNOWN"
         else:
             status = "RESOLVED" if new_coverage.get(finding.service) == "COMPLETE" else "UNKNOWN"
-        changes.append({"status": status, "check_id": finding.id, "title": finding.title,
-                        "severity": finding.severity.value, "service": finding.service,
-                        "account_id": finding.account_id, "region": finding.region,
-                        "resource_id": finding.resource_id,
-                        "before_count": before_count, "after_count": after_count})
-    counts = {status: sum(change["status"] == status for change in changes)
-              for status in ("NEW", "RESOLVED", "UNCHANGED", "UNKNOWN")}
-    comparison = {"schema_version": SCHEMA_VERSION, "kind": "snapshot-diff",
-            "before": {"scan_id": before.metadata.scan_id, "account_id": before.metadata.account_id,
-                       "region": before.metadata.region, "started_at": before.metadata.started_at.isoformat()},
-            "after": {"scan_id": after.metadata.scan_id, "account_id": after.metadata.account_id,
-                      "region": after.metadata.region, "started_at": after.metadata.started_at.isoformat()},
-            "same_scope": same_scope,
-            "coverage": {"before": old_coverage, "after": new_coverage},
-            "summary": counts, "changes": changes}
+        changes.append(
+            {
+                "status": status,
+                "check_id": finding.id,
+                "title": finding.title,
+                "severity": finding.severity.value,
+                "service": finding.service,
+                "account_id": finding.account_id,
+                "region": finding.region,
+                "resource_id": finding.resource_id,
+                "before_count": before_count,
+                "after_count": after_count,
+            }
+        )
+    counts = {
+        status: sum(change["status"] == status for change in changes)
+        for status in ("NEW", "RESOLVED", "UNCHANGED", "UNKNOWN")
+    }
+    comparison = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "snapshot-diff",
+        "before": {
+            "scan_id": before.metadata.scan_id,
+            "account_id": before.metadata.account_id,
+            "region": before.metadata.region,
+            "started_at": before.metadata.started_at.isoformat(),
+        },
+        "after": {
+            "scan_id": after.metadata.scan_id,
+            "account_id": after.metadata.account_id,
+            "region": after.metadata.region,
+            "started_at": after.metadata.started_at.isoformat(),
+        },
+        "same_scope": same_scope,
+        "coverage": {"before": old_coverage, "after": new_coverage},
+        "summary": counts,
+        "changes": changes,
+    }
     if include_leads:
         from awsherlock.lead_delta import compare_lead_delta
+
         comparison["schema_version"] = 2
         comparison["lead_delta"] = compare_lead_delta(before, after, previous, current)
     return comparison

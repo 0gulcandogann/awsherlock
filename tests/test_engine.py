@@ -15,20 +15,34 @@ class ExampleRule:
             return []
         if resource.data["secure"]:
             return []
-        return [Finding(
-            id="TEST-001", title="Synthetic finding", description="Test-only rule",
-            severity=Severity.LOW, service=resource.service, account_id=resource.account_id,
-            region=resource.region, resource_id=resource.resource_id,
-            resource_arn=resource.resource_arn, evidence={"secure": False},
-            risk="Synthetic risk", remediation="Synthetic remediation",
-        )]
+        return [
+            Finding(
+                id="TEST-001",
+                title="Synthetic finding",
+                description="Test-only rule",
+                severity=Severity.LOW,
+                service=resource.service,
+                account_id=resource.account_id,
+                region=resource.region,
+                resource_id=resource.resource_id,
+                resource_arn=resource.resource_arn,
+                evidence={"secure": False},
+                risk="Synthetic risk",
+                remediation="Synthetic remediation",
+            )
+        ]
 
 
 @pytest.fixture
 def resource() -> Resource:
     return Resource(
-        service="test", resource_type="example", account_id="123456789012",
-        region=None, resource_id="first", resource_arn=None, data={"secure": False},
+        service="test",
+        resource_type="example",
+        account_id="123456789012",
+        region=None,
+        resource_id="first",
+        resource_arn=None,
+        data={"secure": False},
     )
 
 

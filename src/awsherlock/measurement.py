@@ -67,8 +67,9 @@ class ScanMeasurements:
             self._identities.setdefault((account_id, identity), len(self._identities) + 1)
 
     @contextmanager
-    def collection(self, account_id: str, identity: str, region: str | None,
-                   service: str) -> Iterator[None]:
+    def collection(
+        self, account_id: str, identity: str, region: str | None, service: str
+    ) -> Iterator[None]:
         with self._lock:
             if self._closed:
                 raise RuntimeError("Measurements are already closed")
@@ -99,26 +100,42 @@ class ScanMeasurements:
             collections = [(key, list(samples)) for key, samples in self.collection_seconds.items()]
 
         def fields(scope: MeasurementScope, service: str) -> dict:
-            return {"account_id": scope.account_id,
-                    "identity_scope": identities[scope.account_id, scope.identity],
-                    "region": scope.region, "service": service}
+            return {
+                "account_id": scope.account_id,
+                "identity_scope": identities[scope.account_id, scope.identity],
+                "region": scope.region,
+                "service": service,
+            }
 
         def scope_key(scope: MeasurementScope, service: str) -> tuple:
-            return (scope.account_id, identities[scope.account_id, scope.identity],
-                    scope.region or "", service)
+            return (
+                scope.account_id,
+                identities[scope.account_id, scope.identity],
+                scope.region or "",
+                service,
+            )
 
         return {
             "schema_version": 1,
             "call_unit": "SDK invocation (not HTTP attempts or retries)",
             "client_unit": "distinct instrumented SDK client",
             "authentication_calls_included": False,
-            "calls": [{**fields(scope, service), "operation": operation, "count": count}
-                      for (scope, service, operation), count in sorted(
-                          calls, key=lambda item: (*scope_key(item[0][0], item[0][1]), item[0][2]))],
-            "clients": [{**fields(scope, service), "count": count}
-                        for (scope, service), count in sorted(
-                            clients, key=lambda item: scope_key(item[0][0], item[0][1]))],
-            "collections": [{**fields(scope, service), "seconds": samples}
-                            for (scope, service), samples in sorted(
-                                collections, key=lambda item: scope_key(item[0][0], item[0][1]))],
+            "calls": [
+                {**fields(scope, service), "operation": operation, "count": count}
+                for (scope, service, operation), count in sorted(
+                    calls, key=lambda item: (*scope_key(item[0][0], item[0][1]), item[0][2])
+                )
+            ],
+            "clients": [
+                {**fields(scope, service), "count": count}
+                for (scope, service), count in sorted(
+                    clients, key=lambda item: scope_key(item[0][0], item[0][1])
+                )
+            ],
+            "collections": [
+                {**fields(scope, service), "seconds": samples}
+                for (scope, service), samples in sorted(
+                    collections, key=lambda item: scope_key(item[0][0], item[0][1])
+                )
+            ],
         }

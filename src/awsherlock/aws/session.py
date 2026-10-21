@@ -41,7 +41,11 @@ def create_scan_context(
     role_match = _validate_role_options(role, role_session_name, external_id)
     validate_region(region)
     validate_account_id(expect_account)
-    if role_match is not None and expect_account is not None and role_match.group(2) != expect_account:
+    if (
+        role_match is not None
+        and expect_account is not None
+        and role_match.group(2) != expect_account
+    ):
         raise SessionError("Requested role does not belong to the expected AWS account.")
     if source_session is not None and profile is not None:
         raise SessionError("Specify either a source session or a profile, not both.")
@@ -50,8 +54,13 @@ def create_scan_context(
     operation = "caller identity"
     client_options = {"config": client_config} if client_config is not None else {}
     try:
-        session = source_session if source_session is not None else boto3.Session(
-            profile_name=profile, **({"region_name": region} if region is not None else {}))
+        session = (
+            source_session
+            if source_session is not None
+            else boto3.Session(
+                profile_name=profile, **({"region_name": region} if region is not None else {})
+            )
+        )
         source_profile = session.profile_name
         if role is not None:
             operation = "AssumeRole"
@@ -74,11 +83,14 @@ def create_scan_context(
             operation = "caller identity"
         identity = session.client("sts", **client_options).get_caller_identity()
     except ProfileNotFound:
-        raise SessionError("AWS profile not found. Check your AWS configuration.",
-                           recovery="profiles") from None
+        raise SessionError(
+            "AWS profile not found. Check your AWS configuration.", recovery="profiles"
+        ) from None
     except (SSOTokenLoadError, UnauthorizedSSOTokenError):
-        raise SessionError("AWS SSO session is unavailable. Sign in again with the selected profile.",
-                           recovery="sso") from None
+        raise SessionError(
+            "AWS SSO session is unavailable. Sign in again with the selected profile.",
+            recovery="sso",
+        ) from None
     except (NoCredentialsError, PartialCredentialsError):
         raise SessionError(
             "AWS credentials are missing or incomplete. Configure the AWS SDK credential chain.",
@@ -89,13 +101,22 @@ def create_scan_context(
         if code in {"AccessDenied", "AccessDeniedException"}:
             message = f"AccessDenied: AWS {operation} request was denied."
         elif code in {
-            "ExpiredToken", "ExpiredTokenException",
-            "InvalidClientTokenId", "SignatureDoesNotMatch",
+            "ExpiredToken",
+            "ExpiredTokenException",
+            "InvalidClientTokenId",
+            "SignatureDoesNotMatch",
         }:
-            message = "AWS credentials are expired or invalid. Refresh your AWS login or credentials."
+            message = (
+                "AWS credentials are expired or invalid. Refresh your AWS login or credentials."
+            )
         else:
             message = f"AWS rejected the {operation} request. Check your AWS configuration."
-        raise SessionError(message, recovery="configuration" if code not in {"AccessDenied", "AccessDeniedException"} else None) from None
+        raise SessionError(
+            message,
+            recovery=(
+                "configuration" if code not in {"AccessDenied", "AccessDeniedException"} else None
+            ),
+        ) from None
     except BotoCoreError:
         # SDK errors may embed credential-process output, tokens, or endpoint URLs.
         raise SessionError(
@@ -149,11 +170,15 @@ def validate_account_id(account_id: str | None) -> None:
 
 def verify_account_id(actual: str, expected: str | None) -> None:
     if expected is not None and actual != expected:
-        raise SessionError("AWS account does not match --expect-account. Scan stopped before collection.")
+        raise SessionError(
+            "AWS account does not match --expect-account. Scan stopped before collection."
+        )
 
 
 def _validate_role_options(
-    role: str | None, role_session_name: str | None, external_id: str | None,
+    role: str | None,
+    role_session_name: str | None,
+    external_id: str | None,
 ) -> re.Match[str] | None:
     """Reject malformed role input before accessing AWS; never echo its values."""
     if role is None:
@@ -166,7 +191,9 @@ def _validate_role_options(
     )
     if match is None:
         raise SessionError("Invalid role ARN. Expected an IAM role ARN with a 12-digit account ID.")
-    if role_session_name is not None and not re.fullmatch(r"[A-Za-z0-9_+=,.@-]{2,64}", role_session_name):
+    if role_session_name is not None and not re.fullmatch(
+        r"[A-Za-z0-9_+=,.@-]{2,64}", role_session_name
+    ):
         raise SessionError("Invalid role session name. Use 2-64 letters, digits, or _+=,.@-.")
     if external_id is not None and not re.fullmatch(r"[A-Za-z0-9_+=,.@:/-]{2,1224}", external_id):
         raise SessionError("Invalid external ID format.")

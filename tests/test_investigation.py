@@ -26,7 +26,9 @@ def api():
 
 
 def selected(value, pattern=LAMBDA):
-    return next(lead for lead in investigation_leads(value)["leads"] if lead["pattern_id"] == pattern)["lead_id"]
+    return next(
+        lead for lead in investigation_leads(value)["leads"] if lead["pattern_id"] == pattern
+    )["lead_id"]
 
 
 def source_file(tmp_path, value=None, pattern=LAMBDA):
@@ -51,7 +53,9 @@ def test_all_families_select_exactly_one_minimized_lead(pattern):
     assert "services" not in pack and '"data":' not in api().render_evidence_json(pack)
 
 
-@pytest.mark.parametrize("selector", ["missing", "LAMBDA-URL-BROAD-ROLE", "LAMBDA-URL-BROAD-ROLE:708c"])
+@pytest.mark.parametrize(
+    "selector", ["missing", "LAMBDA-URL-BROAD-ROLE", "LAMBDA-URL-BROAD-ROLE:708c"]
+)
 def test_unknown_prefix_or_fuzzy_id_fails(selector):
     with pytest.raises(api().InvestigationError):
         api().build_evidence_pack(pair(LAMBDA), selector)
@@ -119,12 +123,15 @@ def test_missing_resolved_finding_is_fatal(monkeypatch):
         module.build_evidence_pack(value, lead_id)
 
 
-@pytest.mark.parametrize("foreign", [
-    f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:other",
-    f"arn:aws:lambda:{REGION}:999999999999:function:fn",
-    f"arn:aws:lambda:us-east-1:{ACCOUNT}:function:fn",
-    f"arn:aws-us-gov:lambda:{REGION}:{ACCOUNT}:function:fn",
-])
+@pytest.mark.parametrize(
+    "foreign",
+    [
+        f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:other",
+        f"arn:aws:lambda:{REGION}:999999999999:function:fn",
+        f"arn:aws:lambda:us-east-1:{ACCOUNT}:function:fn",
+        f"arn:aws-us-gov:lambda:{REGION}:{ACCOUNT}:function:fn",
+    ],
+)
 def test_foreign_lambda_url_cannot_be_exported(foreign):
     value = pair(LAMBDA)
     value.services["lambda"].resources[0].data["urls"][0]["arn"] = foreign
@@ -154,7 +161,11 @@ def test_same_named_foreign_scope_never_supplies_evidence(scope):
     value = pair(LAMBDA)
     lead_id = selected(value)
     fn = value.services["lambda"].resources[0]
-    foreign = replace(fn, account_id="999999999999") if scope == "account" else replace(fn, region="us-east-1")
+    foreign = (
+        replace(fn, account_id="999999999999")
+        if scope == "account"
+        else replace(fn, region="us-east-1")
+    )
     value.services["lambda"].resources.append(foreign)
     # Identical ARN on a distinct logical scope is never a valid exact join.
     with pytest.raises(api().InvestigationError):
@@ -167,8 +178,9 @@ def test_unrelated_resources_findings_relationships_and_secrets_are_excluded():
     value.services["lambda"].resources.append(other)
     value.relationships += (runs_as(other, value.services["iam"].resources[0]),)
     # A valid but unnecessary policy locator must not leak from resource facts.
-    value.services["iam"].resources[0].data["identity_profile"]["boundary"] = (
-        f"arn:aws:iam::{ACCOUNT}:policy/SECRET_SENTINEL")
+    value.services["iam"].resources[0].data["identity_profile"][
+        "boundary"
+    ] = f"arn:aws:iam::{ACCOUNT}:policy/SECRET_SENTINEL"
     pack = api().build_evidence_pack(value, selected(value))
     encoded = api().render_evidence_json(pack)
     assert "SECRET_SENTINEL" not in encoded and "unrelated-name" not in encoded
@@ -180,12 +192,25 @@ def test_secret_bearing_snapshot_fails_safely_without_artifact(tmp_path):
     value = pair(LAMBDA)
     lead_id = selected(value)
     raw = value.to_dict()
-    raw["services"]["lambda"]["resources"][0]["data"]["environment"] = {"secret_access_key": "SECRET_SENTINEL"}
+    raw["services"]["lambda"]["resources"][0]["data"]["environment"] = {
+        "secret_access_key": "SECRET_SENTINEL"
+    }
     path = tmp_path / "secret-facts.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     destination = tmp_path / "pack.html"
-    result = CliRunner().invoke(app, ["investigate", str(path), "--lead-id", lead_id,
-        "--output", "html", "--report-file", str(destination)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "investigate",
+            str(path),
+            "--lead-id",
+            lead_id,
+            "--output",
+            "html",
+            "--report-file",
+            str(destination),
+        ],
+    )
     assert result.exit_code == 1 and not destination.exists()
     assert "SECRET_SENTINEL" not in result.output
 
@@ -211,7 +236,9 @@ def test_nested_normalized_finding_payload_is_allowlisted(monkeypatch):
 def test_partial_policy_context_and_relevant_diagnostics_are_honest_and_minimized():
     value = pair(EC2)
     value.services["iam"].resources[0].data["identity_policy_context"]["complete"] = False
-    value.services["iam"].issues.append(CollectionIssue("worker", "GetRolePolicy", "AccessDenied SECRET_SENTINEL"))
+    value.services["iam"].issues.append(
+        CollectionIssue("worker", "GetRolePolicy", "AccessDenied SECRET_SENTINEL")
+    )
     pack = api().build_evidence_pack(value, selected(value, EC2))
     assert pack["status"] == "PARTIAL"
     assert "IAM_POLICY_CONTEXT_INCOMPLETE" in pack["limitations"]
@@ -230,7 +257,10 @@ class Tags(HTMLParser):
         self.tags.append((tag, dict(attrs)))
 
 
-@pytest.mark.parametrize("payload", ['<script>alert(1)</script>', '<svg onload="alert(1)">', '\"><img src=x onerror=alert(1)>'])
+@pytest.mark.parametrize(
+    "payload",
+    ["<script>alert(1)</script>", '<svg onload="alert(1)">', '"><img src=x onerror=alert(1)>'],
+)
 def test_html_escapes_aws_and_evidence_strings(payload):
     value = pair(LAMBDA)
     value.metadata = replace(value.metadata, scan_id=payload)
@@ -241,7 +271,16 @@ def test_html_escapes_aws_and_evidence_strings(payload):
     assert payload not in rendered and "&lt;" in rendered
 
 
-@pytest.mark.parametrize("url", ["javascript:alert(1)", "http://example.com", "https://user@example.com", "https://example.com:443/a", "https://example.com\\evil"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "javascript:alert(1)",
+        "http://example.com",
+        "https://user@example.com",
+        "https://example.com:443/a",
+        "https://example.com\\evil",
+    ],
+)
 def test_unsafe_urls_are_not_clickable(url):
     pack = api().build_evidence_pack(pair(LAMBDA), selected(pair(LAMBDA)))
     pack["findings"][0]["references"] = [url]
@@ -258,7 +297,9 @@ def test_safe_links_are_private_and_static_html_has_no_network_assets():
     for tag, attrs in parsed.tags:
         assert tag not in {"script", "link", "img", "iframe"}
         if tag == "a":
-            assert attrs["rel"] == "noopener noreferrer" and attrs["referrerpolicy"] == "no-referrer"
+            assert (
+                attrs["rel"] == "noopener noreferrer" and attrs["referrerpolicy"] == "no-referrer"
+            )
 
 
 def test_pack_is_deterministic_and_does_not_mutate_input():
@@ -306,12 +347,19 @@ def test_cli_offline_export_and_partial_exit(tmp_path, monkeypatch, output, part
     def forbidden(*args, **kwargs):
         pytest.fail("Offline evidence export attempted AWS access")
 
-    for obj, name in [(boto3, "Session"), (boto3.session, "Session"), (boto3, "client"),
-                      (botocore.session, "get_session"), (ScanContext, "client")]:
+    for obj, name in [
+        (boto3, "Session"),
+        (boto3.session, "Session"),
+        (boto3, "client"),
+        (botocore.session, "get_session"),
+        (ScanContext, "client"),
+    ]:
         monkeypatch.setattr(obj, name, forbidden)
     value = pair(LAMBDA)
     if partial:
-        value.services["lambda"].issues.append(CollectionIssue("fn", "ListFunctionUrlConfigs", "AccessDenied"))
+        value.services["lambda"].issues.append(
+            CollectionIssue("fn", "ListFunctionUrlConfigs", "AccessDenied")
+        )
     path, lead_id = source_file(tmp_path, value)
     saved = path.read_bytes()
     args = ["investigate", str(path), "--lead-id", lead_id, "--output", output]
@@ -335,8 +383,19 @@ def test_cli_fatal_errors_never_write_or_overwrite(tmp_path, output, failure):
     if failure == "existing":
         destination.write_text("DO_NOT_OVERWRITE", encoding="utf-8")
     saved = destination.read_bytes() if destination.exists() else None
-    result = CliRunner().invoke(app, ["investigate", str(path), "--lead-id", lead_id if failure != "unknown" else "missing",
-                                    "--output", output, "--report-file", str(destination)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "investigate",
+            str(path),
+            "--lead-id",
+            lead_id if failure != "unknown" else "missing",
+            "--output",
+            output,
+            "--report-file",
+            str(destination),
+        ],
+    )
     assert result.exit_code == 1, result.output
     if saved is None:
         assert not destination.exists()
@@ -344,9 +403,15 @@ def test_cli_fatal_errors_never_write_or_overwrite(tmp_path, output, failure):
         assert destination.read_bytes() == saved
 
 
-@pytest.mark.parametrize("args", [["investigate"], ["investigate", "x.json"],
-    ["investigate", "x.json", "--lead-id", "x", "--output", "html"],
-    ["investigate", "x.json", "--lead-id", "x", "--output", "xml"]])
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["investigate"],
+        ["investigate", "x.json"],
+        ["investigate", "x.json", "--lead-id", "x", "--output", "html"],
+        ["investigate", "x.json", "--lead-id", "x", "--output", "xml"],
+    ],
+)
 def test_cli_usage_errors_exit_two(args):
     assert CliRunner().invoke(app, args).exit_code == 2
 
@@ -362,8 +427,23 @@ def test_help_discovers_offline_investigation(args):
 def test_installed_cli_and_pack_template_subprocess(tmp_path):
     path, lead_id = source_file(tmp_path)
     destination = tmp_path / "pack.html"
-    result = subprocess.run([sys.executable, "-m", "awsherlock", "investigate", str(path), "--lead-id", lead_id,
-        "--output", "html", "--report-file", str(destination)], capture_output=True, text=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "awsherlock",
+            "investigate",
+            str(path),
+            "--lead-id",
+            lead_id,
+            "--output",
+            "html",
+            "--report-file",
+            str(destination),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0, result.stderr
     assert "Investigation Evidence Pack" in destination.read_text(encoding="utf-8")
 
@@ -378,8 +458,12 @@ for s in [pair(EC2),operation_snapshot('relationship','SecretMarker123'),operati
     outputs.append([api().render_evidence_json(p),api().render_evidence_html(p)])
 print(json.dumps(outputs))
 """
-    outputs = [subprocess.check_output([sys.executable, "-c", script],
-        env={**os.environ, "PYTHONHASHSEED": seed}) for seed in ["1", "777"]]
+    outputs = [
+        subprocess.check_output(
+            [sys.executable, "-c", script], env={**os.environ, "PYTHONHASHSEED": seed}
+        )
+        for seed in ["1", "777"]
+    ]
     assert outputs[0] == outputs[1]
     assert b"SecretMarker123" not in outputs[0]
 
@@ -394,7 +478,13 @@ def test_normalized_broad_policy_projection_is_narrow(check):
         assert broad["evidence"]["attached"] == ["arn:aws:iam::aws:policy/AdministratorAccess"]
     else:
         assert set(broad["evidence"]["statements"][0]) == {
-            "effect", "conditional", "actions", "resources", "not_actions", "not_resources"}
+            "effect",
+            "conditional",
+            "actions",
+            "resources",
+            "not_actions",
+            "not_resources",
+        }
 
 
 def test_regional_coverage_identity_is_preserved():
@@ -415,10 +505,18 @@ def test_resolved_relationship_and_role_identity_damage_is_fatal(monkeypatch, da
         monkeypatch.setattr(module, "investigation_leads", lambda *args, **kwargs: document)
     elif damage == "foreign_role_path":
         edge = value.relationships[0]
-        value.relationships = (replace(edge, target=replace(edge.target,
-            resource_arn=f"arn:aws:iam::{ACCOUNT}:role/foreign-path/worker")),)
+        value.relationships = (
+            replace(
+                edge,
+                target=replace(
+                    edge.target, resource_arn=f"arn:aws:iam::{ACCOUNT}:role/foreign-path/worker"
+                ),
+            ),
+        )
     else:
-        value.services["bedrock"].resources[0].data["execution_role_arn"] = f"arn:aws:iam::{ACCOUNT}:role/other"
+        value.services["bedrock"].resources[0].data[
+            "execution_role_arn"
+        ] = f"arn:aws:iam::{ACCOUNT}:role/other"
     with pytest.raises(module.InvestigationError):
         module.build_evidence_pack(value, lead_id)
 
@@ -436,6 +534,7 @@ def test_required_relationship_must_connect_selected_subject(monkeypatch):
         doc = real(value, **kwargs)
         lead = next(item for item in doc["leads"] if item["lead_id"] == lead_id)
         from awsherlock.relationships import relationship_to_dict
+
         unrelated = relationship_to_dict(value.relationships[-1])
         lead["relationships"] = [{key: unrelated[key] for key in ("source", "type", "target")}]
         return doc
@@ -445,9 +544,14 @@ def test_required_relationship_must_connect_selected_subject(monkeypatch):
         module.build_evidence_pack(value, lead_id)
 
 
-@pytest.mark.parametrize("payload", ['<script>alert(1)</script>', '<svg/onload=alert(1)>', '"onload="alert(1)'])
+@pytest.mark.parametrize(
+    "payload", ["<script>alert(1)</script>", "<svg/onload=alert(1)>", '"onload="alert(1)']
+)
 def test_html_escapes_real_iam_path_locator(payload):
-    value = snapshot([replace(role(stale=True), resource_arn=f"arn:aws:iam::{ACCOUNT}:role/{payload}/worker")], version=2)
+    value = snapshot(
+        [replace(role(stale=True), resource_arn=f"arn:aws:iam::{ACCOUNT}:role/{payload}/worker")],
+        version=2,
+    )
     rendered = api().render_evidence_html(api().build_evidence_pack(value, selected(value, STALE)))
     parsed = Tags()
     parsed.feed(rendered)
@@ -457,8 +561,11 @@ def test_html_escapes_real_iam_path_locator(payload):
 
 def test_unrelated_service_coverage_does_not_make_pack_partial():
     from awsherlock.collectors.common import CollectionResult
+
     value = pair(LAMBDA)
-    value.services["s3"] = CollectionResult([], [CollectionIssue(None, "ListBuckets", "AccessDenied")])
+    value.services["s3"] = CollectionResult(
+        [], [CollectionIssue(None, "ListBuckets", "AccessDenied")]
+    )
     pack = api().build_evidence_pack(value, selected(value))
     assert pack["status"] == "COMPLETE"
     assert {row["service"] for row in pack["coverage"]} == {"lambda", "iam"}
@@ -472,8 +579,19 @@ def test_unsupported_snapshot_cli_does_not_write(tmp_path, schema):
     path = tmp_path / "unsupported.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     destination = tmp_path / "pack.html"
-    result = CliRunner().invoke(app, ["investigate", str(path), "--lead-id", selected(value),
-        "--output", "html", "--report-file", str(destination)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "investigate",
+            str(path),
+            "--lead-id",
+            selected(value),
+            "--output",
+            "html",
+            "--report-file",
+            str(destination),
+        ],
+    )
     assert result.exit_code == 1 and not destination.exists()
 
 
@@ -481,12 +599,25 @@ def test_unsupported_snapshot_cli_does_not_write(tmp_path, schema):
 def test_foreign_url_cli_fatal_resolution_leaves_no_artifact(tmp_path, output):
     value = pair(LAMBDA)
     lead_id = selected(value)
-    value.services["lambda"].resources[0].data["urls"][0]["arn"] = f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:other"
+    value.services["lambda"].resources[0].data["urls"][0][
+        "arn"
+    ] = f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:other"
     path = tmp_path / "foreign.json"
     path.write_text(json.dumps(value.to_dict()), encoding="utf-8")
     destination = tmp_path / "pack.out"
-    result = CliRunner().invoke(app, ["investigate", str(path), "--lead-id", lead_id,
-        "--output", output, "--report-file", str(destination)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "investigate",
+            str(path),
+            "--lead-id",
+            lead_id,
+            "--output",
+            output,
+            "--report-file",
+            str(destination),
+        ],
+    )
     assert result.exit_code == 1 and not destination.exists()
 
 
@@ -495,15 +626,22 @@ def test_foreign_url_cli_fatal_resolution_leaves_no_artifact(tmp_path, output):
 def test_arbitrary_provenance_text_is_not_exported(location, output):
     value = pair(EC2)
     if location == "coverage":
-        value.services["iam"].issues.append(CollectionIssue("worker", "AccessDenied SECRET_SENTINEL", "AccessDenied"))
+        value.services["iam"].issues.append(
+            CollectionIssue("worker", "AccessDenied SECRET_SENTINEL", "AccessDenied")
+        )
     else:
         edge = value.relationships[0]
-        evidence = RelationshipEvidence(service="iam", fact="secret_sentinel" if location.endswith("fact") else "identity_bindings",
-            operation="AccessDenied SECRET_SENTINEL" if location.endswith("operation") else None)
+        evidence = RelationshipEvidence(
+            service="iam",
+            fact="secret_sentinel" if location.endswith("fact") else "identity_bindings",
+            operation="AccessDenied SECRET_SENTINEL" if location.endswith("operation") else None,
+        )
         value.relationships = (replace(edge, evidence=(evidence,)),)
     value = snapshot_from_dict(value.to_dict())
     pack = api().build_evidence_pack(value, selected(value, EC2))
-    rendered = api().render_evidence_json(pack) if output == "json" else api().render_evidence_html(pack)
+    rendered = (
+        api().render_evidence_json(pack) if output == "json" else api().render_evidence_html(pack)
+    )
     assert "secret_sentinel" not in rendered.lower()
     assert pack["status"] == "PARTIAL"
     assert "PROVENANCE_FIELD_UNAVAILABLE" in pack["limitations"]
@@ -512,23 +650,36 @@ def test_arbitrary_provenance_text_is_not_exported(location, output):
 def test_legitimate_stored_operation_is_preserved():
     value = pair(AI)
     edge = value.relationships[0]
-    value.relationships = (replace(edge, evidence=(RelationshipEvidence(service="bedrock",
-        fact="execution_role_arn", operation="GetAgent"),)),)
+    value.relationships = (
+        replace(
+            edge,
+            evidence=(
+                RelationshipEvidence(
+                    service="bedrock", fact="execution_role_arn", operation="GetAgent"
+                ),
+            ),
+        ),
+    )
     pack = api().build_evidence_pack(value, selected(value, AI))
     assert pack["relationships"][0]["evidence"][0] == {
-        "service": "bedrock", "fact": "execution_role_arn", "operation": "GetAgent"}
+        "service": "bedrock",
+        "fact": "execution_role_arn",
+        "operation": "GetAgent",
+    }
     assert pack["status"] == "COMPLETE"
 
 
+@pytest.mark.browser
 def test_standalone_evidence_pack_opens_in_browser(tmp_path):
     from test_report_browser import run_browser
+
     value = pair(LAMBDA)
     pack = api().build_evidence_pack(value, selected(value))
     rendered = api().render_evidence_html(pack)
     output = run_browser(rendered, "", tmp_path)
     assert pack["lead"]["lead_id"] in output
     assert 'id="findings"' in output and 'id="not_proven"' in output
-    assert '<script>' not in rendered and '<svg' not in rendered
+    assert "<script>" not in rendered and "<svg" not in rendered
 
 
 def operation_snapshot(location, operation):
@@ -538,27 +689,46 @@ def operation_snapshot(location, operation):
         value.services["iam"].issues.append(CollectionIssue("worker", operation, "AccessDenied"))
     else:
         edge = value.relationships[0]
-        value.relationships = (replace(edge, evidence=(RelationshipEvidence(
-            service="iam", fact="identity_bindings", operation=operation),)),)
+        value.relationships = (
+            replace(
+                edge,
+                evidence=(
+                    RelationshipEvidence(
+                        service="iam", fact="identity_bindings", operation=operation
+                    ),
+                ),
+            ),
+        )
     return snapshot_from_dict(value.to_dict())
 
 
-@pytest.mark.parametrize("marker", ["SecretMarker123", "GetSecretMarker123", "DescribeSecretMarker777"])
+@pytest.mark.parametrize(
+    "marker", ["SecretMarker123", "GetSecretMarker123", "DescribeSecretMarker777"]
+)
 @pytest.mark.parametrize("location", ["relationship", "coverage"])
 @pytest.mark.parametrize("output", ["json", "html"])
 def test_operation_allowlist_excludes_identifier_shaped_payloads(marker, location, output):
     value = operation_snapshot(location, marker)
     lead_id = selected(value, EC2)
     pack = api().build_evidence_pack(value, lead_id)
-    rendered = api().render_evidence_json(pack) if output == "json" else api().render_evidence_html(pack)
+    rendered = (
+        api().render_evidence_json(pack) if output == "json" else api().render_evidence_html(pack)
+    )
     assert marker not in rendered
     assert pack["status"] == "PARTIAL"
     assert "PROVENANCE_FIELD_UNAVAILABLE" in pack["limitations"]
     assert pack["lead"]["lead_id"] == lead_id
-    assert {f["check_id"] for f in pack["findings"]} == {"AWSH-EC2-004", "AWSH-EC2-005", "AWSH-IAM-001"}
+    assert {f["check_id"] for f in pack["findings"]} == {
+        "AWSH-EC2-004",
+        "AWSH-EC2-005",
+        "AWSH-IAM-001",
+    }
     assert len(pack["relationships"]) == 1 and pack["statements"]["observed"]
-    target = (pack["relationships"][0]["evidence"][0] if location == "relationship" else
-              next(row for row in pack["coverage"] if row["service"] == "iam")["issues"][0])
+    target = (
+        pack["relationships"][0]["evidence"][0]
+        if location == "relationship"
+        else next(row for row in pack["coverage"] if row["service"] == "iam")["issues"][0]
+    )
     assert target["operation"] is None
 
 
@@ -572,18 +742,21 @@ def test_operation_allowlist_rejects_wrong_context_and_casing(location):
         assert operation not in api().render_evidence_json(pack)
 
 
-@pytest.mark.parametrize("pattern,service,operation", [
-    (EC2, "ec2", "describe_instances.metadata"),
-    (EC2, "ec2", "describe_instances"),
-    (LAMBDA, "lambda", "ListFunctionUrlConfigs"),
-    (LAMBDA, "lambda", "ListAttachedRolePolicies"),
-    (LAMBDA, "lambda", "ManagedRuntime (images/unknown runtimes not scanned)"),
-    (EC2, "iam", "GetRolePolicy"),
-    (EC2, "iam", "IdentityManagedPolicy"),
-    (EC2, "iam", "RoleLastUsed"),
-    (EC2, "iam", f"IdentityBindings:ec2:{REGION}"),
-    (AI, "bedrock", "GetAgent"),
-])
+@pytest.mark.parametrize(
+    "pattern,service,operation",
+    [
+        (EC2, "ec2", "describe_instances.metadata"),
+        (EC2, "ec2", "describe_instances"),
+        (LAMBDA, "lambda", "ListFunctionUrlConfigs"),
+        (LAMBDA, "lambda", "ListAttachedRolePolicies"),
+        (LAMBDA, "lambda", "ManagedRuntime (images/unknown runtimes not scanned)"),
+        (EC2, "iam", "GetRolePolicy"),
+        (EC2, "iam", "IdentityManagedPolicy"),
+        (EC2, "iam", "RoleLastUsed"),
+        (EC2, "iam", f"IdentityBindings:ec2:{REGION}"),
+        (AI, "bedrock", "GetAgent"),
+    ],
+)
 def test_operation_allowlist_preserves_real_collection_labels(pattern, service, operation):
     value = pair(pattern)
     value.services[service].issues.append(CollectionIssue(None, operation, "AccessDenied"))
@@ -595,22 +768,34 @@ def test_operation_allowlist_preserves_real_collection_labels(pattern, service, 
     assert pack["status"] == "PARTIAL" and pack["findings"] and pack["relationships"]
 
 
-@pytest.mark.parametrize("pattern,service,fact,operation", [
-    (LAMBDA, "iam", "identity_bindings", "ListFunctions"),
-    (EC2, "iam", "identity_bindings", "DescribeInstances"),
-    (EC2, "iam", "identity_bindings", "GetInstanceProfile"),
-    (EC2, "iam", "identity_bindings", "GetRole"),
-    (AI, "iam", "identity_bindings", "GetAgent"),
-    (AI, "bedrock", "execution_role_arn", "GetAgent"),
-])
-def test_operation_allowlist_preserves_attributed_relationship_operations(pattern, service, fact, operation):
+@pytest.mark.parametrize(
+    "pattern,service,fact,operation",
+    [
+        (LAMBDA, "iam", "identity_bindings", "ListFunctions"),
+        (EC2, "iam", "identity_bindings", "DescribeInstances"),
+        (EC2, "iam", "identity_bindings", "GetInstanceProfile"),
+        (EC2, "iam", "identity_bindings", "GetRole"),
+        (AI, "iam", "identity_bindings", "GetAgent"),
+        (AI, "bedrock", "execution_role_arn", "GetAgent"),
+    ],
+)
+def test_operation_allowlist_preserves_attributed_relationship_operations(
+    pattern, service, fact, operation
+):
     value = pair(pattern)
     edge = value.relationships[0]
-    value.relationships = (replace(edge, evidence=(RelationshipEvidence(
-        service=service, fact=fact, operation=operation),)),)
+    value.relationships = (
+        replace(
+            edge, evidence=(RelationshipEvidence(service=service, fact=fact, operation=operation),)
+        ),
+    )
     value = snapshot_from_dict(value.to_dict())
     pack = api().build_evidence_pack(value, selected(value, pattern))
-    assert pack["relationships"][0]["evidence"][0] == {"service": service, "fact": fact, "operation": operation}
+    assert pack["relationships"][0]["evidence"][0] == {
+        "service": service,
+        "fact": fact,
+        "operation": operation,
+    }
     assert pack["status"] == "COMPLETE"
 
 
@@ -618,8 +803,14 @@ def test_operation_allowlist_preserves_attributed_relationship_operations(patter
 def test_operation_allowlist_preserves_agentcore_and_historical_null(operation):
     value = agentcore_snapshot("7")
     edge = value.relationships[0]
-    value.relationships = (replace(edge, evidence=(RelationshipEvidence(
-        service="iam", fact="identity_bindings", operation=operation),)),)
+    value.relationships = (
+        replace(
+            edge,
+            evidence=(
+                RelationshipEvidence(service="iam", fact="identity_bindings", operation=operation),
+            ),
+        ),
+    )
     pack = api().build_evidence_pack(value, selected(value, AI))
     assert pack["relationships"][0]["evidence"][0]["operation"] == operation
     assert pack["status"] == "COMPLETE"
@@ -643,14 +834,22 @@ def test_operation_allowlist_cli_partial_exit_and_source_integrity(tmp_path, loc
     assert "PARTIAL" in rendered and lead_id in rendered
     assert source.read_bytes() == original
     pack = api().build_evidence_pack(value, lead_id)
-    assert api().render_evidence_json(pack) == api().render_evidence_json(api().build_evidence_pack(value, lead_id))
-    assert api().render_evidence_html(pack) == api().render_evidence_html(api().build_evidence_pack(value, lead_id))
+    assert api().render_evidence_json(pack) == api().render_evidence_json(
+        api().build_evidence_pack(value, lead_id)
+    )
+    assert api().render_evidence_html(pack) == api().render_evidence_html(
+        api().build_evidence_pack(value, lead_id)
+    )
 
 
 def test_operation_allowlist_unrelated_coverage_does_not_contaminate_pack():
     value = pair(LAMBDA)
-    value.services["s3"] = CollectionResult([], [CollectionIssue(None, "SecretMarker123", "AccessDenied")])
-    value.services["iam"].issues.append(CollectionIssue("unrelated", "SecretMarker123", "AccessDenied"))
+    value.services["s3"] = CollectionResult(
+        [], [CollectionIssue(None, "SecretMarker123", "AccessDenied")]
+    )
+    value.services["iam"].issues.append(
+        CollectionIssue("unrelated", "SecretMarker123", "AccessDenied")
+    )
     pack = api().build_evidence_pack(value, selected(value))
     assert "SecretMarker123" not in api().render_evidence_json(pack)
     assert "SecretMarker123" not in api().render_evidence_html(pack)
@@ -660,7 +859,9 @@ def test_operation_allowlist_unrelated_coverage_does_not_contaminate_pack():
     assert "s3" not in {row["service"] for row in pack["coverage"]}
 
 
-@pytest.mark.parametrize("operation", [f"IdentityBindings:s3:{REGION}", "IdentityBindings:ec2:us-east-1"])
+@pytest.mark.parametrize(
+    "operation", [f"IdentityBindings:s3:{REGION}", "IdentityBindings:ec2:us-east-1"]
+)
 def test_operation_allowlist_rejects_unrelated_binding_diagnostic_scope(operation):
     value = operation_snapshot("coverage", operation)
     pack = api().build_evidence_pack(value, selected(value, EC2))

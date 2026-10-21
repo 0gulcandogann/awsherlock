@@ -5,7 +5,11 @@ from unittest.mock import Mock
 import json
 
 import pytest
-from botocore.exceptions import SSOTokenLoadError, UnauthorizedSSOTokenError, EndpointConnectionError
+from botocore.exceptions import (
+    SSOTokenLoadError,
+    UnauthorizedSSOTokenError,
+    EndpointConnectionError,
+)
 from typer.testing import CliRunner
 
 from awsherlock.aws.context import ScanContext
@@ -15,22 +19,32 @@ from awsherlock.cli import app
 from awsherlock.evaluation import Report
 from awsherlock.organization import scan_organization
 from awsherlock.snapshot import write_snapshot
-from test_snapshot import snapshot
 
 runner = CliRunner()
 
 
 @pytest.fixture
 def context():
-    return ScanContext("123456789012", "arn:aws:sts::123456789012:assumed-role/AuditRole/test",
-                       "aws", "production", "eu-central-1", Mock())
+    return ScanContext(
+        "123456789012",
+        "arn:aws:sts::123456789012:assumed-role/AuditRole/test",
+        "aws",
+        "production",
+        "eu-central-1",
+        Mock(),
+    )
 
 
-@pytest.mark.parametrize("resource,label", [
-    ("assumed-role/AuditRole/test", "assumed role"),
-    ("user/team/alice", "IAM user"), ("root", "root"),
-    ("federated-user/alice", "federated user"), ("other", "unknown"),
-])
+@pytest.mark.parametrize(
+    "resource,label",
+    [
+        ("assumed-role/AuditRole/test", "assumed role"),
+        ("user/team/alice", "IAM user"),
+        ("root", "root"),
+        ("federated-user/alice", "federated user"),
+        ("other", "unknown"),
+    ],
+)
 def test_whoami_identity_types_without_collection(context, monkeypatch, resource, label):
     service = "sts" if resource.startswith(("assumed-role/", "federated-user/")) else "iam"
     context = replace(context, caller_arn=f"arn:aws:{service}::123456789012:{resource}")
@@ -50,9 +64,24 @@ def test_whoami_role_and_guard_options(context, monkeypatch):
     factory = Mock(return_value=context)
     monkeypatch.setattr("awsherlock.cli.create_scan_context", factory)
     role = "arn:aws:iam::123456789012:role/team/AuditRole"
-    result = runner.invoke(app, ["whoami", "--role", role, "--external-id", "private-external",
-                                "--role-session-name", "audit", "--region", "eu-west-1",
-                                "--expect-account", context.account_id, "--timeout", "7"])
+    result = runner.invoke(
+        app,
+        [
+            "whoami",
+            "--role",
+            role,
+            "--external-id",
+            "private-external",
+            "--role-session-name",
+            "audit",
+            "--region",
+            "eu-west-1",
+            "--expect-account",
+            context.account_id,
+            "--timeout",
+            "7",
+        ],
+    )
     assert result.exit_code == 0
     options = factory.call_args.kwargs
     assert options["role"] == role and options["external_id"] == "private-external"
@@ -87,13 +116,16 @@ def test_live_summary_before_collection_and_json_clean(context, monkeypatch):
     monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
     seen = []
     from awsherlock.identity_display import show_identity
+
     def show(*args, **kwargs):
         seen.append("identity")
         show_identity(*args, **kwargs)
+
     def capture(*args, **kwargs):
         assert seen == ["identity"]
         seen.append("collection")
         return Mock()
+
     monkeypatch.setattr("awsherlock.cli.show_identity", show)
     monkeypatch.setattr("awsherlock.cli.capture_snapshot", capture)
     monkeypatch.setattr("awsherlock.cli.evaluate_snapshot", Mock(return_value=Report({}, [], [])))
@@ -122,8 +154,10 @@ def test_multiregion_summary_once_with_selected_scope(context, monkeypatch):
     monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
     scan = Mock(return_value=Report({}, [], []))
     monkeypatch.setattr("awsherlock.cli.scan_regions", scan)
-    result = runner.invoke(app, ["scan", "--regions", "eu-central-1,eu-west-1",
-                                "--services", "s3,ec2", "--output", "json"])
+    result = runner.invoke(
+        app,
+        ["scan", "--regions", "eu-central-1,eu-west-1", "--services", "s3,ec2", "--output", "json"],
+    )
     assert result.exit_code == 0, result.output
     json.loads(result.stdout)
     assert result.stderr.count("Identity: verified live via STS") == 1
@@ -137,7 +171,10 @@ def test_whoami_real_session_layer_account_guard(context, monkeypatch):
     context.session.profile_name = "production"
     context.session.region_name = context.region
     context.session.client.return_value.get_caller_identity.return_value = {
-        "Account": context.account_id, "Arn": context.caller_arn, "UserId": "NOT_FOR_OUTPUT"}
+        "Account": context.account_id,
+        "Arn": context.caller_arn,
+        "UserId": "NOT_FOR_OUTPUT",
+    }
     result = runner.invoke(app, ["whoami", "--expect-account", "999999999999"])
     assert result.exit_code == 1 and not result.stdout
     assert "does not match" in result.stderr and "NOT_FOR_OUTPUT" not in result.output
@@ -145,29 +182,54 @@ def test_whoami_real_session_layer_account_guard(context, monkeypatch):
 
 def test_organization_identity_only_for_authenticated_targets(context, snapshot, monkeypatch):
     context.session.client.return_value.get_paginator.return_value.paginate.return_value = [
-        {"Accounts": [{"Id": "000000000001", "Name": "one", "State": "ACTIVE"},
-                      {"Id": "000000000002", "Name": "two", "State": "ACTIVE"}]}]
-    target = replace(context, account_id="000000000001",
-                     caller_arn="arn:aws:sts::000000000001:assumed-role/AuditRole/test")
-    monkeypatch.setattr("awsherlock.organization.create_scan_context",
-                        Mock(side_effect=[target, SessionError("AccessDenied")]))
+        {
+            "Accounts": [
+                {"Id": "000000000001", "Name": "one", "State": "ACTIVE"},
+                {"Id": "000000000002", "Name": "two", "State": "ACTIVE"},
+            ]
+        }
+    ]
+    target = replace(
+        context,
+        account_id="000000000001",
+        caller_arn="arn:aws:sts::000000000001:assumed-role/AuditRole/test",
+    )
+    monkeypatch.setattr(
+        "awsherlock.organization.create_scan_context",
+        Mock(side_effect=[target, SessionError("AccessDenied")]),
+    )
     events = []
+
     def capture(received, services):
         assert events == [target]
-        return replace(snapshot, metadata=replace(snapshot.metadata, account_id=received.account_id),
-                       services={"s3": type(snapshot.services["s3"])([], [])})
+        return replace(
+            snapshot,
+            metadata=replace(snapshot.metadata, account_id=received.account_id),
+            services={"s3": type(snapshot.services["s3"])([], [])},
+        )
+
     monkeypatch.setattr("awsherlock.organization.capture_snapshot", capture)
     report = scan_organization(context, ["s3"], identity_callback=events.append)
     assert events == [target]
     assert report.incomplete
 
 
-@pytest.mark.parametrize("command", [["--help"], ["whoami", "--help"],
-                                     ["profiles", "--help"], ["profiles", "list", "--help"], ["--doctor"]])
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["--help"],
+        ["whoami", "--help"],
+        ["profiles", "--help"],
+        ["profiles", "list", "--help"],
+        ["--doctor"],
+    ],
+)
 def test_help_and_doctor_do_not_authenticate(monkeypatch, command):
     factory = Mock(side_effect=AssertionError("no authentication"))
     monkeypatch.setattr("awsherlock.cli.create_scan_context", factory)
-    monkeypatch.setattr("awsherlock.cli.list_profiles", Mock(side_effect=AssertionError("no profile inspection")))
+    monkeypatch.setattr(
+        "awsherlock.cli.list_profiles", Mock(side_effect=AssertionError("no profile inspection"))
+    )
     result = runner.invoke(app, command)
     assert result.exit_code == 0, result.output
     factory.assert_not_called()
@@ -176,26 +238,44 @@ def test_help_and_doctor_do_not_authenticate(monkeypatch, command):
 def test_profile_metadata_no_provider_resolution(tmp_path, monkeypatch):
     config = tmp_path / "config"
     credentials = tmp_path / "credentials"
-    config.write_text("[profile sso]\nregion=eu-west-1\nsso_session=work\n"
-                      "[profile process]\ncredential_process=DO_NOT_EXECUTE\n"
-                      "[sso-session work]\nsso_start_url=https://example.invalid\n", encoding="utf-8")
-    credentials.write_text("[legacy]\naws_access_key_id=SECRET_ID\naws_secret_access_key=SECRET_VALUE\n", encoding="utf-8")
+    config.write_text(
+        "[profile sso]\nregion=eu-west-1\nsso_session=work\n"
+        "[profile process]\ncredential_process=DO_NOT_EXECUTE\n"
+        "[sso-session work]\nsso_start_url=https://example.invalid\n",
+        encoding="utf-8",
+    )
+    credentials.write_text(
+        "[legacy]\naws_access_key_id=SECRET_ID\naws_secret_access_key=SECRET_VALUE\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
     monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(credentials))
-    forbid = Mock(side_effect=AssertionError("profile metadata must not resolve credentials or create clients"))
+    forbid = Mock(
+        side_effect=AssertionError(
+            "profile metadata must not resolve credentials or create clients"
+        )
+    )
     monkeypatch.setattr("botocore.session.Session.get_credentials", forbid)
     monkeypatch.setattr("botocore.session.Session.create_client", forbid)
-    assert [(p.name, p.region) for p in list_profiles()] == [("legacy", None), ("process", None), ("sso", "eu-west-1")]
+    assert [(p.name, p.region) for p in list_profiles()] == [
+        ("legacy", None),
+        ("process", None),
+        ("sso", "eu-west-1"),
+    ]
     result = runner.invoke(app, ["profiles", "list"])
     assert result.exit_code == 0, result.output
     assert "legacy" in result.stdout and "unknown" in result.stdout
     assert "Configured region" in result.stdout and "Not verified" in result.stdout
     assert "eu-west-1" in result.stdout
-    assert not any(s in result.output for s in ("SECRET_ID", "SECRET_VALUE", "DO_NOT_EXECUTE", "sso_start_url"))
+    assert not any(
+        s in result.output for s in ("SECRET_ID", "SECRET_VALUE", "DO_NOT_EXECUTE", "sso_start_url")
+    )
     forbid.assert_not_called()
 
 
-@pytest.mark.parametrize("contents", [None, "[broken\nsecret-marker", "[profile a]\nregion=x\nregion=y\n"])
+@pytest.mark.parametrize(
+    "contents", [None, "[broken\nsecret-marker", "[profile a]\nregion=x\nregion=y\n"]
+)
 def test_empty_or_malformed_profile_configuration(tmp_path, monkeypatch, contents):
     path = tmp_path / "config"
     if contents is not None:
@@ -211,11 +291,14 @@ def test_empty_or_malformed_profile_configuration(tmp_path, monkeypatch, content
         assert not result.stdout
 
 
-@pytest.mark.parametrize("error,recovery", [
-    (SSOTokenLoadError(error_msg="secret-marker"), "sso"),
-    (UnauthorizedSSOTokenError(), "sso"),
-    (EndpointConnectionError(endpoint_url="https://secret-marker.invalid"), None),
-])
+@pytest.mark.parametrize(
+    "error,recovery",
+    [
+        (SSOTokenLoadError(error_msg="secret-marker"), "sso"),
+        (UnauthorizedSSOTokenError(), "sso"),
+        (EndpointConnectionError(endpoint_url="https://secret-marker.invalid"), None),
+    ],
+)
 def test_sdk_errors_classified_without_payloads(context, monkeypatch, error, recovery):
     factory = Mock(return_value=context.session)
     monkeypatch.setattr("awsherlock.aws.session.boto3.Session", factory)
@@ -231,23 +314,37 @@ def test_sdk_errors_classified_without_payloads(context, monkeypatch, error, rec
 
 
 def test_recovery_for_missing_profile_and_controls(context, monkeypatch):
-    monkeypatch.setattr("awsherlock.cli.create_scan_context",
-                        Mock(side_effect=SessionError("Profile not found", recovery="profiles")))
+    monkeypatch.setattr(
+        "awsherlock.cli.create_scan_context",
+        Mock(side_effect=SessionError("Profile not found", recovery="profiles")),
+    )
     assert "Next: awsherlock profiles list" in runner.invoke(app, ["whoami"]).stderr
     context = replace(context, profile="bad\x1b[2J\nname")
     monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
-    result = runner.invoke(app, ["whoami", "--color", "never"], env={"NO_COLOR": "1", "COLUMNS": "40"})
+    result = runner.invoke(
+        app, ["whoami", "--color", "never"], env={"NO_COLOR": "1", "COLUMNS": "40"}
+    )
     assert result.exit_code == 0 and "\x1b" not in result.stdout
     assert "\\x1b" in result.stdout and "\\n" in result.stdout
 
 
 @pytest.mark.parametrize("width", [40, 60, 100])
 def test_profile_table_fits_terminal_width(monkeypatch, width):
-    monkeypatch.setattr("awsherlock.cli.list_profiles", Mock(return_value=[
-        ProfileMetadata("production-audit-with-a-long-profile-name", "eu-central-1"),
-        ProfileMetadata("dev", None)]))
-    result = runner.invoke(app, ["profiles", "list", "--color", "never"],
-                           env={"COLUMNS": str(width)}, terminal_width=width)
+    monkeypatch.setattr(
+        "awsherlock.cli.list_profiles",
+        Mock(
+            return_value=[
+                ProfileMetadata("production-audit-with-a-long-profile-name", "eu-central-1"),
+                ProfileMetadata("dev", None),
+            ]
+        ),
+    )
+    result = runner.invoke(
+        app,
+        ["profiles", "list", "--color", "never"],
+        env={"COLUMNS": str(width)},
+        terminal_width=width,
+    )
     assert result.exit_code == 0, result.output
     assert "AWS profiles (2 configured)" in result.stdout
     assert max(map(len, result.stdout.splitlines())) <= width
@@ -258,12 +355,19 @@ def test_profile_table_fits_terminal_width(monkeypatch, width):
         assert "Configured region" in result.stdout and "Not verified" in result.stdout
 
 
-@pytest.mark.parametrize("args,env,colored", [
-    ([], {}, False), (["--color", "always"], {}, True),
-    (["--color", "never"], {}, False), ([], {"NO_COLOR": "1"}, False),
-])
+@pytest.mark.parametrize(
+    "args,env,colored",
+    [
+        ([], {}, False),
+        (["--color", "always"], {}, True),
+        (["--color", "never"], {}, False),
+        ([], {"NO_COLOR": "1"}, False),
+    ],
+)
 def test_profile_table_color_modes_and_redirect(monkeypatch, args, env, colored):
-    monkeypatch.setattr("awsherlock.cli.list_profiles", Mock(return_value=[ProfileMetadata("dev", None)]))
+    monkeypatch.setattr(
+        "awsherlock.cli.list_profiles", Mock(return_value=[ProfileMetadata("dev", None)])
+    )
     result = runner.invoke(app, ["profiles", "list", *args], env={"COLUMNS": "100", **env})
     assert result.exit_code == 0, result.output
     assert ("\x1b[" in result.stdout) == colored
@@ -272,8 +376,10 @@ def test_profile_table_color_modes_and_redirect(monkeypatch, args, env, colored)
 
 
 def test_profile_table_escapes_controls_and_keeps_markup_literal(monkeypatch):
-    monkeypatch.setattr("awsherlock.cli.list_profiles", Mock(return_value=[
-        ProfileMetadata("[red]dev\x1b[2J", "bad\nregion")]))
+    monkeypatch.setattr(
+        "awsherlock.cli.list_profiles",
+        Mock(return_value=[ProfileMetadata("[red]dev\x1b[2J", "bad\nregion")]),
+    )
     result = runner.invoke(app, ["profiles", "list", "--color", "never"], env={"COLUMNS": "100"})
     assert result.exit_code == 0, result.output
     assert "[red]dev\\x1b[2J" in result.stdout and "bad\\nregion" in result.stdout

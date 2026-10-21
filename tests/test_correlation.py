@@ -18,7 +18,6 @@ from awsherlock.correlation import (
 )
 from awsherlock.models import RelationshipType, ResourceRef
 
-
 ACCOUNT = "123456789012"
 REGION = "eu-west-1"
 
@@ -52,11 +51,15 @@ def finding(check_id: str, subject: ResourceRef, arn: str | None = None) -> Find
     )
 
 
-def lead(*subjects: ResourceRef, title: str = "Lead", next_step: str = "Review.",
-         related_resources: tuple[ResourceRef, ...] = (),
-         finding_refs: tuple[FindingRef, ...] = (),
-         relationship_refs: tuple[RelationshipRef, ...] = (),
-         observed: tuple[LeadStatement, ...] = ()) -> Lead:
+def lead(
+    *subjects: ResourceRef,
+    title: str = "Lead",
+    next_step: str = "Review.",
+    related_resources: tuple[ResourceRef, ...] = (),
+    finding_refs: tuple[FindingRef, ...] = (),
+    relationship_refs: tuple[RelationshipRef, ...] = (),
+    observed: tuple[LeadStatement, ...] = (),
+) -> Lead:
     return Lead(
         pattern_id="TEST-PATTERN",
         subjects=subjects,
@@ -111,10 +114,12 @@ def test_lead_normalizes_all_supporting_collections_and_is_immutable():
     role_plain = resource("role", service="iam", resource_type="role", region=None)
     role_arn = f"arn:aws:iam::{ACCOUNT}:role/role"
     role_located = replace(role_plain, resource_arn=role_arn)
-    edge = RelationshipRef(source=subject, relationship_type=RelationshipType.RUNS_AS,
-                           target=role_plain)
-    edge_located = RelationshipRef(source=subject, relationship_type=RelationshipType.RUNS_AS,
-                                   target=role_located)
+    edge = RelationshipRef(
+        source=subject, relationship_type=RelationshipType.RUNS_AS, target=role_plain
+    )
+    edge_located = RelationshipRef(
+        source=subject, relationship_type=RelationshipType.RUNS_AS, target=role_located
+    )
     candidate = lead(
         subject,
         related_resources=(role_plain, role_located),
@@ -135,10 +140,18 @@ def test_merge_leads_unions_supporting_data_without_set_loss():
     subject = resource("worker")
     role = resource("role", service="iam", resource_type="role", region=None)
     edge = RelationshipRef(source=subject, relationship_type=RelationshipType.RUNS_AS, target=role)
-    first = lead(subject, related_resources=(role,), finding_refs=(finding("AWSH-X-001", subject),),
-                 observed=(LeadStatement(code="FIRST", text="First."),))
-    second = lead(subject, relationship_refs=(edge,), finding_refs=(finding("AWSH-X-002", subject),),
-                  observed=(LeadStatement(code="SECOND", text="Second."),))
+    first = lead(
+        subject,
+        related_resources=(role,),
+        finding_refs=(finding("AWSH-X-001", subject),),
+        observed=(LeadStatement(code="FIRST", text="First."),),
+    )
+    second = lead(
+        subject,
+        relationship_refs=(edge,),
+        finding_refs=(finding("AWSH-X-002", subject),),
+        observed=(LeadStatement(code="SECOND", text="Second."),),
+    )
 
     merged = merge_leads((second, first))
 
@@ -147,7 +160,9 @@ def test_merge_leads_unions_supporting_data_without_set_loss():
     assert {item.check_id for item in merged[0].finding_refs} == {"AWSH-X-001", "AWSH-X-002"}
     assert merged[0].relationship_refs == (edge,)
     assert {item.code for item in merged[0].observed} == {"FIRST", "SECOND"}
-    assert lead_to_dict(merge_leads((first, second))[0]) == lead_to_dict(merge_leads((second, first))[0])
+    assert lead_to_dict(merge_leads((first, second))[0]) == lead_to_dict(
+        merge_leads((second, first))[0]
+    )
 
 
 def test_conflicting_merge_metadata_and_statement_text_fail_safely():
@@ -155,10 +170,13 @@ def test_conflicting_merge_metadata_and_statement_text_fail_safely():
     with pytest.raises(CorrelationError, match="metadata"):
         merge_leads((lead(subject), lead(subject, title="Conflict")))
     with pytest.raises(CorrelationError, match="statement"):
-        lead(subject, observed=(
-            LeadStatement(code="SAME", text="First."),
-            LeadStatement(code="SAME", text="Second."),
-        ))
+        lead(
+            subject,
+            observed=(
+                LeadStatement(code="SAME", text="First."),
+                LeadStatement(code="SAME", text="Second."),
+            ),
+        )
 
 
 def test_conflicting_optional_locators_fail_safely():
@@ -168,20 +186,26 @@ def test_conflicting_optional_locators_fail_safely():
         lead(first, second)
     subject = resource("subject")
     with pytest.raises(CorrelationError, match="ARN"):
-        lead(subject, finding_refs=(
-            finding("AWSH-X-001", subject, first.resource_arn),
-            finding("AWSH-X-001", subject, second.resource_arn),
-        ))
-    first_edge = RelationshipRef(source=subject, relationship_type=RelationshipType.RUNS_AS,
-                                 target=first)
-    second_edge = RelationshipRef(source=subject, relationship_type=RelationshipType.RUNS_AS,
-                                  target=second)
+        lead(
+            subject,
+            finding_refs=(
+                finding("AWSH-X-001", subject, first.resource_arn),
+                finding("AWSH-X-001", subject, second.resource_arn),
+            ),
+        )
+    first_edge = RelationshipRef(
+        source=subject, relationship_type=RelationshipType.RUNS_AS, target=first
+    )
+    second_edge = RelationshipRef(
+        source=subject, relationship_type=RelationshipType.RUNS_AS, target=second
+    )
     with pytest.raises(CorrelationError, match="ARN"):
         lead(subject, relationship_refs=(first_edge, second_edge))
 
 
 def test_duplicate_correlation_rule_ids_fail_loudly():
     from awsherlock.leads import CORRELATION_RULES
+
     with pytest.raises(CorrelationError, match="Duplicate"):
         validate_correlation_rules((CORRELATION_RULES[0], CORRELATION_RULES[0]))
 
@@ -190,8 +214,18 @@ def test_models_reject_malformed_nested_values_and_account_ids_safely():
     with pytest.raises(CorrelationError):
         lead("not-a-resource-ref")
     with pytest.raises(CorrelationError, match="account_id"):
-        FindingRef(check_id="AWSH-X-001", service="iam", account_id="invalid", region=None,
-                   resource_id="role")
+        FindingRef(
+            check_id="AWSH-X-001",
+            service="iam",
+            account_id="invalid",
+            region=None,
+            resource_id="role",
+        )
     with pytest.raises(CorrelationError):
-        CorrelationRule(pattern_id="TEST", title="Test", priority=LeadPriority.LOW,
-                        requires_relationships=1, correlate=lambda context: ())
+        CorrelationRule(
+            pattern_id="TEST",
+            title="Test",
+            priority=LeadPriority.LOW,
+            requires_relationships=1,
+            correlate=lambda context: (),
+        )

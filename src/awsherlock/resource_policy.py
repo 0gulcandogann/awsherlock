@@ -40,8 +40,16 @@ def statements(document: object) -> list[dict]:
         actions = statement.get("Action", statement.get("NotAction"))
         actions = actions if isinstance(actions, list) else [actions]
         actions = [text_field(value) for value in actions]
-        if not actions or ("Condition" in statement and not isinstance(statement["Condition"], dict)):
+        if not actions or (
+            "Condition" in statement and not isinstance(statement["Condition"], dict)
+        ):
             raise InvalidResponse()
-        output.append({"effect": statement["Effect"], "broad_principal": "NotPrincipal" in statement or "*" in values,
-                       "conditional": bool(statement.get("Condition")), "actions": actions})
+        output.append(
+            {
+                "effect": statement["Effect"],
+                "broad_principal": "NotPrincipal" in statement or "*" in values,
+                "conditional": bool(statement.get("Condition")),
+                "actions": actions,
+            }
+        )
     return output

@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AWSherlock contextual investigations</title>
+<style>html{color-scheme:light}body{margin:0;background:#f8fafc;color:#0f172a;font:14px/1.6 system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:20px}.panel{background:white;border:1px solid #cbd5e1;padding:20px;margin:20px 0;overflow-wrap:anywhere}a{color:#1d4ed8}.statement-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.statement{padding:10px;background:#f8fafc}input,select{max-width:100%;padding:8px}.filters{display:flex;flex-wrap:wrap;gap:14px}.filters label{display:block}code{font-size:11px}@media(max-width:800px){.statement-grid{grid-template-columns:1fr}}</style></head><body><main><h1>AWSherlock contextual investigations</h1><p>Account {{ result.account_id }} · {{ result.region or 'Global' }} · {% if result.incomplete %}INCOMPLETE{% else %}Recorded evaluation complete{% endif %}</p>
+<p>{{ result.limitations }}</p>{% if result.coverage_gaps %}<details open><summary>Scope coverage limitations</summary><ul>{% for gap in result.coverage_gaps %}<li>{{ gap.code }} / {{ gap.service or 'Supporting evidence' }} / {{ gap.status }} / {{ gap.reason_code or 'Unknown completeness' }}</li>{% endfor %}</ul></details>{% endif %}
+{% include 'contextual.html' %}</main>
+<script>
+(() => {
+  'use strict';
+  window.addEventListener('beforeprint', () => document.querySelectorAll('details').forEach(item => {
+    item.dataset.printOpen = item.open ? '1' : '0'; item.open = true;
+  }));
+  window.addEventListener('afterprint', () => document.querySelectorAll('details').forEach(item => {
+    item.open = item.dataset.printOpen === '1'; delete item.dataset.printOpen;
+  }));
+})();
+</script></body></html>

@@ -14,18 +14,36 @@ from test_s3 import aws_error
 
 
 def resource(rule, value):
-    return Resource(service=rule.service, resource_type="test", account_id="123456789012", region="eu-west-1",
-                    resource_id="test", resource_arn=None, data={rule.required_fact: value})
+    return Resource(
+        service=rule.service,
+        resource_type="test",
+        account_id="123456789012",
+        region="eu-west-1",
+        resource_id="test",
+        resource_arn=None,
+        data={rule.required_fact: value},
+    )
 
 
-@pytest.mark.parametrize("rule,bad,good", [
-    (LAMBDA_RULES[0], [{"auth": "NONE", "arn": "test"}], [{"auth": "AWS_IAM", "arn": "test"}]),
-    (LAMBDA_RULES[1], ["arn:aws:iam::aws:policy/AdministratorAccess"], ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]),
-    (LAMBDA_RULES[2], {"deprecated": True}, {"deprecated": False}),
-    (SECRET_RULES[0], False, True),
-    (SECRET_RULES[1], [{"effect": "Allow", "broad_principal": True}], [{"effect": "Allow", "broad_principal": False}]),
-    (SECRET_RULES[2], {"state": "Disabled"}, {"state": "Enabled"}),
-])
+@pytest.mark.parametrize(
+    "rule,bad,good",
+    [
+        (LAMBDA_RULES[0], [{"auth": "NONE", "arn": "test"}], [{"auth": "AWS_IAM", "arn": "test"}]),
+        (
+            LAMBDA_RULES[1],
+            ["arn:aws:iam::aws:policy/AdministratorAccess"],
+            ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"],
+        ),
+        (LAMBDA_RULES[2], {"deprecated": True}, {"deprecated": False}),
+        (SECRET_RULES[0], False, True),
+        (
+            SECRET_RULES[1],
+            [{"effect": "Allow", "broad_principal": True}],
+            [{"effect": "Allow", "broad_principal": False}],
+        ),
+        (SECRET_RULES[2], {"state": "Disabled"}, {"state": "Enabled"}),
+    ],
+)
 def test_six_rules(rule, bad, good):
     assert len(rule.evaluate(resource(rule, bad))) == 1
     assert rule.evaluate(resource(rule, good)) == []
@@ -36,7 +54,14 @@ def test_six_rules(rule, bad, good):
 
 
 def test_policy_context():
-    normal = {"Statement": {"Effect": "Allow", "Principal": {"AWS": "arn:aws:iam::123456789012:root"}, "Action": "kms:*", "Resource": "*"}}
+    normal = {
+        "Statement": {
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+            "Action": "kms:*",
+            "Resource": "*",
+        }
+    }
     assert not statements(normal)[0]["broad_principal"]
     normal["Statement"]["Principal"] = "*"
     normal["Statement"]["Condition"] = {"StringEquals": {"secret-marker": "hidden"}}
@@ -60,13 +85,44 @@ def context():
     session = Mock()
     clients = {name: Mock() for name in ("lambda", "iam", "secretsmanager", "kms")}
     session.client.side_effect = lambda name, **kwargs: clients[name]
-    function = {"FunctionName": "test", "FunctionArn": "arn:aws:lambda:eu-west-1:123456789012:function:test", "Role": "arn:aws:iam::123456789012:role/path/execute", "Runtime": "python3.12", "PackageType": "Zip", "Environment": {"Variables": {"password": "secret-marker"}}}
-    lambda_pages = {"list_functions": [{"Functions": [function]}], "list_function_url_configs": [{"FunctionUrlConfigs": []}, {"FunctionUrlConfigs": [{"FunctionArn": function["FunctionArn"] + ":alias", "AuthType": "NONE"}]}]}
-    clients["lambda"].get_paginator.side_effect = lambda method: Mock(paginate=Mock(return_value=lambda_pages[method]))
+    function = {
+        "FunctionName": "test",
+        "FunctionArn": "arn:aws:lambda:eu-west-1:123456789012:function:test",
+        "Role": "arn:aws:iam::123456789012:role/path/execute",
+        "Runtime": "python3.12",
+        "PackageType": "Zip",
+        "Environment": {"Variables": {"password": "secret-marker"}},
+    }
+    lambda_pages = {
+        "list_functions": [{"Functions": [function]}],
+        "list_function_url_configs": [
+            {"FunctionUrlConfigs": []},
+            {
+                "FunctionUrlConfigs": [
+                    {"FunctionArn": function["FunctionArn"] + ":alias", "AuthType": "NONE"}
+                ]
+            },
+        ],
+    }
+    clients["lambda"].get_paginator.side_effect = lambda method: Mock(
+        paginate=Mock(return_value=lambda_pages[method])
+    )
     clients["iam"].get_paginator.return_value.paginate.return_value = [{"AttachedPolicies": []}]
-    clients["secretsmanager"].get_paginator.return_value.paginate.return_value = [{"SecretList": [{"Name": "test-secret", "ARN": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:test-secret", "RotationEnabled": True}]}]
+    clients["secretsmanager"].get_paginator.return_value.paginate.return_value = [
+        {
+            "SecretList": [
+                {
+                    "Name": "test-secret",
+                    "ARN": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:test-secret",
+                    "RotationEnabled": True,
+                }
+            ]
+        }
+    ]
     clients["secretsmanager"].get_resource_policy.return_value = {}
-    return ScanContext("123456789012", "arn:aws:iam::123456789012:root", "aws", None, "eu-west-1", session)
+    return ScanContext(
+        "123456789012", "arn:aws:iam::123456789012:root", "aws", None, "eu-west-1", session
+    )
 
 
 def test_collectors_exclude_secrets(context):
@@ -82,7 +138,13 @@ def test_collectors_exclude_secrets(context):
     context.session.client("lambda").get_function.assert_not_called()
 
 
-@pytest.mark.parametrize("collector,service,method", [(collect_lambda, "lambda", "get_paginator"), (collect_secrets, "secretsmanager", "get_resource_policy")])
+@pytest.mark.parametrize(
+    "collector,service,method",
+    [
+        (collect_lambda, "lambda", "get_paginator"),
+        (collect_secrets, "secretsmanager", "get_resource_policy"),
+    ],
+)
 def test_denied(context, collector, service, method):
     getattr(context.session.client(service), method).side_effect = aws_error("AccessDenied")
     result = collector(context)
@@ -92,15 +154,21 @@ def test_denied(context, collector, service, method):
 
 
 def test_url_paginator_exists():
-    client = boto3.Session(aws_access_key_id="test", aws_secret_access_key="test", region_name="eu-west-1").client("lambda")
+    client = boto3.Session(
+        aws_access_key_id="test", aws_secret_access_key="test", region_name="eu-west-1"
+    ).client("lambda")
     assert client.can_paginate("list_function_url_configs")
 
 
 def test_secrets_key_state_and_denial(context):
     client = context.session.client("secretsmanager")
-    client.get_paginator.return_value.paginate.return_value[0]["SecretList"][0]["KmsKeyId"] = "key-id"
+    client.get_paginator.return_value.paginate.return_value[0]["SecretList"][0][
+        "KmsKeyId"
+    ] = "key-id"
     kms = context.session.client("kms")
-    kms.describe_key.return_value = {"KeyMetadata": {"KeyState": "PendingDeletion", "KeyManager": "CUSTOMER"}}
+    kms.describe_key.return_value = {
+        "KeyMetadata": {"KeyState": "PendingDeletion", "KeyManager": "CUSTOMER"}
+    }
     result = collect_secrets(context)
     assert SECRET_RULES[2].evaluate(result.resources[0])
     kms.describe_key.side_effect = aws_error("AccessDenied")

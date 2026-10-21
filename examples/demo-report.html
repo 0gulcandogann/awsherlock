@@ -62,6 +62,20 @@ a:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible,su
 }</pre><h3>Risk</h3><p>Overwrites and deletions may make data recovery harder.</p><h3>Remediation</h3><p>Enable bucket versioning and review lifecycle retention requirements.</p><h3>References</h3><ul><li><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html" rel="noopener noreferrer" referrerpolicy="no-referrer">https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html</a></li></ul></div></details></div><div id="no-matches" class="empty" hidden>No findings match these filters. Change the search or reset the filters.</div></section>
 <section class="panel"><details class="coverage-details" open><summary id="coverage-title">Scan coverage · 3 account / service entries</summary><div class="table-wrap"><table><caption>Coverage of selected checks. COMPLETE describes evaluation coverage, not a secure account or per-check PASS.</caption><thead><tr><th>Account / Service</th><th>Region / Scope</th><th>Status</th><th>Resources</th><th>Evaluated</th><th>Not scanned</th><th>Issues</th></tr></thead><tbody><tr id="coverage-9419cbe51ac1ad6fbe548d17e9d8a4f6f6eb226087c30c20445ba9d98655bd85"><th scope="row">000000000000 / ec2</th><td>global</td><td><span class="badge COMPLETE">COMPLETE</span></td><td>1</td><td>2</td><td>0</td><td><span class="muted">No collection errors</span></td></tr><tr id="coverage-eafbd65de021875030cffc61313b9aacc27ea76e5478bea6bd1d03ac23991cb3"><th scope="row">000000000000 / iam</th><td>global</td><td><span class="badge COMPLETE">COMPLETE</span></td><td>0</td><td>0</td><td>0</td><td><span class="muted">No collection errors</span></td></tr><tr id="coverage-cd346cf05127df1f5560b5b24a595a87459475727c8d7e46b8843e85a89a7d6b"><th scope="row">000000000000 / s3</th><td>global</td><td><span class="badge PARTIAL">PARTIAL</span></td><td>1</td><td>4</td><td>1</td><td><details><summary>3 issue(s)</summary><ul><li><strong>example-demo-bucket · AccountPublicAccessContext</strong>: Account public-access facts are missing; context was not scanned</li><li><strong>example-demo-bucket · GetBucketLogging</strong>: AccessDenied</li><li><strong>example-demo-bucket · RequiredFact</strong>: AWSH-S3-004 requires logging; a related collection issue is recorded separately.</li></ul></details></td></tr></tbody></table></div></details></section>
 <footer>AWSherlock 0.1.0 · Standalone offline report · Configuration indicators and Leads do not prove effective access, exploitability, compromise, or an attack path.</footer>
+<section class="panel" id="contextual-investigations" aria-labelledby="contextual-title">
+<h2 id="contextual-title">Contextual investigations</h2>
+<p>Priority describes configuration review urgency, not impact or confidence. PROVISIONAL means effective access, reachability or business criticality remains unknown. Missing evidence does not establish safety.</p>
+<p>No contextual investigation data. Review findings and coverage; no absence or safety conclusion follows.</p>
+
+</section>
+<section class="panel" id="investigation-graph" aria-labelledby="graph-title">
+<h2 id="graph-title">Investigation Graph</h2>
+<p>Solid blue lines: observed configuration relationships. Dashed gray lines: inferred review associations. Neither establishes verified access or an attack path. Findings and coverage gaps are evidence nodes.</p>
+<p>No graph data. Missing graph nodes do not establish safety or absent relationships.</p>
+</section>
+<style>
+.contextual-record{margin:14px 0;border:1px solid #cbd5e1;padding:12px;overflow-wrap:anywhere}.contextual-record>summary{cursor:pointer}.contextual-record code{overflow-wrap:anywhere}.graph-scroll{max-height:650px;overflow:auto;max-width:100%;border:1px solid #cbd5e1}.graph-scroll svg{display:block}#graph-inferred{width:auto}#graph-node-detail{overflow-wrap:anywhere}@media print{.graph-scroll{display:none}#investigation-graph .filters{display:none}}
+</style>
 </main>
 <script>
 (() => {

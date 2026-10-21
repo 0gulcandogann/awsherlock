@@ -1,0 +1,97 @@
+<section class="panel" id="contextual-investigations" aria-labelledby="contextual-title">
+<h2 id="contextual-title">Contextual investigations</h2>
+<p>Priority describes configuration review urgency, not impact or confidence. PROVISIONAL means effective access, reachability or business criticality remains unknown. Missing evidence does not establish safety.</p>
+{% if not investigation.contextual %}<p>No contextual investigation data. Review findings and coverage; no absence or safety conclusion follows.</p>{% endif %}
+{% for item in investigation.contextual %}
+<details class="contextual-record" id="context-{{ item.id | replace(':', '-') }}">
+<summary><strong>{{ item.priority }} · {{ item.priority_status }}</strong> — {{ item.title }}</summary>
+<p>{{ item.id }}<br>Account {{ item.account_id }} · {{ item.region or 'Global' }}</p>
+<p>{{ item.explanation }}</p><p>{{ item.priority_explanation }}</p>
+<ul>{% for factor in item.priority_factors %}<li><strong>{{ factor.code }} +{{ factor.points }}</strong>: {{ factor.explanation }}<br>Evidence: {% for ref in factor.evidence %}<code>{{ ref.id }}</code> {% endfor %}</li>{% endfor %}</ul>
+<div class="statement-grid">{% for field in ['observed', 'inferred', 'unknown'] %}<div class="statement"><h3>{{ field | capitalize }}</h3><ul>{% for condition in item[field] %}<li><strong>{{ condition.code }}</strong>: {{ condition.text }}{% if condition.assumptions %}<p>Assumptions: {{ condition.assumptions | join(' ') }}</p>{% endif %}{% if condition.evidence %}<p>Evidence: {% for ref in condition.evidence %}<code>{{ ref.id }}</code> {% endfor %}</p>{% endif %}</li>{% endfor %}</ul></div>{% endfor %}</div>
+<h3>Resources</h3><ul>{% for ref in item.resources %}<li>{{ ref.account_id }} / {{ ref.region or 'Global' }} / {{ ref.service }} / {{ ref.resource_type }} / {{ ref.resource_id }}{% if ref.resource_arn %}<br>{{ ref.resource_arn }}{% endif %}</li>{% endfor %}</ul>
+<h3>Supporting evidence references</h3><ul>{% for finding in item.supporting_findings %}<li><code>{{ finding.id }}</code>: {{ finding.reference.check_id }} / {{ finding.reference.service }} / {{ finding.reference.resource_id }}</li>{% endfor %}{% for edge in item.supporting_relationships %}<li><code>{{ edge.id }}</code>: {{ edge.reference.source.resource_id }} → {{ edge.reference.type }} → {{ edge.reference.target.resource_id }}</li>{% endfor %}</ul>
+<h3>Coverage limitations</h3><ul>{% for gap in item.coverage_gaps %}<li><code>{{ gap.id }}</code>: {{ gap.code }} / {{ gap.service or 'Supporting evidence' }} / {{ gap.status }}{% if gap.reason_code %} / {{ gap.reason_code }}{% endif %}{% if gap.operation %} / {{ gap.operation }}{% endif %}</li>{% else %}<li>No supporting coverage gap detected. Effective access and exhaustive inventory remain unverified.</li>{% endfor %}</ul>
+<h3>Recommended investigation actions</h3><ol>{% for action in item.recommended_actions %}<li>{{ action.text }}</li>{% endfor %}</ol>
+</details>
+{% endfor %}
+</section>
+<section class="panel" id="investigation-graph" aria-labelledby="graph-title">
+<h2 id="graph-title">Investigation Graph</h2>
+<p>Solid blue lines: observed configuration relationships. Dashed gray lines: inferred review associations. Neither establishes verified access or an attack path. Findings and coverage gaps are evidence nodes.</p>
+{% if investigation.graph.investigations %}
+<div class="filters"><label for="investigation-select">Select investigation<select id="investigation-select">{% for item in investigation.graph.investigations %}<option value="{{ item.investigation_id }}">{{ item.priority }} · {{ item.title }} · {{ loop.index }}</option>{% endfor %}</select></label><label for="graph-search">Highlight nodes<input id="graph-search" type="search" placeholder="Resource, finding, gap…"></label><label for="graph-inferred"><input id="graph-inferred" type="checkbox" checked> Show inferred associations</label></div>
+<p><a id="graph-evidence-link" href="#context-{{ investigation.graph.investigations[0].investigation_id | replace(':', '-') }}">Inspect selected investigation evidence</a></p>
+<p id="graph-status" role="status" aria-live="polite"></p><p id="graph-node-detail" aria-live="polite">Select a node to read its full label.</p>
+<div class="graph-scroll"><svg id="investigation-svg" role="group" aria-label="Selected investigation configuration and evidence graph" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<p>Legend: purple = investigation; blue = resource or IAM role; orange = supporting finding; red = coverage gap. Graph limits: {{ investigation.graph.limits.nodes_per_investigation }} nodes and {{ investigation.graph.limits.edges_per_investigation }} edges per selection. {{ investigation.graph.omitted_investigations }} additional investigations omitted from the graph; their text remains above.</p>
+<noscript><p>The graph requires JavaScript. All investigation conditions, evidence references, coverage limitations and actions are available in the text above.</p></noscript>
+<script type="application/json" id="investigation-graph-data">{{ investigation.graph | tojson }}</script>
+<script>
+(() => {
+  'use strict';
+  const data = JSON.parse(document.getElementById('investigation-graph-data').textContent);
+  const select = document.getElementById('investigation-select');
+  const search = document.getElementById('graph-search');
+  const inferred = document.getElementById('graph-inferred');
+  const svg = document.getElementById('investigation-svg');
+  const nodeLabels = new Map();
+  const ns = 'http://www.w3.org/2000/svg';
+  function element(tag, attrs, text) {
+    const item = document.createElementNS(ns, tag);
+    for (const [name, value] of Object.entries(attrs)) item.setAttribute(name, String(value));
+    if (text !== undefined) item.textContent = text;
+    return item;
+  }
+  function draw() {
+    const graph = data.investigations.find(item => item.investigation_id === select.value);
+    if (!graph) return;
+    svg.replaceChildren();
+    nodeLabels.clear();
+    document.getElementById('graph-node-detail').textContent = 'Select a node to read its full label.';
+    const height = Math.max(180, Math.ceil(graph.nodes.length / 3) * 90 + 30);
+    svg.setAttribute('viewBox', `0 0 1080 ${height}`);
+    svg.setAttribute('width', '1080'); svg.setAttribute('height', String(height));
+    const positions = new Map(graph.nodes.map((node, index) => [node.id, {x: 10 + index % 3 * 360, y: 20 + Math.floor(index / 3) * 90}]));
+    for (const edge of graph.edges) {
+      if (!inferred.checked && edge.semantics === 'INFERRED') continue;
+      const a = positions.get(edge.source), b = positions.get(edge.target);
+      const line = element('line', {x1:a.x+160, y1:a.y+25, x2:b.x+160, y2:b.y+25, stroke:edge.semantics === 'OBSERVED' ? '#2563eb' : '#94a3b8', 'stroke-width':2, 'data-semantics':edge.semantics});
+      if (edge.semantics === 'INFERRED') line.setAttribute('stroke-dasharray', '6 5');
+      line.append(element('title', {}, edge.label)); svg.append(line);
+      if (edge.semantics === 'OBSERVED') svg.append(element('text', {x:(a.x+b.x)/2+160, y:(a.y+b.y)/2+18, fill:'#1d4ed8', 'font-size':10}, edge.label));
+    }
+    const colors = {INVESTIGATION:'#6d28d9', RESOURCE:'#1d4ed8', FINDING:'#b45309', COVERAGE:'#b91c1c'};
+    for (const node of graph.nodes) {
+      const p = positions.get(node.id);
+      const group = element('g', {'data-node':node.id, tabindex:0, role:'button', 'aria-label':node.kind+': '+node.label});
+      group.append(element('rect', {x:p.x, y:p.y, width:330, height:54, rx:5, fill:'#fff', stroke:colors[node.kind]}));
+      group.append(element('text', {x:p.x+8, y:p.y+18, fill:colors[node.kind], 'font-size':10}, node.kind));
+      group.append(element('text', {x:p.x+8, y:p.y+38, fill:'#111827', 'font-size':11}, node.label.length > 43 ? node.label.slice(0, 40)+'…' : node.label));
+      group.append(element('title', {}, node.label));
+      const inspect = () => { document.getElementById('graph-node-detail').textContent = node.kind+': '+node.label+' — '+node.id; };
+      group.addEventListener('click', inspect); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inspect(); } });
+      nodeLabels.set(group, node.label.toLowerCase());
+      svg.append(group);
+    }
+    document.getElementById('graph-evidence-link').setAttribute('href', '#context-'+graph.investigation_id.replaceAll(':','-'));
+    document.getElementById('graph-status').textContent = `${graph.priority} / ${graph.priority_status}. ${graph.nodes.length} nodes; ${graph.omitted_nodes} nodes and ${graph.omitted_edges} edges omitted. Text evidence remains available.`;
+    highlight();
+  }
+  function highlight() {
+    const query = search.value.trim().toLowerCase();
+    for (const [group, label] of nodeLabels) group.setAttribute('opacity', !query || label.includes(query) ? '1' : '0.2');
+  }
+  const evidenceLink = document.getElementById('graph-evidence-link');
+  evidenceLink.addEventListener('click', () => {
+    const record = document.getElementById(evidenceLink.getAttribute('href').slice(1));
+    if (record) record.open = true;
+  });
+  select.addEventListener('change', draw); search.addEventListener('input', highlight); inferred.addEventListener('change', draw); draw();
+})();
+</script>
+{% else %}<p>No graph data. Missing graph nodes do not establish safety or absent relationships.</p>{% endif %}
+</section>
+<style>
+.contextual-record{margin:14px 0;border:1px solid #cbd5e1;padding:12px;overflow-wrap:anywhere}.contextual-record>summary{cursor:pointer}.contextual-record code{overflow-wrap:anywhere}.graph-scroll{max-height:650px;overflow:auto;max-width:100%;border:1px solid #cbd5e1}.graph-scroll svg{display:block}#graph-inferred{width:auto}#graph-node-detail{overflow-wrap:anywhere}@media print{.graph-scroll{display:none}#investigation-graph .filters{display:none}}
+</style>

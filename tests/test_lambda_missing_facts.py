@@ -11,8 +11,6 @@ from awsherlock.collectors.common import CollectionIssue
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.snapshot import capture_snapshot, read_snapshot, write_snapshot
 from test_s3 import aws_error
-from test_serverless import context
-
 
 FACT_OPERATIONS = (
     ("urls", "ListFunctionUrlConfigs", "AWSH-LAMBDA-001"),
@@ -22,50 +20,71 @@ FACT_OPERATIONS = (
 
 
 @pytest.mark.parametrize("fact,operation,check_id", FACT_OPERATIONS)
-def test_matching_function_issue_names_only_check_and_fact(context, fact, operation, check_id):
-    snapshot = capture_snapshot(context, ["lambda"])
+def test_matching_function_issue_names_only_check_and_fact(
+    serverless_context, fact, operation, check_id
+):
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
     snapshot.services["lambda"].resources[0].data.pop(fact)
-    snapshot.services["lambda"].issues.append(CollectionIssue("test", operation, "AccessDenied: private-marker"))
+    snapshot.services["lambda"].issues.append(
+        CollectionIssue("test", operation, "AccessDenied: private-marker")
+    )
     coverage = evaluate_snapshot(snapshot).coverage[0]
     required = [issue for issue in coverage["issues"] if issue["operation"] == "RequiredFact"]
-    assert required == [{"resource_id": "test", "operation": "RequiredFact",
-                         "message": f"{check_id} requires {fact}; a related collection issue is recorded separately."}]
+    assert required == [
+        {
+            "resource_id": "test",
+            "operation": "RequiredFact",
+            "message": f"{check_id} requires {fact}; a related collection issue is recorded separately.",
+        }
+    ]
     assert "private-marker" not in required[0]["message"]
     assert coverage["status"] == "PARTIAL"
     assert coverage["evaluated"] == 2 and coverage["not_scanned"] == 1
 
 
 @pytest.mark.parametrize("fact,operation,check_id", FACT_OPERATIONS)
-def test_old_snapshot_does_not_blame_unrelated_issue(context, tmp_path, fact, operation, check_id):
-    snapshot = capture_snapshot(context, ["lambda"])
+def test_old_snapshot_does_not_blame_unrelated_issue(
+    serverless_context, tmp_path, fact, operation, check_id
+):
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
     snapshot.services["lambda"].resources[0].data.pop(fact)
-    snapshot.services["lambda"].issues.extend([
-        CollectionIssue("different-function", operation, "AccessDenied"),
-        CollectionIssue("test", "OtherRead", "AccessDenied"),
-    ])
+    snapshot.services["lambda"].issues.extend(
+        [
+            CollectionIssue("different-function", operation, "AccessDenied"),
+            CollectionIssue("test", "OtherRead", "AccessDenied"),
+        ]
+    )
     path = tmp_path / "old.json"
     write_snapshot(snapshot, path)
-    required = [issue for issue in evaluate_snapshot(read_snapshot(path)).coverage[0]["issues"]
-                if issue["operation"] == "RequiredFact"]
-    assert required[0]["message"] == f"{check_id} requires {fact}; the fact is absent from this snapshot."
+    required = [
+        issue
+        for issue in evaluate_snapshot(read_snapshot(path)).coverage[0]["issues"]
+        if issue["operation"] == "RequiredFact"
+    ]
+    assert (
+        required[0]["message"]
+        == f"{check_id} requires {fact}; the fact is absent from this snapshot."
+    )
 
 
-def test_missing_only_and_selection_exclusions(context):
-    snapshot = capture_snapshot(context, ["lambda"])
+def test_missing_only_and_selection_exclusions(serverless_context):
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
     snapshot.services["lambda"].resources[0].data.clear()
     coverage = evaluate_snapshot(snapshot).coverage[0]
     assert coverage["status"] == "NOT_SCANNED"
     assert coverage["evaluated"] == 0 and coverage["not_scanned"] == 3
     assert sum(issue["operation"] == "RequiredFact" for issue in coverage["issues"]) == 3
     selected = evaluate_snapshot(snapshot, selected_checks=["AWSH-LAMBDA-001"])
-    assert sum(issue["operation"] == "RequiredFact" for issue in selected.coverage[0]["issues"]) == 1
+    assert (
+        sum(issue["operation"] == "RequiredFact" for issue in selected.coverage[0]["issues"]) == 1
+    )
     excluded = evaluate_snapshot(snapshot, selected_resources=["different-function"])
     assert not any(issue["operation"] == "RequiredFact" for issue in excluded.coverage[0]["issues"])
     assert excluded.coverage[0]["not_scanned"] == 3
 
 
-def test_complete_function_preserves_secure_and_insecure_results(context):
-    snapshot = capture_snapshot(context, ["lambda"])
+def test_complete_function_preserves_secure_and_insecure_results(serverless_context):
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
     resource = snapshot.services["lambda"].resources[0]
     resource.data["urls"] = []
     resource.data["role_policies"] = []
@@ -81,8 +100,10 @@ def test_complete_function_preserves_secure_and_insecure_results(context):
 
 
 @pytest.mark.parametrize("fact,operation,check_id", FACT_OPERATIONS)
-def test_actual_collector_issue_maps_to_required_fact(context, fact, operation, check_id):
-    client = context.session.client("lambda")
+def test_actual_collector_issue_maps_to_required_fact(
+    serverless_context, fact, operation, check_id
+):
+    client = serverless_context.session.client("lambda")
     if fact == "urls":
         original = client.get_paginator.side_effect
 
@@ -93,23 +114,36 @@ def test_actual_collector_issue_maps_to_required_fact(context, fact, operation, 
 
         client.get_paginator.side_effect = paginator
     elif fact == "role_policies":
-        context.session.client("iam").get_paginator.side_effect = aws_error("AccessDenied")
+        serverless_context.session.client("iam").get_paginator.side_effect = aws_error(
+            "AccessDenied"
+        )
     else:
-        client.get_paginator("list_functions").paginate.return_value[0]["Functions"][0]["PackageType"] = "Image"
-    snapshot = capture_snapshot(context, ["lambda"])
-    assert any(issue.operation == operation and issue.resource_id == "test"
-               for issue in snapshot.services["lambda"].issues)
+        client.get_paginator("list_functions").paginate.return_value[0]["Functions"][0][
+            "PackageType"
+        ] = "Image"
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
+    assert any(
+        issue.operation == operation and issue.resource_id == "test"
+        for issue in snapshot.services["lambda"].issues
+    )
     coverage = evaluate_snapshot(snapshot).coverage[0]
-    assert any(issue["operation"] == "RequiredFact" and
-               issue["message"] == f"{check_id} requires {fact}; a related collection issue is recorded separately."
-               for issue in coverage["issues"])
+    assert any(
+        issue["operation"] == "RequiredFact"
+        and issue["message"]
+        == f"{check_id} requires {fact}; a related collection issue is recorded separately."
+        for issue in coverage["issues"]
+    )
     assert coverage["status"] == "PARTIAL" and coverage["not_scanned"] == 1
 
 
-def test_offline_json_console_html_explain_without_authenticating(context, monkeypatch, tmp_path):
-    snapshot = capture_snapshot(context, ["lambda"])
+def test_offline_json_console_html_explain_without_authenticating(
+    serverless_context, monkeypatch, tmp_path
+):
+    snapshot = capture_snapshot(serverless_context, ["lambda"])
     snapshot.services["lambda"].resources[0].data.pop("role_policies")
-    snapshot.services["lambda"].issues.append(CollectionIssue("test", "ListAttachedRolePolicies", "AccessDenied"))
+    snapshot.services["lambda"].issues.append(
+        CollectionIssue("test", "ListAttachedRolePolicies", "AccessDenied")
+    )
     path = tmp_path / "facts.json"
     write_snapshot(snapshot, path)
     factory = Mock(side_effect=AssertionError("offline replay must not authenticate"))
@@ -118,9 +152,12 @@ def test_offline_json_console_html_explain_without_authenticating(context, monke
     result = runner.invoke(app, ["scan", str(path), "--output", "json"])
     assert result.exit_code == 1
     issues = json.loads(result.stdout)["coverage"][0]["issues"]
-    assert any(issue["operation"] == "RequiredFact" and
-               issue["message"] == "AWSH-LAMBDA-002 requires role_policies; a related collection issue is recorded separately."
-               for issue in issues)
+    assert any(
+        issue["operation"] == "RequiredFact"
+        and issue["message"]
+        == "AWSH-LAMBDA-002 requires role_policies; a related collection issue is recorded separately."
+        for issue in issues
+    )
     assert "secret-marker" not in result.stdout
     console = runner.invoke(app, ["scan", str(path), "--no-progress"])
     assert console.exit_code == 1 and "AWSH-LAMBDA-002 requires role_policies" in console.output

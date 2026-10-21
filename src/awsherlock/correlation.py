@@ -51,7 +51,9 @@ class FindingRef:
                 raise CorrelationError(f"{name} must be a non-empty string")
         if re.fullmatch(r"[0-9]{12}", self.account_id) is None:
             raise CorrelationError("account_id must contain 12 digits")
-        if self.region is not None and (not isinstance(self.region, str) or not self.region.strip()):
+        if self.region is not None and (
+            not isinstance(self.region, str) or not self.region.strip()
+        ):
             raise CorrelationError("region must be a non-empty string or None")
         if self.resource_arn is not None and (
             not isinstance(self.resource_arn, str) or not self.resource_arn.strip()
@@ -103,7 +105,11 @@ def _reconcile_resource(current: ResourceRef | None, observed: ResourceRef) -> R
         raise CorrelationError("lead resources must be ResourceRef values")
     if current is None:
         return observed
-    if current.resource_arn and observed.resource_arn and current.resource_arn != observed.resource_arn:
+    if (
+        current.resource_arn
+        and observed.resource_arn
+        and current.resource_arn != observed.resource_arn
+    ):
         raise CorrelationError("Conflicting resource ARNs for one logical lead resource")
     return replace(current, resource_arn=current.resource_arn or observed.resource_arn)
 
@@ -114,7 +120,9 @@ def _normalize_resources(resources: Iterable[ResourceRef]) -> tuple[ResourceRef,
         if not isinstance(item, ResourceRef):
             raise CorrelationError("lead resources must be ResourceRef values")
         reconciled[item.logical_key] = _reconcile_resource(reconciled.get(item.logical_key), item)
-    return tuple(sorted(reconciled.values(), key=lambda item: (item.logical_key, item.resource_arn or "")))
+    return tuple(
+        sorted(reconciled.values(), key=lambda item: (item.logical_key, item.resource_arn or ""))
+    )
 
 
 def _reconcile_finding(current: FindingRef | None, observed: FindingRef) -> FindingRef:
@@ -122,7 +130,11 @@ def _reconcile_finding(current: FindingRef | None, observed: FindingRef) -> Find
         raise CorrelationError("finding_refs must contain FindingRef values")
     if current is None:
         return observed
-    if current.resource_arn and observed.resource_arn and current.resource_arn != observed.resource_arn:
+    if (
+        current.resource_arn
+        and observed.resource_arn
+        and current.resource_arn != observed.resource_arn
+    ):
         raise CorrelationError("Conflicting resource ARNs for one logical finding")
     return replace(current, resource_arn=current.resource_arn or observed.resource_arn)
 
@@ -133,10 +145,14 @@ def _normalize_findings(findings: Iterable[FindingRef]) -> tuple[FindingRef, ...
         if not isinstance(item, FindingRef):
             raise CorrelationError("finding_refs must contain FindingRef values")
         reconciled[item.logical_key] = _reconcile_finding(reconciled.get(item.logical_key), item)
-    return tuple(sorted(reconciled.values(), key=lambda item: (item.logical_key, item.resource_arn or "")))
+    return tuple(
+        sorted(reconciled.values(), key=lambda item: (item.logical_key, item.resource_arn or ""))
+    )
 
 
-def _normalize_relationships(relationships: Iterable[RelationshipRef]) -> tuple[RelationshipRef, ...]:
+def _normalize_relationships(
+    relationships: Iterable[RelationshipRef],
+) -> tuple[RelationshipRef, ...]:
     grouped: dict[tuple, RelationshipRef] = {}
     for item in relationships:
         if not isinstance(item, RelationshipRef):
@@ -150,13 +166,18 @@ def _normalize_relationships(relationships: Iterable[RelationshipRef]) -> tuple[
             relationship_type=item.relationship_type,
             target=_reconcile_resource(current.target, item.target),
         )
-    return tuple(sorted(grouped.values(), key=lambda item: (
-        item.source.logical_key,
-        item.relationship_type.value,
-        item.target.logical_key,
-        item.source.resource_arn or "",
-        item.target.resource_arn or "",
-    )))
+    return tuple(
+        sorted(
+            grouped.values(),
+            key=lambda item: (
+                item.source.logical_key,
+                item.relationship_type.value,
+                item.target.logical_key,
+                item.source.resource_arn or "",
+                item.target.resource_arn or "",
+            ),
+        )
+    )
 
 
 def _normalize_statements(statements: Iterable[LeadStatement]) -> tuple[LeadStatement, ...]:
@@ -202,7 +223,9 @@ class Lead:
         object.__setattr__(self, "subjects", subjects)
         object.__setattr__(self, "related_resources", _normalize_resources(self.related_resources))
         object.__setattr__(self, "finding_refs", _normalize_findings(self.finding_refs))
-        object.__setattr__(self, "relationship_refs", _normalize_relationships(self.relationship_refs))
+        object.__setattr__(
+            self, "relationship_refs", _normalize_relationships(self.relationship_refs)
+        )
         object.__setattr__(self, "observed", _normalize_statements(self.observed))
         object.__setattr__(self, "unknown", _normalize_statements(self.unknown))
         object.__setattr__(self, "not_proven", _normalize_statements(self.not_proven))
@@ -210,9 +233,14 @@ class Lead:
             "pattern_id": self.pattern_id,
             "subjects": [list(item.logical_key) for item in subjects],
         }
-        digest = hashlib.sha256(json.dumps(
-            identity, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-        ).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(
+            json.dumps(
+                identity,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
         object.__setattr__(self, "lead_id", f"{self.pattern_id}:{digest}")
 
 
@@ -244,9 +272,16 @@ def merge_leads(candidates: Iterable[Lead]) -> tuple[Lead, ...]:
             unknown=current.unknown + candidate.unknown,
             not_proven=current.not_proven + candidate.not_proven,
         )
-    return tuple(sorted(grouped.values(), key=lambda item: (
-        PRIORITY_RANK[item.priority], item.pattern_id, item.lead_id,
-    )))
+    return tuple(
+        sorted(
+            grouped.values(),
+            key=lambda item: (
+                PRIORITY_RANK[item.priority],
+                item.pattern_id,
+                item.lead_id,
+            ),
+        )
+    )
 
 
 def resource_ref_to_dict(reference: ResourceRef) -> dict:
@@ -351,11 +386,15 @@ class CorrelationContext:
     relationships_to: Mapping[tuple[str, str, str, str, str], tuple[Relationship, ...]]
     coverage_by_service: Mapping[str, Mapping[str, object]]
 
-    def resource_for(self, key: FindingResourceKey, *, resource_type: str,
-                     resource_arn: str | None = None) -> Resource | None:
-        matches = tuple(item for item in self.resources_by_key.get(key, ())
-                        if item.resource_type == resource_type
-                        and (resource_arn is None or item.resource_arn == resource_arn))
+    def resource_for(
+        self, key: FindingResourceKey, *, resource_type: str, resource_arn: str | None = None
+    ) -> Resource | None:
+        matches = tuple(
+            item
+            for item in self.resources_by_key.get(key, ())
+            if item.resource_type == resource_type
+            and (resource_arn is None or item.resource_arn == resource_arn)
+        )
         return matches[0] if len(matches) == 1 else None
 
 
@@ -381,33 +420,45 @@ def build_correlation_context(
     for item in snapshot.relationships:
         from_index.setdefault(item.source.logical_key, []).append(item)
         to_index.setdefault(item.target.logical_key, []).append(item)
-    finding_sort = lambda item: (*finding_resource_key(item), item.id, item.resource_arn or "")
-    relationship_sort = lambda item: (
-        item.source.logical_key, item.relationship_type.value, item.target.logical_key,
-        item.source.resource_arn or "", item.target.resource_arn or "",
-    )
+
+    def finding_sort(item: Finding):
+        return (*finding_resource_key(item), item.id, item.resource_arn or "")
+
+    def relationship_sort(item: Relationship):
+        return (
+            item.source.logical_key,
+            item.relationship_type.value,
+            item.target.logical_key,
+            item.source.resource_arn or "",
+            item.target.resource_arn or "",
+        )
+
     return CorrelationContext(
         snapshot=snapshot,
         findings=finding_values,
-        resources_by_key=MappingProxyType({
-            key: tuple(sorted(value, key=lambda item: (item.resource_type, item.resource_arn or "")))
-            for key, value in resources.items()
-        }),
-        findings_by_check=MappingProxyType({
-            key: tuple(sorted(value, key=finding_sort)) for key, value in by_check.items()
-        }),
-        findings_by_resource=MappingProxyType({
-            key: tuple(sorted(value, key=finding_sort)) for key, value in by_resource.items()
-        }),
-        relationships_from=MappingProxyType({
-            key: tuple(sorted(value, key=relationship_sort)) for key, value in from_index.items()
-        }),
-        relationships_to=MappingProxyType({
-            key: tuple(sorted(value, key=relationship_sort)) for key, value in to_index.items()
-        }),
-        coverage_by_service=MappingProxyType({
-            row["service"]: MappingProxyType(dict(row)) for row in coverage
-        }),
+        resources_by_key=MappingProxyType(
+            {
+                key: tuple(
+                    sorted(value, key=lambda item: (item.resource_type, item.resource_arn or ""))
+                )
+                for key, value in resources.items()
+            }
+        ),
+        findings_by_check=MappingProxyType(
+            {key: tuple(sorted(value, key=finding_sort)) for key, value in by_check.items()}
+        ),
+        findings_by_resource=MappingProxyType(
+            {key: tuple(sorted(value, key=finding_sort)) for key, value in by_resource.items()}
+        ),
+        relationships_from=MappingProxyType(
+            {key: tuple(sorted(value, key=relationship_sort)) for key, value in from_index.items()}
+        ),
+        relationships_to=MappingProxyType(
+            {key: tuple(sorted(value, key=relationship_sort)) for key, value in to_index.items()}
+        ),
+        coverage_by_service=MappingProxyType(
+            {row["service"]: MappingProxyType(dict(row)) for row in coverage}
+        ),
     )
 
 
@@ -427,8 +478,11 @@ class CorrelationRule:
             raise CorrelationError("Correlation rule pattern_id must be a non-empty string")
         if not isinstance(self.title, str) or not self.title.strip():
             raise CorrelationError("Correlation rule title must be a non-empty string")
-        if (not isinstance(self.priority, LeadPriority)
-                or type(self.requires_relationships) is not bool or not callable(self.correlate)):
+        if (
+            not isinstance(self.priority, LeadPriority)
+            or type(self.requires_relationships) is not bool
+            or not callable(self.correlate)
+        ):
             raise CorrelationError("Invalid correlation rule metadata")
 
 

@@ -21,13 +21,24 @@ IDENTITY = f"arn:aws:iam::{ACCOUNT}:role/Reader"
 
 
 def sdk_client(service, region="eu-west-1"):
-    return boto3.client(service, region_name=region, aws_access_key_id="synthetic",
-                        aws_secret_access_key="synthetic")
+    return boto3.client(
+        service,
+        region_name=region,
+        aws_access_key_id="synthetic",
+        aws_secret_access_key="synthetic",
+    )
 
 
 def context(client, measurements=None):
-    return ScanContext(ACCOUNT, IDENTITY, "aws", None, "eu-west-1",
-                       Mock(client=Mock(return_value=client)), measurements=measurements)
+    return ScanContext(
+        ACCOUNT,
+        IDENTITY,
+        "aws",
+        None,
+        "eu-west-1",
+        Mock(client=Mock(return_value=client)),
+        measurements=measurements,
+    )
 
 
 def operation_counts(measurements):
@@ -38,7 +49,12 @@ def test_pagination_counts_denial_and_handler_cleanup():
     client = sdk_client("kms")
     with Stubber(client) as stub:
         stub.add_response("list_keys", {"Keys": [], "Truncated": True, "NextMarker": "page-2"}, {})
-        stub.add_client_error("list_keys", "AccessDeniedException", "payload-secret", expected_params={"Marker": "page-2"})
+        stub.add_client_error(
+            "list_keys",
+            "AccessDeniedException",
+            "payload-secret",
+            expected_params={"Marker": "page-2"},
+        )
         stub.add_response("list_keys", {"Keys": []}, {})
         with ScanMeasurements() as measurements:
             target = context(client, measurements)
@@ -53,14 +69,19 @@ def test_pagination_counts_denial_and_handler_cleanup():
         stub.assert_no_pending_responses()
 
 
-@pytest.mark.parametrize("failure", [
-    ReadTimeoutError(endpoint_url="https://secret.invalid"),
-    ClientError({"Error": {"Code": "ExpiredToken", "Message": "secret-marker"}}, "ListKeys"),
-])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ReadTimeoutError(endpoint_url="https://secret.invalid"),
+        ClientError({"Error": {"Code": "ExpiredToken", "Message": "secret-marker"}}, "ListKeys"),
+    ],
+)
 def test_failed_call_is_counted_without_payload(failure):
     client = sdk_client("kms")
+
     def fail(**kwargs):
         raise failure
+
     client.meta.events.register("before-call.kms.ListKeys", fail)
     with ScanMeasurements() as measurements:
         report = evaluate_snapshot(capture_snapshot(context(client, measurements), ["kms"]))
@@ -72,12 +93,14 @@ def test_failed_call_is_counted_without_payload(failure):
 
 def test_identity_region_isolation_and_fresh_scan_reset():
     with ScanMeasurements() as measurements:
-        for index, (account, identity, region) in enumerate([
-            (ACCOUNT, IDENTITY, "eu-west-1"),
-            (ACCOUNT, IDENTITY + "Other", "eu-west-1"),
-            (ACCOUNT, IDENTITY, "eu-central-1"),
-            ("999999999999", "another-identity", "eu-west-1"),
-        ]):
+        for index, (account, identity, region) in enumerate(
+            [
+                (ACCOUNT, IDENTITY, "eu-west-1"),
+                (ACCOUNT, IDENTITY + "Other", "eu-west-1"),
+                (ACCOUNT, IDENTITY, "eu-central-1"),
+                ("999999999999", "another-identity", "eu-west-1"),
+            ]
+        ):
             client = sdk_client("kms", region)
             with Stubber(client) as stub:
                 stub.add_response("list_keys", {"Keys": []}, {})
@@ -86,10 +109,12 @@ def test_identity_region_isolation_and_fresh_scan_reset():
         rows = measurements.to_dict()["calls"]
         assert len(rows) == 4 and all(row["count"] == 1 for row in rows)
         account_rows = [row for row in rows if row["account_id"] == ACCOUNT]
-        central_scope = next(row["identity_scope"] for row in account_rows
-                             if row["region"] == "eu-central-1")
-        west_scopes = {row["identity_scope"] for row in account_rows
-                       if row["region"] == "eu-west-1"}
+        central_scope = next(
+            row["identity_scope"] for row in account_rows if row["region"] == "eu-central-1"
+        )
+        west_scopes = {
+            row["identity_scope"] for row in account_rows if row["region"] == "eu-west-1"
+        }
         assert central_scope in west_scopes and len(west_scopes) == 2
         assert IDENTITY not in json.dumps(measurements.to_dict())
     with ScanMeasurements() as fresh:
@@ -116,8 +141,10 @@ def test_region_orchestration_counts_and_report_equivalence():
 def test_collection_timer_retained_if_collector_raises(monkeypatch):
     ticks = iter([5.0, 5.25])
     monkeypatch.setattr("awsherlock.measurement.perf_counter", lambda: next(ticks))
-    monkeypatch.setattr("awsherlock.snapshot.service_components",
-                        lambda service: (Mock(side_effect=ValueError("bad collector")), []))
+    monkeypatch.setattr(
+        "awsherlock.snapshot.service_components",
+        lambda service: (Mock(side_effect=ValueError("bad collector")), []),
+    )
     with ScanMeasurements() as measurements:
         with pytest.raises(ValueError):
             capture_snapshot(context(None, measurements), ["kms"])
@@ -131,15 +158,20 @@ def test_organization_discovery_and_member_measurements(monkeypatch):
     factory = Mock(return_value=member)
     monkeypatch.setattr("awsherlock.organization.create_scan_context", factory)
     with Stubber(org) as discovery, Stubber(kms) as inventory:
-        discovery.add_response("list_accounts", {"Accounts": [{"Id": member.account_id,
-                                "Name": "Synthetic", "State": "ACTIVE"}]}, {})
+        discovery.add_response(
+            "list_accounts",
+            {"Accounts": [{"Id": member.account_id, "Name": "Synthetic", "State": "ACTIVE"}]},
+            {},
+        )
         inventory.add_response("list_keys", {"Keys": []}, {})
         with ScanMeasurements() as measurements:
             report = scan_organization(context(org, measurements), ["kms"])
             assert not report.incomplete
             rows = measurements.to_dict()["calls"]
             assert {(r["account_id"], r["operation"]) for r in rows} == {
-                (ACCOUNT, "ListAccounts"), (member.account_id, "ListKeys")}
+                (ACCOUNT, "ListAccounts"),
+                (member.account_id, "ListKeys"),
+            }
             assert factory.call_args.kwargs["source_session"] is not None
 
 
@@ -149,7 +181,9 @@ def test_opt_in_does_not_change_snapshot_or_report():
         client = sdk_client("kms")
         with Stubber(client) as stub, ScanMeasurements() as measurements:
             stub.add_response("list_keys", {"Keys": []}, {})
-            snapshots.append(capture_snapshot(context(client, measurements if measured else None), ["kms"]))
+            snapshots.append(
+                capture_snapshot(context(client, measurements if measured else None), ["kms"])
+            )
     snapshots[1].metadata = snapshots[0].metadata
     assert snapshots[0].to_dict() == snapshots[1].to_dict()
     assert evaluate_snapshot(snapshots[0]).to_dict() == evaluate_snapshot(snapshots[1]).to_dict()

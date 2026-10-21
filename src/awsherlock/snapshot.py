@@ -28,8 +28,22 @@ from awsherlock.fact_validation import validate_resource_facts
 CURRENT_SCHEMA_VERSION = 2
 SUPPORTED_SCHEMA_VERSIONS = frozenset({1, CURRENT_SCHEMA_VERSION})
 FACTS = RESOURCE_FACTS
-FORBIDDEN = {"session", "credentials", "accesskeyid", "awsaccesskeyid", "secretaccesskey", "awssecretaccesskey",
-             "sessiontoken", "awssessiontoken", "secretstring", "secretbinary", "privatekey", "password", "environment", "variables"}
+FORBIDDEN = {
+    "session",
+    "credentials",
+    "accesskeyid",
+    "awsaccesskeyid",
+    "secretaccesskey",
+    "awssecretaccesskey",
+    "sessiontoken",
+    "awssessiontoken",
+    "secretstring",
+    "secretbinary",
+    "privatekey",
+    "password",
+    "environment",
+    "variables",
+}
 
 
 class SnapshotError(ValueError):
@@ -60,7 +74,10 @@ class Snapshot:
         return self.schema_version >= 2
 
     def to_dict(self) -> dict:
-        if type(self.schema_version) is not int or self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version not in SUPPORTED_SCHEMA_VERSIONS
+        ):
             raise SnapshotError("Unsupported snapshot schema version")
         if self.schema_version == 1 and self.relationships:
             raise SnapshotError("Snapshot schema version 1 cannot contain relationships")
@@ -68,12 +85,22 @@ class Snapshot:
             raise SnapshotError("Invalid normalized snapshot data")
         metadata = asdict(self.metadata)
         metadata["started_at"] = self.metadata.started_at.isoformat()
-        data = {"schema_version": self.schema_version, "metadata": metadata,
-                "services": {name: {"resources": [asdict(resource) for resource in result.resources],
-                                    "issues": [asdict(issue) for issue in result.issues],
-                                    **({"completed_operations": result.completed_operations}
-                                       if service_spec(name).completed_operations and result.completed_operations else {})}
-                             for name, result in self.services.items()}}
+        data = {
+            "schema_version": self.schema_version,
+            "metadata": metadata,
+            "services": {
+                name: {
+                    "resources": [asdict(resource) for resource in result.resources],
+                    "issues": [asdict(issue) for issue in result.issues],
+                    **(
+                        {"completed_operations": result.completed_operations}
+                        if service_spec(name).completed_operations and result.completed_operations
+                        else {}
+                    ),
+                }
+                for name, result in self.services.items()
+            },
+        }
         if self.supports_relationships:
             relationships = normalize_relationships(self.relationships, self.services)
             data["relationships"] = [relationship_to_dict(item) for item in relationships]
@@ -83,23 +110,39 @@ class Snapshot:
 
 def _collect_service(context: ScanContext, service: str) -> CollectionResult:
     collector, _ = service_components(service)
-    timer = (context.measurements.collection(context.account_id, context.caller_arn,
-                                             context.region, service)
-             if context.measurements is not None else nullcontext())
+    timer = (
+        context.measurements.collection(
+            context.account_id, context.caller_arn, context.region, service
+        )
+        if context.measurements is not None
+        else nullcontext()
+    )
     with timer:
         result = collector(context)
-    return CollectionResult(result.resources, result.issues,
-                            getattr(result, "completed_operations", []),
-                            getattr(result, "relationship_observations", []))
+    return CollectionResult(
+        result.resources,
+        result.issues,
+        getattr(result, "completed_operations", []),
+        getattr(result, "relationship_observations", []),
+    )
 
 
-def capture_snapshot(context: ScanContext, services: list[str],
-                     progress: Callable[[str, int, int], None] | None = None,
-                     *, max_workers: int = 1) -> Snapshot:
+def capture_snapshot(
+    context: ScanContext,
+    services: list[str],
+    progress: Callable[[str, int, int], None] | None = None,
+    *,
+    max_workers: int = 1,
+) -> Snapshot:
     if type(max_workers) is not int or not 1 <= max_workers <= len(SERVICES):
         raise SnapshotError(f"max_workers must be between 1 and {len(SERVICES)}")
-    metadata = ScanMetadata(scan_id=str(uuid4()), started_at=datetime.now(timezone.utc),
-                            account_id=context.account_id, region=context.region, version=__version__)
+    metadata = ScanMetadata(
+        scan_id=str(uuid4()),
+        started_at=datetime.now(timezone.utc),
+        account_id=context.account_id,
+        region=context.region,
+        version=__version__,
+    )
     results = {}
     if max_workers == 1 or len(services) <= 1:
         for index, service in enumerate(services):
@@ -109,8 +152,9 @@ def capture_snapshot(context: ScanContext, services: list[str],
             if progress is not None:
                 progress(f"Collected {service.upper()}", index + 1, len(services))
     else:
-        executor = ThreadPoolExecutor(max_workers=min(max_workers, len(services)),
-                                      thread_name_prefix="awsherlock-collect")
+        executor = ThreadPoolExecutor(
+            max_workers=min(max_workers, len(services)), thread_name_prefix="awsherlock-collect"
+        )
         stop = Event()
         futures: list[tuple[str, Future[CollectionResult | None]]] = []
 
@@ -133,7 +177,8 @@ def capture_snapshot(context: ScanContext, services: list[str],
                     future.cancel()
                 executor.shutdown(wait=True, cancel_futures=True)
                 failed = next(
-                    future for _, future in futures
+                    future
+                    for _, future in futures
                     if not future.cancelled() and future.exception() is not None
                 )
             else:
@@ -178,14 +223,22 @@ def snapshot_from_dict(data: object) -> Snapshot:
             raise ValueError()
         services = {}
         for service, collection in data["services"].items():
-            if service not in SERVICES or not isinstance(collection, dict) or not {"resources", "issues"} <= set(collection):
+            if (
+                service not in SERVICES
+                or not isinstance(collection, dict)
+                or not {"resources", "issues"} <= set(collection)
+            ):
                 raise ValueError()
-            if set(collection) - {"resources", "issues"} != ({"completed_operations"} if "completed_operations" in collection else set()):
+            if set(collection) - {"resources", "issues"} != (
+                {"completed_operations"} if "completed_operations" in collection else set()
+            ):
                 raise ValueError()
             registered_operations = service_spec(service).completed_operations
             if "completed_operations" in collection and not registered_operations:
                 raise ValueError()
-            if not isinstance(collection["resources"], list) or not isinstance(collection["issues"], list):
+            if not isinstance(collection["resources"], list) or not isinstance(
+                collection["issues"], list
+            ):
                 raise ValueError()
             result = CollectionResult()
             if "completed_operations" in collection:
@@ -203,7 +256,10 @@ def snapshot_from_dict(data: object) -> Snapshot:
                 result.resources.append(resource)
             for raw in collection["issues"]:
                 issue = CollectionIssue(**raw)
-                if any(not isinstance(value, str) or not value.strip() for value in (issue.operation, issue.message)):
+                if any(
+                    not isinstance(value, str) or not value.strip()
+                    for value in (issue.operation, issue.message)
+                ):
                     raise ValueError()
                 if issue.resource_id is not None and not isinstance(issue.resource_id, str):
                     raise ValueError()
@@ -234,6 +290,7 @@ def write_snapshot(snapshot: Snapshot, path: Path) -> None:
 def snapshot_saver(path: Path, *, bundle: bool = False) -> Callable[[Snapshot, str], None]:
     """Save new replayable files; create bundles only after identity is verified."""
     created = False
+
     def save(snapshot: Snapshot, label: str) -> None:
         nonlocal created
         if not bundle:
@@ -245,6 +302,7 @@ def snapshot_saver(path: Path, *, bundle: bool = False) -> Callable[[Snapshot, s
             path.mkdir()
             created = True
         write_snapshot(snapshot, path / f"{snapshot.metadata.account_id}-{label}.json")
+
     return save
 
 

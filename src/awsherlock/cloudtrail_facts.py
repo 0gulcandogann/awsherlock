@@ -6,10 +6,15 @@ MANAGEMENT_SOURCES = {"kms.amazonaws.com", "rdsdata.amazonaws.com"}
 
 
 def management_events(response: object) -> bool:
-    if not isinstance(response, dict) or not any(key in response for key in ("EventSelectors", "AdvancedEventSelectors")):
+    if not isinstance(response, dict) or not any(
+        key in response for key in ("EventSelectors", "AdvancedEventSelectors")
+    ):
         raise InvalidResponse()
     basic = items({"EventSelectors": response.get("EventSelectors", [])}, "EventSelectors")
-    advanced = items({"AdvancedEventSelectors": response.get("AdvancedEventSelectors", [])}, "AdvancedEventSelectors")
+    advanced = items(
+        {"AdvancedEventSelectors": response.get("AdvancedEventSelectors", [])},
+        "AdvancedEventSelectors",
+    )
     if basic and advanced:
         raise InvalidResponse()
     if not basic and not advanced:
@@ -21,19 +26,30 @@ def management_events(response: object) -> bool:
             raise InvalidResponse()
         value = selector.get("IncludeManagementEvents", True)
         read_write_type = selector.get("ReadWriteType", "All")
-        if type(value) is not bool or not isinstance(read_write_type, str) or read_write_type not in {"All", "ReadOnly", "WriteOnly"}:
+        if (
+            type(value) is not bool
+            or not isinstance(read_write_type, str)
+            or read_write_type not in {"All", "ReadOnly", "WriteOnly"}
+        ):
             raise InvalidResponse()
         included.append(value)
     for selector in advanced:
         if not isinstance(selector, dict):
             raise InvalidResponse()
         fields = items(selector, "FieldSelectors")
-        category_fields = [field for field in fields if isinstance(field, dict) and field.get("Field") == "eventCategory"]
+        category_fields = [
+            field
+            for field in fields
+            if isinstance(field, dict) and field.get("Field") == "eventCategory"
+        ]
         if len(category_fields) != 1:
             raise InvalidResponse()
         category = category_fields[0]
-        if set(category) != {"Field", "Equals"} or not isinstance(category["Equals"], list) or not category["Equals"] or any(
-            not isinstance(value, str) or not value for value in category["Equals"]
+        if (
+            set(category) != {"Field", "Equals"}
+            or not isinstance(category["Equals"], list)
+            or not category["Equals"]
+            or any(not isinstance(value, str) or not value for value in category["Equals"])
         ):
             raise InvalidResponse()
         if "Management" not in category["Equals"]:
@@ -43,7 +59,11 @@ def management_events(response: object) -> bool:
         categories = []
         seen = set()
         for field in fields:
-            if not isinstance(field, dict) or field.get("Field") not in {"eventCategory", "readOnly", "eventSource"}:
+            if not isinstance(field, dict) or field.get("Field") not in {
+                "eventCategory",
+                "readOnly",
+                "eventSource",
+            }:
                 # More restrictive event-source/name/resource filters are not simulated.
                 raise InvalidResponse()
             operator = "NotEquals" if field["Field"] == "eventSource" else "Equals"
@@ -53,7 +73,11 @@ def management_events(response: object) -> bool:
                 raise InvalidResponse()
             seen.add(field["Field"])
             values = field[operator]
-            if not isinstance(values, list) or not values or any(not isinstance(value, str) or not value for value in values):
+            if (
+                not isinstance(values, list)
+                or not values
+                or any(not isinstance(value, str) or not value for value in values)
+            ):
                 raise InvalidResponse()
             if field["Field"] == "eventCategory":
                 categories.append("Management" in values)
@@ -80,7 +104,9 @@ def management_context(response: object) -> dict:
     for selector in response.get("EventSelectors", []):
         if selector.get("IncludeManagementEvents", True):
             sources = selector.get("ExcludeManagementEventSources", [])
-            if not isinstance(sources, list) or any(not isinstance(s, str) or s not in MANAGEMENT_SOURCES for s in sources):
+            if not isinstance(sources, list) or any(
+                not isinstance(s, str) or s not in MANAGEMENT_SOURCES for s in sources
+            ):
                 raise InvalidResponse()
             exclusions.append(set(sources))
             read_write_type = selector.get("ReadWriteType", "All")
@@ -88,11 +114,29 @@ def management_context(response: object) -> dict:
             event_types["write"] |= read_write_type in {"All", "WriteOnly"}
     for selector in response.get("AdvancedEventSelectors", []):
         fields = selector["FieldSelectors"]
-        if any(isinstance(field, dict) and field.get("Field") == "eventCategory" and "Management" in field.get("Equals", []) for field in fields):
-            exclusions.append({source for field in fields if field["Field"] == "eventSource" for source in field["NotEquals"]})
-            read_only = next((field["Equals"] for field in fields if field["Field"] == "readOnly"), ["true", "false"])
+        if any(
+            isinstance(field, dict)
+            and field.get("Field") == "eventCategory"
+            and "Management" in field.get("Equals", [])
+            for field in fields
+        ):
+            exclusions.append(
+                {
+                    source
+                    for field in fields
+                    if field["Field"] == "eventSource"
+                    for source in field["NotEquals"]
+                }
+            )
+            read_only = next(
+                (field["Equals"] for field in fields if field["Field"] == "readOnly"),
+                ["true", "false"],
+            )
             event_types["read"] |= "true" in read_only
             event_types["write"] |= "false" in read_only
     common = set.intersection(*exclusions) if exclusions else set()
-    return {"management_events": enabled, "management_excluded_sources": sorted(common),
-            "management_event_types": event_types}
+    return {
+        "management_events": enabled,
+        "management_excluded_sources": sorted(common),
+        "management_event_types": event_types,
+    }

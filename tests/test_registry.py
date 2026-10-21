@@ -9,13 +9,26 @@ import pytest
 from awsherlock.collectors.common import CollectionResult
 from awsherlock.models import Resource, ScanMetadata, Severity
 from awsherlock.registry import (
-    RESOURCE_FACTS, SERVICE_SPECS, CheckSpec, ServiceSpec, check_specs, service_spec,
+    RESOURCE_FACTS,
+    SERVICE_SPECS,
+    CheckSpec,
+    ServiceSpec,
+    check_specs,
+    service_spec,
 )
 
-
 EXPECTED_SERVICES = (
-    "iam", "s3", "ec2", "lambda", "secretsmanager", "cloudtrail", "kms",
-    "rds", "guardduty", "dynamodb", "bedrock",
+    "iam",
+    "s3",
+    "ec2",
+    "lambda",
+    "secretsmanager",
+    "cloudtrail",
+    "kms",
+    "rds",
+    "guardduty",
+    "dynamodb",
+    "bedrock",
 )
 EXPECTED_COUNTS = (12, 5, 6, 3, 3, 4, 2, 3, 1, 1, 2)
 EXPECTED_IDS = (
@@ -27,7 +40,10 @@ EXPECTED_IDS = (
     *(f"AWSH-CT-{number:03}" for number in range(1, 5)),
     *(f"AWSH-KMS-{number:03}" for number in range(1, 3)),
     *(f"AWSH-RDS-{number:03}" for number in range(1, 4)),
-    "AWSH-GD-001", "AWSH-DDB-001", "AWSH-BEDROCK-001", "AWSH-BEDROCK-002",
+    "AWSH-GD-001",
+    "AWSH-DDB-001",
+    "AWSH-BEDROCK-001",
+    "AWSH-BEDROCK-002",
 )
 
 
@@ -36,7 +52,10 @@ def test_registry_preserves_service_and_check_discovery_contract() -> None:
     assert all(isinstance(spec, ServiceSpec) for spec in SERVICE_SPECS)
     assert tuple(spec.identifier for spec in SERVICE_SPECS) == EXPECTED_SERVICES
     assert tuple(len(spec.checks) for spec in SERVICE_SPECS) == EXPECTED_COUNTS
-    assert tuple(spec.identifier for spec in SERVICE_SPECS if spec.default_enabled) == EXPECTED_SERVICES[:7]
+    assert (
+        tuple(spec.identifier for spec in SERVICE_SPECS if spec.default_enabled)
+        == EXPECTED_SERVICES[:7]
+    )
     assert tuple(spec.identifier for spec in check_specs()) == EXPECTED_IDS
     assert all(isinstance(spec, CheckSpec) for spec in check_specs())
 
@@ -80,8 +99,11 @@ def test_registry_owns_primary_fact_catalog_metadata_and_rds_marker() -> None:
     )
     assert service_spec("rds").completed_operations == ("DescribeDBInstances",)
     assert service_spec("bedrock").completed_operations == ("ListAgents",)
-    assert all(not spec.completed_operations for spec in SERVICE_SPECS
-               if spec.identifier not in {"rds", "bedrock"})
+    assert all(
+        not spec.completed_operations
+        for spec in SERVICE_SPECS
+        if spec.identifier not in {"rds", "bedrock"}
+    )
 
 
 def test_registry_evaluator_primary_metadata_stays_in_parity() -> None:
@@ -142,15 +164,15 @@ def test_duplicate_service_and_check_ids_fail_loudly(monkeypatch) -> None:
 
     iam = service_spec("iam")
     monkeypatch.setattr(registry, "SERVICE_SPECS", (iam, iam))
-    monkeypatch.setattr(registry, "_SERVICE_INDEX",
-                        MappingProxyType({iam.identifier: iam}))
+    monkeypatch.setattr(registry, "_SERVICE_INDEX", MappingProxyType({iam.identifier: iam}))
     with pytest.raises(ValueError, match="Duplicate service identifier"):
         registry._validate_registry()
 
     duplicate_check_service = replace(iam, checks=(iam.checks[0], iam.checks[0]))
     monkeypatch.setattr(registry, "SERVICE_SPECS", (duplicate_check_service,))
-    monkeypatch.setattr(registry, "_SERVICE_INDEX",
-                        MappingProxyType({iam.identifier: duplicate_check_service}))
+    monkeypatch.setattr(
+        registry, "_SERVICE_INDEX", MappingProxyType({iam.identifier: duplicate_check_service})
+    )
     with pytest.raises(ValueError, match="Duplicate check identifier"):
         registry._validate_registry()
 
@@ -159,8 +181,9 @@ def test_catalog_projects_registry_metadata(monkeypatch) -> None:
     from awsherlock import catalog
 
     original = check_specs()[0]
-    synthetic = replace(original, identifier="AWSH-TEST-001", service="test",
-                        title="Synthetic registry title")
+    synthetic = replace(
+        original, identifier="AWSH-TEST-001", service="test", title="Synthetic registry title"
+    )
     monkeypatch.setattr(catalog, "check_specs", lambda: (synthetic,))
     assert catalog.check_catalog() == [
         ("AWSH-TEST-001", "test", "Synthetic registry title"),
@@ -186,9 +209,13 @@ def test_snapshot_fact_allowlist_is_registry_projection() -> None:
 def test_snapshot_unknown_service_preserves_safe_validation_error() -> None:
     from awsherlock.snapshot import Snapshot, SnapshotError
 
-    metadata = ScanMetadata(scan_id="registry-test",
-                            started_at=datetime(2026, 10, 7, tzinfo=timezone.utc),
-                            account_id="123456789012", region="eu-west-1", version="test")
+    metadata = ScanMetadata(
+        scan_id="registry-test",
+        started_at=datetime(2026, 10, 7, tzinfo=timezone.utc),
+        account_id="123456789012",
+        region="eu-west-1",
+        version="test",
+    )
     with pytest.raises(SnapshotError, match="Invalid normalized snapshot data"):
         Snapshot(metadata, {"unknown": CollectionResult()}).to_dict()
 
@@ -197,16 +224,24 @@ def test_evaluation_consumes_registry_check_specs(monkeypatch) -> None:
     from awsherlock import evaluation
     from awsherlock.snapshot import Snapshot
 
-    metadata = ScanMetadata(scan_id="registry-test",
-                            started_at=datetime(2026, 10, 7, tzinfo=timezone.utc),
-                            account_id="123456789012", region="eu-west-1", version="test")
-    resource = Resource(service="ec2", resource_type="volume",
-                        account_id=metadata.account_id, region=metadata.region,
-                        resource_id="vol-test", resource_arn=None,
-                        data={"encrypted": False})
+    metadata = ScanMetadata(
+        scan_id="registry-test",
+        started_at=datetime(2026, 10, 7, tzinfo=timezone.utc),
+        account_id="123456789012",
+        region="eu-west-1",
+        version="test",
+    )
+    resource = Resource(
+        service="ec2",
+        resource_type="volume",
+        account_id=metadata.account_id,
+        region=metadata.region,
+        resource_id="vol-test",
+        resource_arn=None,
+        data={"encrypted": False},
+    )
     original = service_spec("ec2")
-    monkeypatch.setattr(evaluation, "service_spec",
-                        lambda identifier: replace(original, checks=()))
+    monkeypatch.setattr(evaluation, "service_spec", lambda identifier: replace(original, checks=()))
     report = evaluation.evaluate_snapshot(
         Snapshot(metadata, {"ec2": CollectionResult([resource], [])})
     )
@@ -215,87 +250,213 @@ def test_evaluation_consumes_registry_check_specs(monkeypatch) -> None:
 
 
 def _resource(resource_type: str, data: dict, *, service: str) -> Resource:
-    return Resource(service=service, resource_type=resource_type,
-                    account_id="123456789012", region=None if service == "iam" else "eu-west-1",
-                    resource_id="registry-parity", resource_arn=None, data=data)
+    return Resource(
+        service=service,
+        resource_type=resource_type,
+        account_id="123456789012",
+        region=None if service == "iam" else "eu-west-1",
+        resource_id="registry-parity",
+        resource_arn=None,
+        data=data,
+    )
 
 
 def _runtime_parity_resources() -> dict[str, Resource]:
-    statement = {"effect": "Allow", "conditional": False, "actions": ["*"],
-                 "resources": ["*"], "not_actions": False, "not_resources": False}
-    profile = {"owner": False, "purpose": False, "declared_kind": "unknown",
-               "boundary": None, "service_linked": False}
-    approval = {"status": "unregistered", "declared_kind": "unknown",
-                "owner": False, "purpose": False, "allowed_principals": [],
-                "shared": False, "external_id_required": False,
-                "source_identity_required": False}
-    trust = {"principals": [{"kind": "AWS", "value": "*"}],
-             "mechanisms": ["assume_role"], "broad": True, "status": "supported",
-             "external_id_condition": False, "source_identity_condition": False}
+    statement = {
+        "effect": "Allow",
+        "conditional": False,
+        "actions": ["*"],
+        "resources": ["*"],
+        "not_actions": False,
+        "not_resources": False,
+    }
+    profile = {
+        "owner": False,
+        "purpose": False,
+        "declared_kind": "unknown",
+        "boundary": None,
+        "service_linked": False,
+    }
+    approval = {
+        "status": "unregistered",
+        "declared_kind": "unknown",
+        "owner": False,
+        "purpose": False,
+        "allowed_principals": [],
+        "shared": False,
+        "external_id_required": False,
+        "source_identity_required": False,
+    }
+    trust = {
+        "principals": [{"kind": "AWS", "value": "*"}],
+        "mechanisms": ["assume_role"],
+        "broad": True,
+        "status": "supported",
+        "external_id_condition": False,
+        "source_identity_condition": False,
+    }
     cases = {
-        "AWSH-IAM-001": _resource("role", {"attached": ["arn:aws:iam::aws:policy/AdministratorAccess"]}, service="iam"),
+        "AWSH-IAM-001": _resource(
+            "role", {"attached": ["arn:aws:iam::aws:policy/AdministratorAccess"]}, service="iam"
+        ),
         "AWSH-IAM-002": _resource("role", {"statements": [statement]}, service="iam"),
         "AWSH-IAM-003": _resource("role", {"statements": [statement]}, service="iam"),
-        "AWSH-IAM-004": _resource("user", {"console_mfa": {"console": True, "mfa": False}}, service="iam"),
-        "AWSH-IAM-005": _resource("access_key", {"key_age": {"active": True, "days": 91}}, service="iam"),
-        "AWSH-IAM-006": _resource("access_key", {"key_stale": {"days": 91, "never_used": False}}, service="iam"),
-        "AWSH-IAM-007": _resource("role", {"identity_profile": profile, "identity_approval": approval}, service="iam"),
-        "AWSH-IAM-008": _resource("role", {"identity_profile": profile, "identity_approval": approval}, service="iam"),
-        "AWSH-IAM-009": _resource("role", {"identity_profile": profile, "identity_usage": {
-            "created_days": 120, "last_used_days": 91, "status": "recorded"}}, service="iam"),
+        "AWSH-IAM-004": _resource(
+            "user", {"console_mfa": {"console": True, "mfa": False}}, service="iam"
+        ),
+        "AWSH-IAM-005": _resource(
+            "access_key", {"key_age": {"active": True, "days": 91}}, service="iam"
+        ),
+        "AWSH-IAM-006": _resource(
+            "access_key", {"key_stale": {"days": 91, "never_used": False}}, service="iam"
+        ),
+        "AWSH-IAM-007": _resource(
+            "role", {"identity_profile": profile, "identity_approval": approval}, service="iam"
+        ),
+        "AWSH-IAM-008": _resource(
+            "role", {"identity_profile": profile, "identity_approval": approval}, service="iam"
+        ),
+        "AWSH-IAM-009": _resource(
+            "role",
+            {
+                "identity_profile": profile,
+                "identity_usage": {"created_days": 120, "last_used_days": 91, "status": "recorded"},
+            },
+            service="iam",
+        ),
         "AWSH-IAM-010": _resource("role", {"identity_trust": trust}, service="iam"),
         "AWSH-IAM-011": _resource("role", {"identity_approval": approval}, service="iam"),
-        "AWSH-IAM-012": _resource("role", {"identity_approval": {**approval, "status": "registered"},
-                                             "identity_trust": trust}, service="iam"),
+        "AWSH-IAM-012": _resource(
+            "role",
+            {"identity_approval": {**approval, "status": "registered"}, "identity_trust": trust},
+            service="iam",
+        ),
     }
-    s3 = _resource("bucket", {
-        "public_access_block": None, "encryption": None, "versioning": None,
-        "logging": None, "policy_public": True,
-    }, service="s3")
+    s3 = _resource(
+        "bucket",
+        {
+            "public_access_block": None,
+            "encryption": None,
+            "versioning": None,
+            "logging": None,
+            "policy_public": True,
+        },
+        service="s3",
+    )
     cases.update({f"AWSH-S3-{number:03}": s3 for number in range(1, 6)})
-    group = _resource("security-group", {"ingress": [{
-        "protocol": "-1", "from": None, "to": None, "cidrs": ["0.0.0.0/0"],
-    }]}, service="ec2")
-    instance = _resource("instance", {
-        "metadata": {"endpoint": "enabled", "tokens": "optional"},
-        "addresses": ["203.0.113.10"],
-    }, service="ec2")
-    cases.update({"AWSH-EC2-001": group, "AWSH-EC2-002": group, "AWSH-EC2-003": group,
-                  "AWSH-EC2-004": instance, "AWSH-EC2-005": instance,
-                  "AWSH-EC2-006": _resource("volume", {"encrypted": False}, service="ec2")})
-    function = _resource("function", {
-        "urls": [{"arn": "arn:aws:lambda:eu-west-1:123456789012:function:test", "auth": "NONE"}],
-        "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
-        "runtime": {"name": "python3.8", "deprecated": True,
-                    "catalog_date": "2026-09-15", "evaluated_on": "2026-10-07"},
-    }, service="lambda")
+    group = _resource(
+        "security-group",
+        {
+            "ingress": [
+                {
+                    "protocol": "-1",
+                    "from": None,
+                    "to": None,
+                    "cidrs": ["0.0.0.0/0"],
+                }
+            ]
+        },
+        service="ec2",
+    )
+    instance = _resource(
+        "instance",
+        {
+            "metadata": {"endpoint": "enabled", "tokens": "optional"},
+            "addresses": ["203.0.113.10"],
+        },
+        service="ec2",
+    )
+    cases.update(
+        {
+            "AWSH-EC2-001": group,
+            "AWSH-EC2-002": group,
+            "AWSH-EC2-003": group,
+            "AWSH-EC2-004": instance,
+            "AWSH-EC2-005": instance,
+            "AWSH-EC2-006": _resource("volume", {"encrypted": False}, service="ec2"),
+        }
+    )
+    function = _resource(
+        "function",
+        {
+            "urls": [
+                {"arn": "arn:aws:lambda:eu-west-1:123456789012:function:test", "auth": "NONE"}
+            ],
+            "role_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"],
+            "runtime": {
+                "name": "python3.8",
+                "deprecated": True,
+                "catalog_date": "2026-09-15",
+                "evaluated_on": "2026-10-07",
+            },
+        },
+        service="lambda",
+    )
     cases.update({f"AWSH-LAMBDA-{number:03}": function for number in range(1, 4)})
-    secret = _resource("secret", {
-        "rotation": False,
-        "policy": [{"effect": "Allow", "broad_principal": True,
-                    "conditional": False, "actions": ["secretsmanager:GetSecretValue"]}],
-        "encryption": {"manager": "CUSTOMER", "state": "Disabled"},
-    }, service="secretsmanager")
+    secret = _resource(
+        "secret",
+        {
+            "rotation": False,
+            "policy": [
+                {
+                    "effect": "Allow",
+                    "broad_principal": True,
+                    "conditional": False,
+                    "actions": ["secretsmanager:GetSecretValue"],
+                }
+            ],
+            "encryption": {"manager": "CUSTOMER", "state": "Disabled"},
+        },
+        service="secretsmanager",
+    )
     cases.update({f"AWSH-SECRET-{number:03}": secret for number in range(1, 4)})
-    cases["AWSH-CT-001"] = _resource("regional_summary", {"usable_trail": False}, service="cloudtrail")
-    trail = _resource("trail", {"trail_settings": {
-        "IsMultiRegionTrail": False, "IncludeGlobalServiceEvents": False,
-        "LogFileValidationEnabled": False, "IsOrganizationTrail": False,
-    }, "management_events": False}, service="cloudtrail")
+    cases["AWSH-CT-001"] = _resource(
+        "regional_summary", {"usable_trail": False}, service="cloudtrail"
+    )
+    trail = _resource(
+        "trail",
+        {
+            "trail_settings": {
+                "IsMultiRegionTrail": False,
+                "IncludeGlobalServiceEvents": False,
+                "LogFileValidationEnabled": False,
+                "IsOrganizationTrail": False,
+            },
+            "management_events": False,
+        },
+        service="cloudtrail",
+    )
     cases.update({"AWSH-CT-002": trail, "AWSH-CT-003": trail, "AWSH-CT-004": trail})
-    cases["AWSH-KMS-001"] = _resource("key", {"rotation": {
-        "eligible": True, "enabled": False}}, service="kms")
-    cases["AWSH-KMS-002"] = _resource("key", {"policy": [{
-        "effect": "Allow", "broad_principal": True, "conditional": False,
-        "actions": ["kms:Decrypt"],
-    }]}, service="kms")
+    cases["AWSH-KMS-001"] = _resource(
+        "key", {"rotation": {"eligible": True, "enabled": False}}, service="kms"
+    )
+    cases["AWSH-KMS-002"] = _resource(
+        "key",
+        {
+            "policy": [
+                {
+                    "effect": "Allow",
+                    "broad_principal": True,
+                    "conditional": False,
+                    "actions": ["kms:Decrypt"],
+                }
+            ]
+        },
+        service="kms",
+    )
     cases["AWSH-RDS-001"] = _resource("db-snapshot", {"restore_public": True}, service="rds")
-    rds_instance = _resource("db-instance", {
-        "storage_encrypted": False, "publicly_accessible": True,
-    }, service="rds")
+    rds_instance = _resource(
+        "db-instance",
+        {
+            "storage_encrypted": False,
+            "publicly_accessible": True,
+        },
+        service="rds",
+    )
     cases.update({"AWSH-RDS-002": rds_instance, "AWSH-RDS-003": rds_instance})
-    cases["AWSH-GD-001"] = _resource("regional-summary", {
-        "enabled_detector_present": False}, service="guardduty")
+    cases["AWSH-GD-001"] = _resource(
+        "regional-summary", {"enabled_detector_present": False}, service="guardduty"
+    )
     cases["AWSH-DDB-001"] = _resource("table", {"pitr_enabled": False}, service="dynamodb")
     cases["AWSH-BEDROCK-001"] = _resource(
         "agent",
@@ -326,8 +487,18 @@ def test_registry_metadata_matches_every_runtime_finding() -> None:
         findings = spec.evaluator.evaluate(resources[spec.identifier])
         assert len(findings) == 1, spec.identifier
         finding = findings[0]
-        assert (finding.id, finding.title, finding.severity, finding.service,
-                finding.remediation, tuple(finding.references)) == (
-                    spec.identifier, spec.title, spec.severity, spec.service,
-                    spec.remediation, spec.references,
-                )
+        assert (
+            finding.id,
+            finding.title,
+            finding.severity,
+            finding.service,
+            finding.remediation,
+            tuple(finding.references),
+        ) == (
+            spec.identifier,
+            spec.title,
+            spec.severity,
+            spec.service,
+            spec.remediation,
+            spec.references,
+        )

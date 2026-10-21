@@ -12,8 +12,6 @@ from awsherlock.catalog import check_catalog, describe_check
 from awsherlock.cli import app
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.snapshot import write_snapshot
-from test_snapshot import snapshot
-from test_s3 import context
 from dataclasses import replace
 
 
@@ -65,20 +63,38 @@ def test_catalog_ids_are_unique_and_match_supported_check_families():
     catalog = check_catalog()
     ids = {entry[0] for entry in catalog}
     assert len(ids) == len(catalog) == 42
-    expected = {f"AWSH-{prefix}-{number:03}" for prefix, count in
-                (("IAM", 12), ("S3", 5), ("EC2", 6), ("LAMBDA", 3),
-                 ("SECRET", 3), ("CT", 4), ("KMS", 2), ("RDS", 3), ("GD", 1),
-                 ("DDB", 1), ("BEDROCK", 2))
-                for number in range(1, count + 1)}
+    expected = {
+        f"AWSH-{prefix}-{number:03}"
+        for prefix, count in (
+            ("IAM", 12),
+            ("S3", 5),
+            ("EC2", 6),
+            ("LAMBDA", 3),
+            ("SECRET", 3),
+            ("CT", 4),
+            ("KMS", 2),
+            ("RDS", 3),
+            ("GD", 1),
+            ("DDB", 1),
+            ("BEDROCK", 2),
+        )
+        for number in range(1, count + 1)
+    }
     assert ids == expected
     assert all(title for _, _, title in catalog)
 
 
-@pytest.mark.parametrize("args", [
-    ["--doctor", "--list-checks"], ["--list-services", "--list-checks"],
-    ["--update", "--doctor"], ["--doctor", "scan"],
-    ["--list-services", "scan"], ["--list-checks", "snapshot", "--output", "unused.json"],
-])
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--doctor", "--list-checks"],
+        ["--list-services", "--list-checks"],
+        ["--update", "--doctor"],
+        ["--doctor", "scan"],
+        ["--list-services", "scan"],
+        ["--list-checks", "snapshot", "--output", "unused.json"],
+    ],
+)
 def test_conflicting_actions_fail_before_work(args, no_aws, monkeypatch):
     updater = Mock(side_effect=AssertionError("Must not update"))
     monkeypatch.setattr("awsherlock.cli.update_installation", updater)
@@ -89,18 +105,30 @@ def test_conflicting_actions_fail_before_work(args, no_aws, monkeypatch):
 
 
 @pytest.mark.parametrize("mode", ["live", "offline", "organization"])
-@pytest.mark.parametrize("options,banner,bar", [
-    ([], True, True), (["--no-banner"], False, True),
-    (["--no-progress"], False, False), (["--no-progress", "--no-banner"], False, False),
-])
-def test_display_switches_preserve_json_and_incomplete_exit(snapshot, context, tmp_path, monkeypatch,
-                                                           mode, options, banner, bar):
+@pytest.mark.parametrize(
+    "options,banner,bar",
+    [
+        ([], True, True),
+        (["--no-banner"], False, True),
+        (["--no-progress"], False, False),
+        (["--no-progress", "--no-banner"], False, False),
+    ],
+)
+def test_display_switches_preserve_json_and_incomplete_exit(
+    snapshot, s3_context, tmp_path, monkeypatch, mode, options, banner, bar
+):
     stream = StringIO()
-    console = Console(file=stream, force_terminal=True, force_interactive=True,
-                      width=100, legacy_windows=False, _environ={"TERM": "xterm"})
+    console = Console(
+        file=stream,
+        force_terminal=True,
+        force_interactive=True,
+        width=100,
+        legacy_windows=False,
+        _environ={"TERM": "xterm"},
+    )
     monkeypatch.setattr("awsherlock.activity.Console", lambda **kwargs: console)
     monkeypatch.setattr("awsherlock.activity.terminal_banner", lambda **kwargs: "ASCII LOGO")
-    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
+    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=s3_context))
     monkeypatch.setattr("awsherlock.cli.capture_snapshot", Mock(return_value=snapshot))
     report = evaluate_snapshot(snapshot)
     monkeypatch.setattr("awsherlock.cli.scan_organization", Mock(return_value=report))
@@ -135,8 +163,8 @@ def test_summary_only_rejects_file_formats_before_aws(output, no_aws):
 
 
 @pytest.mark.parametrize("mode", ["live", "offline", "organization"])
-def test_verbose_keeps_json_and_incomplete_exit(snapshot, context, tmp_path, monkeypatch, mode):
-    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=context))
+def test_verbose_keeps_json_and_incomplete_exit(snapshot, s3_context, tmp_path, monkeypatch, mode):
+    monkeypatch.setattr("awsherlock.cli.create_scan_context", Mock(return_value=s3_context))
     monkeypatch.setattr("awsherlock.cli.capture_snapshot", Mock(return_value=snapshot))
     report = evaluate_snapshot(snapshot)
     monkeypatch.setattr("awsherlock.cli.scan_organization", Mock(return_value=report))
@@ -168,10 +196,13 @@ def test_summary_only_cli_preserves_denied_coverage(snapshot, tmp_path):
     assert "AccessDenied" in result.stderr
 
 
-@pytest.mark.parametrize("args", [
-    ["scan", "--region", "BAD"],
-    ["scan", "unused.json", "--region", "eu-west-1"],
-])
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["scan", "--region", "BAD"],
+        ["scan", "unused.json", "--region", "eu-west-1"],
+    ],
+)
 def test_region_invalid_or_offline_fails_before_aws(args, no_aws):
     result = CliRunner().invoke(app, args)
     assert result.exit_code == 2
@@ -179,8 +210,8 @@ def test_region_invalid_or_offline_fails_before_aws(args, no_aws):
 
 
 @pytest.mark.parametrize("organization", [False, True])
-def test_region_reaches_scan_context_and_report(context, snapshot, monkeypatch, organization):
-    target = replace(context, region="eu-west-1")
+def test_region_reaches_scan_context_and_report(s3_context, snapshot, monkeypatch, organization):
+    target = replace(s3_context, region="eu-west-1")
     factory = Mock(return_value=target)
     monkeypatch.setattr("awsherlock.cli.create_scan_context", factory)
     selected_snapshot = replace(snapshot, metadata=replace(snapshot.metadata, region=target.region))
@@ -189,8 +220,12 @@ def test_region_reaches_scan_context_and_report(context, snapshot, monkeypatch, 
     report = evaluate_snapshot(selected_snapshot)
     org = Mock(return_value=report)
     monkeypatch.setattr("awsherlock.cli.scan_organization", org)
-    result = CliRunner().invoke(app, ["scan"] + (["organization"] if organization else []) +
-                                ["--region", "eu-west-1", "--no-progress", "--output", "json"])
+    result = CliRunner().invoke(
+        app,
+        ["scan"]
+        + (["organization"] if organization else [])
+        + ["--region", "eu-west-1", "--no-progress", "--output", "json"],
+    )
     assert result.exit_code == 1
     assert factory.call_args.kwargs["region"] == "eu-west-1"
     assert json.loads(result.stdout)["metadata"]["region"] == "eu-west-1"
@@ -198,10 +233,15 @@ def test_region_reaches_scan_context_and_report(context, snapshot, monkeypatch, 
 
 
 @pytest.mark.parametrize("identifier,service,title", check_catalog())
-def test_every_check_can_be_described_without_aws_or_evaluation(identifier, service, title, no_aws, monkeypatch):
+def test_every_check_can_be_described_without_aws_or_evaluation(
+    identifier, service, title, no_aws, monkeypatch
+):
     from awsherlock.scanner import SERVICES, service_components
+
     fail = Mock(side_effect=AssertionError("Description must not evaluate rules"))
-    for rule_type in {type(rule) for selected in SERVICES for rule in service_components(selected)[1]}:
+    for rule_type in {
+        type(rule) for selected in SERVICES for rule in service_components(selected)[1]
+    }:
         monkeypatch.setattr(rule_type, "evaluate", fail)
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "private-secret-marker")
     result = CliRunner().invoke(app, ["--describe-check", identifier.lower()])
@@ -215,16 +255,19 @@ def test_every_check_can_be_described_without_aws_or_evaluation(identifier, serv
     no_aws.assert_not_called()
 
 
-@pytest.mark.parametrize("args", [
-    ["--describe-check", "AWSH-CT-001", "--doctor"],
-    ["--describe-check", "AWSH-CT-001", "--update"],
-    ["--describe-check", "AWSH-CT-001", "--list-checks"],
-    ["--describe-check", "AWSH-CT-001", "--list-services"],
-    ["--describe-check", "AWSH-CT-001", "scan"],
-    ["--describe-check", "AWSH-UNKNOWN-999"],
-    ["--describe-check", ""],
-    ["--describe-check", "bad\x1b[2J"],
-])
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--describe-check", "AWSH-CT-001", "--doctor"],
+        ["--describe-check", "AWSH-CT-001", "--update"],
+        ["--describe-check", "AWSH-CT-001", "--list-checks"],
+        ["--describe-check", "AWSH-CT-001", "--list-services"],
+        ["--describe-check", "AWSH-CT-001", "scan"],
+        ["--describe-check", "AWSH-UNKNOWN-999"],
+        ["--describe-check", ""],
+        ["--describe-check", "bad\x1b[2J"],
+    ],
+)
 def test_invalid_descriptions_fail_before_work(args, no_aws, monkeypatch):
     updater = Mock(side_effect=AssertionError("Must not update"))
     monkeypatch.setattr("awsherlock.cli.update_installation", updater)
@@ -238,10 +281,22 @@ def test_invalid_descriptions_fail_before_work(args, no_aws, monkeypatch):
 def test_s3_description_guidance_matches_actual_findings():
     from awsherlock.models import Resource
     from awsherlock.rules.s3 import S3_RULES
-    resource = Resource(service="s3", resource_type="bucket", account_id="123456789012",
-                        region="eu-west-1", resource_id="example-bucket", resource_arn=None,
-                        data={"public_access_block": None, "encryption": None,
-                              "versioning": None, "logging": None, "policy_public": True})
+
+    resource = Resource(
+        service="s3",
+        resource_type="bucket",
+        account_id="123456789012",
+        region="eu-west-1",
+        resource_id="example-bucket",
+        resource_arn=None,
+        data={
+            "public_access_block": None,
+            "encryption": None,
+            "versioning": None,
+            "logging": None,
+            "policy_public": True,
+        },
+    )
     for rule in S3_RULES:
         finding = rule.evaluate(resource)[0]
         details = describe_check(finding.id)

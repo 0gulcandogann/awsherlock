@@ -9,7 +9,13 @@ from uuid import uuid4
 from awsherlock import __version__
 from awsherlock.aws.context import ScanContext
 from awsherlock.aws.session import SessionError, create_scan_context
-from awsherlock.collectors.common import AWS_ERRORS, InvalidResponse, error_message, items, text_field
+from awsherlock.collectors.common import (
+    AWS_ERRORS,
+    InvalidResponse,
+    error_message,
+    items,
+    text_field,
+)
 from awsherlock.evaluation import Report, evaluate_snapshot, finalize_resource_selection
 from awsherlock.coverage import coverage_status
 from awsherlock.snapshot import SnapshotError, capture_snapshot
@@ -28,7 +34,9 @@ def discover_ou_accounts(client, selected_ous: list[str]) -> set[str]:
             continue
         visited.add(parent)
         for kind in ("ACCOUNT", "ORGANIZATIONAL_UNIT"):
-            for page in client.get_paginator("list_children").paginate(ParentId=parent, ChildType=kind):
+            for page in client.get_paginator("list_children").paginate(
+                ParentId=parent, ChildType=kind
+            ):
                 for child in items(page, "Children"):
                     if not isinstance(child, dict) or child.get("Type") != kind:
                         raise InvalidResponse()
@@ -48,29 +56,47 @@ def discover_ou_accounts(client, selected_ous: list[str]) -> set[str]:
     return members
 
 
-def scan_organization(source: ScanContext, services: list[str], role_name: str = "AWSherlockAuditRole",
-                      external_id: str | None = None, role_session_name: str | None = None,
-                      progress: Callable[[str, int, int], None] | None = None,
-                      regions: list[str] | None = None,
-                      snapshot_sink: SnapshotSink | None = None,
-                      evaluated_scope_sink: EvaluatedScopeSink | None = None,
-                      selected_checks: list[str] | None = None,
-                      selected_accounts: list[str] | None = None,
-                      selected_ous: list[str] | None = None,
-                      selected_resources: list[str] | None = None,
-                      identity_callback: Callable[[ScanContext], None] | None = None,
-                      max_workers: int = 1) -> Report:
+def scan_organization(
+    source: ScanContext,
+    services: list[str],
+    role_name: str = "AWSherlockAuditRole",
+    external_id: str | None = None,
+    role_session_name: str | None = None,
+    progress: Callable[[str, int, int], None] | None = None,
+    regions: list[str] | None = None,
+    snapshot_sink: SnapshotSink | None = None,
+    evaluated_scope_sink: EvaluatedScopeSink | None = None,
+    selected_checks: list[str] | None = None,
+    selected_accounts: list[str] | None = None,
+    selected_ous: list[str] | None = None,
+    selected_resources: list[str] | None = None,
+    identity_callback: Callable[[ScanContext], None] | None = None,
+    max_workers: int = 1,
+) -> Report:
     if not re.fullmatch(r"(?:[A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}", role_name):
         raise SessionError("Invalid organization role name or path.")
-    report = Report({"scan_id": str(uuid4()), "started_at": datetime.now(timezone.utc).isoformat(),
-                     "account_id": source.account_id, "region": source.region, "version": __version__,
-                     "mode": "organization", "accounts": []}, [], [])
+    report = Report(
+        {
+            "scan_id": str(uuid4()),
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "account_id": source.account_id,
+            "region": source.region,
+            "version": __version__,
+            "mode": "organization",
+            "accounts": [],
+        },
+        [],
+        [],
+    )
     accounts = report.metadata["accounts"]
     matched_resources = set()
     if selected_resources is not None:
         report.metadata["selected_resources"] = list(selected_resources)
-    resource_options = ({"selected_resources": selected_resources, "report_unmatched": False}
-                        if selected_resources is not None else {})
+    resource_options = (
+        {"selected_resources": selected_resources, "report_unmatched": False}
+        if selected_resources is not None
+        else {}
+    )
     if selected_checks is not None:
         report.metadata["selected_checks"] = list(selected_checks)
     if selected_accounts is not None:
@@ -80,15 +106,25 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
         report.metadata["selected_ous"] = list(selected_ous)
     if regions is not None:
         report.metadata.update(region=None, regions=regions)
-    def account_failures(account_id: str, operation: str, message: str,
-                         status: str = "ERROR") -> None:
+
+    def account_failures(
+        account_id: str, operation: str, message: str, status: str = "ERROR"
+    ) -> None:
         scopes = collection_scopes(services, regions) if regions is not None else [(None, services)]
         for region, selected in scopes:
             for service in selected:
                 entry = failed_coverage(account_id, service, operation, message, status)
                 if regions is not None:
-                    entry.update(region=region, scope="bucket" if service == "s3" else ("global" if region is None else "regional"))
+                    entry.update(
+                        region=region,
+                        scope=(
+                            "bucket"
+                            if service == "s3"
+                            else ("global" if region is None else "regional")
+                        ),
+                    )
                 report.coverage.append(entry)
+
     seen = set()
     if progress is not None:
         progress("Discovering accounts", 0, 1)
@@ -96,24 +132,44 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
         client = source.client("organizations")
         for page in client.get_paginator("list_accounts").paginate():
             for raw in items(page, "Accounts"):
-                if not isinstance(raw, dict) or not isinstance(raw.get("Id"), str) or not re.fullmatch(r"[0-9]{12}", raw["Id"]):
+                if (
+                    not isinstance(raw, dict)
+                    or not isinstance(raw.get("Id"), str)
+                    or not re.fullmatch(r"[0-9]{12}", raw["Id"])
+                ):
                     raise InvalidResponse()
-                account = {"account_id": raw["Id"], "name": text_field(raw.get("Name")),
-                           "state": text_field(raw.get("State"))}
+                account = {
+                    "account_id": raw["Id"],
+                    "name": text_field(raw.get("Name")),
+                    "state": text_field(raw.get("State")),
+                }
                 if account["account_id"] in seen:
                     continue
                 seen.add(account["account_id"])
                 accounts.append(account)
     except AWS_ERRORS as error:
-        report.coverage.append(failed_coverage(source.account_id, "organizations", "ListAccounts", error_message(error)))
+        report.coverage.append(
+            failed_coverage(
+                source.account_id, "organizations", "ListAccounts", error_message(error)
+            )
+        )
     ou_members = None
     if selected_ous is not None:
         try:
             ou_members = discover_ou_accounts(source.client("organizations"), selected_ous)
             for account_id in sorted(ou_members - seen):
-                account_failures(account_id, "OUSelection", "OU member was not discovered by ListAccounts", "NOT_SCANNED")
+                account_failures(
+                    account_id,
+                    "OUSelection",
+                    "OU member was not discovered by ListAccounts",
+                    "NOT_SCANNED",
+                )
         except AWS_ERRORS as error:
-            report.coverage.append(failed_coverage(source.account_id, "organizations", "ListChildren", error_message(error)))
+            report.coverage.append(
+                failed_coverage(
+                    source.account_id, "organizations", "ListChildren", error_message(error)
+                )
+            )
     if progress is not None:
         progress("Accounts discovered", 1, len(accounts) + 2)
     for index, account in enumerate(accounts):
@@ -122,13 +178,24 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
             progress(f"Scanning account {account_id}", index + 1, len(accounts) + 2)
         if selected_accounts is not None and account_id not in selected_accounts:
             account["scan_status"] = "NOT_SCANNED"
-            account_failures(account_id, "AccountSelection", "Account excluded by --accounts", "NOT_SCANNED")
+            account_failures(
+                account_id, "AccountSelection", "Account excluded by --accounts", "NOT_SCANNED"
+            )
             if progress is not None:
                 progress(f"Account {account_id} excluded", index + 2, len(accounts) + 2)
             continue
         if selected_ous is not None and (ou_members is None or account_id not in ou_members):
             account["scan_status"] = "NOT_SCANNED"
-            account_failures(account_id, "OUSelection", "OU membership could not be verified" if ou_members is None else "Account excluded by --ous", "NOT_SCANNED")
+            account_failures(
+                account_id,
+                "OUSelection",
+                (
+                    "OU membership could not be verified"
+                    if ou_members is None
+                    else "Account excluded by --ous"
+                ),
+                "NOT_SCANNED",
+            )
             continue
         if account["state"] != "ACTIVE":
             account["scan_status"] = "NOT_SCANNED"
@@ -137,30 +204,49 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
                 progress(f"Account {account_id} skipped", index + 2, len(accounts) + 2)
             continue
         try:
-            context = create_scan_context(source_session=source.session,
-                                          role=f"arn:{source.partition}:iam::{account_id}:role/{role_name}",
-                                          external_id=external_id, role_session_name=role_session_name,
-                                          **({"client_config": source.client_config} if source.client_config is not None else {}))
+            context = create_scan_context(
+                source_session=source.session,
+                role=f"arn:{source.partition}:iam::{account_id}:role/{role_name}",
+                external_id=external_id,
+                role_session_name=role_session_name,
+                **(
+                    {"client_config": source.client_config}
+                    if source.client_config is not None
+                    else {}
+                ),
+            )
             if source.measurements is not None:
                 context = replace(context, measurements=source.measurements)
             if source.identity_options is not None:
-                context = replace(context, identity_options=source.identity_options, region=source.region)
+                context = replace(
+                    context, identity_options=source.identity_options, region=source.region
+                )
             if identity_callback is not None:
                 identity_callback(context)
             if regions is not None:
-                result = scan_regions(context, services, regions, snapshot_sink=snapshot_sink,
-                                      evaluated_scope_sink=evaluated_scope_sink,
-                                      **({"max_workers": max_workers} if max_workers != 1 else {}),
-                                      **resource_options,
-                                      **({"selected_checks": selected_checks} if selected_checks is not None else {}))
+                result = scan_regions(
+                    context,
+                    services,
+                    regions,
+                    snapshot_sink=snapshot_sink,
+                    evaluated_scope_sink=evaluated_scope_sink,
+                    **({"max_workers": max_workers} if max_workers != 1 else {}),
+                    **resource_options,
+                    **({"selected_checks": selected_checks} if selected_checks is not None else {}),
+                )
             else:
                 snapshot = capture_snapshot(
-                    context, services,
+                    context,
+                    services,
                     **({"max_workers": max_workers} if max_workers != 1 else {}),
                 )
                 if snapshot_sink is not None:
                     snapshot_sink(snapshot, context.region or "global")
-                result = evaluate_snapshot(snapshot, **resource_options, **({"selected_checks": selected_checks} if selected_checks is not None else {}))
+                result = evaluate_snapshot(
+                    snapshot,
+                    **resource_options,
+                    **({"selected_checks": selected_checks} if selected_checks is not None else {}),
+                )
                 if evaluated_scope_sink is not None:
                     evaluated_scope_sink(snapshot, result)
         except (SessionError, SnapshotError) as error:
@@ -182,16 +268,30 @@ def scan_organization(source: ScanContext, services: list[str], role_name: str =
     if selected_accounts is not None:
         for account_id in selected_accounts:
             if account_id not in seen:
-                account_failures(account_id, "AccountSelection", "Selected account was not discovered", "NOT_SCANNED")
+                account_failures(
+                    account_id,
+                    "AccountSelection",
+                    "Selected account was not discovered",
+                    "NOT_SCANNED",
+                )
     if selected_resources is not None:
         report.metadata["matched_resource_selectors"] = sorted(matched_resources)
         finalize_resource_selection(report)
     return report
 
 
-def failed_coverage(account_id: str, service: str, operation: str, message: str, status: str = "ERROR") -> dict:
+def failed_coverage(
+    account_id: str, service: str, operation: str, message: str, status: str = "ERROR"
+) -> dict:
     if status == "ERROR":
         status = coverage_status([{"message": message}], 0, 0)
-    return {"account_id": account_id, "service": service, "status": status,
-            "resources": 0, "evaluated": 0, "not_scanned": 0, "findings": 0,
-            "issues": [{"resource_id": None, "operation": operation, "message": message}]}
+    return {
+        "account_id": account_id,
+        "service": service,
+        "status": status,
+        "resources": 0,
+        "evaluated": 0,
+        "not_scanned": 0,
+        "findings": 0,
+        "issues": [{"resource_id": None, "operation": operation, "message": message}],
+    }

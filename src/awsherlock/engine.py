@@ -26,7 +26,9 @@ def evaluate_rules(resources: Iterable[Resource], rules: Iterable[Rule]) -> list
             raise TypeError("Rule engine inputs must be Resource instances")
         for rule in ordered_rules:
             result = rule.evaluate(resource)
-            if not isinstance(result, list) or any(not isinstance(item, Finding) for item in result):
+            if not isinstance(result, list) or any(
+                not isinstance(item, Finding) for item in result
+            ):
                 raise TypeError("Rules must return a list of Finding instances")
             findings.extend(result)
     return findings

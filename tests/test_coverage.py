@@ -2,20 +2,24 @@ import pytest
 from awsherlock.collectors.common import CollectionIssue
 from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.reporting import render_console, render_json, render_html
-from test_snapshot import snapshot
 
 
-@pytest.mark.parametrize("facts,message,status", [
-    ({}, "AccessDenied", "ACCESS_DENIED"),
-    ({"public_access_block": None}, "AccessDenied", "PARTIAL"),
-    ({}, "AWS request failed", "ERROR"),
-    ({}, None, "NOT_SCANNED"),
-])
+@pytest.mark.parametrize(
+    "facts,message,status",
+    [
+        ({}, "AccessDenied", "ACCESS_DENIED"),
+        ({"public_access_block": None}, "AccessDenied", "PARTIAL"),
+        ({}, "AWS request failed", "ERROR"),
+        ({}, None, "NOT_SCANNED"),
+    ],
+)
 def test_coverage_in_every_report(snapshot, facts, message, status, capsys):
     collection = snapshot.services["s3"]
     collection.resources[0].data.clear()
     collection.resources[0].data.update(facts)
-    collection.issues = [CollectionIssue("test-bucket", "GetBucketLogging", message)] if message else []
+    collection.issues = (
+        [CollectionIssue("test-bucket", "GetBucketLogging", message)] if message else []
+    )
     report = evaluate_snapshot(snapshot)
     assert report.coverage[0]["status"] == status
     assert report.incomplete

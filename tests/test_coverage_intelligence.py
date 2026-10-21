@@ -21,12 +21,10 @@ from awsherlock.models import (
     Relationship,
     RelationshipEvidence,
     RelationshipType,
-    Resource,
     ResourceRef,
     ScanMetadata,
 )
 from awsherlock.snapshot import Snapshot, write_snapshot
-
 
 ACCOUNT = "123456789012"
 REGION = "eu-central-1"
@@ -77,9 +75,11 @@ def relationship():
             region=REGION,
             resource_id=f"{RUNTIME}:2",
         ),
-        evidence=(RelationshipEvidence(
-            service="agentcore", fact="live_version", operation="GetAgentRuntimeEndpoint"
-        ),),
+        evidence=(
+            RelationshipEvidence(
+                service="agentcore", fact="live_version", operation="GetAgentRuntimeEndpoint"
+            ),
+        ),
     )
 
 
@@ -113,38 +113,48 @@ def test_contract_reports_recorded_evidence_without_security_pass_or_score():
     assert '"overall_status": "pass"' not in rendered
 
 
-@pytest.mark.parametrize(("message", "reason"), [
-    ("AccessDenied", "ACCESS_DENIED"),
-    ("AWS request throttled", "THROTTLED"),
-    ("Invalid AWS response", "INVALID_RESPONSE"),
-    ("AWS request timed out", "REQUEST_TIMEOUT"),
-    ("AWS endpoint connection failed", "ENDPOINT_CONNECTION_FAILED"),
-    ("AWS credentials expired or invalid", "CREDENTIALS_INVALID"),
-    ("Event history page/time budget exhausted", "BUDGET_EXHAUSTED"),
-    ("arbitrary private failure detail", "CAUSE_NOT_ESTABLISHED"),
-])
+@pytest.mark.parametrize(
+    ("message", "reason"),
+    [
+        ("AccessDenied", "ACCESS_DENIED"),
+        ("AWS request throttled", "THROTTLED"),
+        ("Invalid AWS response", "INVALID_RESPONSE"),
+        ("AWS request timed out", "REQUEST_TIMEOUT"),
+        ("AWS endpoint connection failed", "ENDPOINT_CONNECTION_FAILED"),
+        ("AWS credentials expired or invalid", "CREDENTIALS_INVALID"),
+        ("Event history page/time budget exhausted", "BUDGET_EXHAUSTED"),
+        ("arbitrary private failure detail", "CAUSE_NOT_ESTABLISHED"),
+    ],
+)
 def test_known_sanitized_reasons_are_bounded_and_unknown_text_is_not_exported(message, reason):
     value = snapshot(issues=[CollectionIssue(None, "ListBuckets", message)])
     document = diagnostics(value)
     item = limitations(document)[0]
     assert item["reason_code"] == reason
     assert message not in json.dumps(document) or message in {
-        "AccessDenied", "AWS request throttled", "Invalid AWS response",
-        "AWS request timed out", "AWS endpoint connection failed",
-        "AWS credentials expired or invalid", "Event history page/time budget exhausted",
+        "AccessDenied",
+        "AWS request throttled",
+        "Invalid AWS response",
+        "AWS request timed out",
+        "AWS endpoint connection failed",
+        "AWS credentials expired or invalid",
+        "Event history page/time budget exhausted",
     }
     assert "discarded-private-detail" not in json.dumps(document)
 
 
-@pytest.mark.parametrize("message", [
-    "AccessDenied: attacker-controlled text",
-    "AccessDenied: SecretMarker123",
-    "AccessDenied:",
-    "AccessDeniedExtra",
-    "AccessDenied!",
-    "accessdenied",
-    "ACCESSDENIED",
-])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "AccessDenied: attacker-controlled text",
+        "AccessDenied: SecretMarker123",
+        "AccessDenied:",
+        "AccessDeniedExtra",
+        "AccessDenied!",
+        "accessdenied",
+        "ACCESSDENIED",
+    ],
+)
 def test_access_denied_variants_do_not_establish_a_specific_cause(message):
     value = snapshot(issues=[CollectionIssue(None, "UnknownOperation", message)])
     document = diagnostics(value)
@@ -166,34 +176,44 @@ def test_unknown_operation_is_not_exported_as_validated_provenance():
     assert payload not in json.dumps(diagnostics(value))
 
 
-@pytest.mark.parametrize(("service", "operation"), [
-    ("s3", "GetAccountPublicAccessBlock"),
-    ("s3", "GetBucketLocation"),
-    ("s3", "CreateRegionalClient"),
-    ("secretsmanager", "SecretMetadata"),
-    ("rds", "RDSClient"),
-])
+@pytest.mark.parametrize(
+    ("service", "operation"),
+    [
+        ("s3", "GetAccountPublicAccessBlock"),
+        ("s3", "GetBucketLocation"),
+        ("s3", "CreateRegionalClient"),
+        ("secretsmanager", "SecretMetadata"),
+        ("rds", "RDSClient"),
+    ],
+)
 def test_known_collector_operations_retain_validated_provenance(service, operation):
-    value = snapshot(service=service, issues=[CollectionIssue(None, operation, "Invalid AWS response")])
+    value = snapshot(
+        service=service, issues=[CollectionIssue(None, operation, "Invalid AWS response")]
+    )
     assert limitations(diagnostics(value))[0]["operation"] == operation
 
 
-@pytest.mark.parametrize(("operation", "expected"), [
-    ("RequiredFact", "EVALUATION_INCOMPLETE"),
-    ("RequiredCollection", "COLLECTION_INCOMPLETE"),
-    ("CheckSelection", "SCOPE_NOT_RECORDED"),
-    ("ResourceSelection", "SCOPE_NOT_RECORDED"),
-])
+@pytest.mark.parametrize(
+    ("operation", "expected"),
+    [
+        ("RequiredFact", "EVALUATION_INCOMPLETE"),
+        ("RequiredCollection", "COLLECTION_INCOMPLETE"),
+        ("CheckSelection", "SCOPE_NOT_RECORDED"),
+        ("ResourceSelection", "SCOPE_NOT_RECORDED"),
+    ],
+)
 def test_evaluation_and_scope_limitations_use_recorded_operations(operation, expected):
     value = snapshot(issues=[CollectionIssue(None, operation, "private detail")])
     item = limitations(diagnostics(value))[0]
     assert item["reason_code"] == expected and item["operation"] == operation
-    assert item["issue_reference"]["source_field"] == f"report.coverage.s3.issues"
+    assert item["issue_reference"]["source_field"] == "report.coverage.s3.issues"
     assert "private detail" not in json.dumps(diagnostics(value))
 
 
 def test_unsupported_operation_claim_is_not_invented_from_ambiguous_issue():
-    value = snapshot(issues=[CollectionIssue(None, "ListAgentRuntimeEndpoints", "Invalid AWS response")])
+    value = snapshot(
+        issues=[CollectionIssue(None, "ListAgentRuntimeEndpoints", "Invalid AWS response")]
+    )
     item = limitations(diagnostics(value))[0]
     assert item["reason_code"] == "INVALID_RESPONSE"
     assert item["reason_code"] != "UNSUPPORTED_OPERATION"
@@ -208,7 +228,9 @@ def test_v1_and_v2_relationship_capabilities_are_truthful_and_positive_only():
     assert v2_empty["relationship_coverage"]["capability"] == "POSITIVE_ONLY"
     assert v2_empty["relationship_coverage"]["observed_relationships"] == 0
     assert v2_positive["relationship_coverage"]["observed_relationships"] == 1
-    assert v2_empty["relationship_coverage"]["reason_code"] == "RELATIONSHIP_COMPLETENESS_NOT_PROVEN"
+    assert (
+        v2_empty["relationship_coverage"]["reason_code"] == "RELATIONSHIP_COMPLETENESS_NOT_PROVEN"
+    )
     assert "no relationships exist" not in json.dumps(v2_empty).lower()
 
 
@@ -236,14 +258,19 @@ def test_default_and_opt_in_are_registry_metadata_not_collection_history():
     assert recorded["registered_mode"] == "OPT_IN" and recorded["recorded"] is True
     assert absent["s3"]["registered_mode"] == "DEFAULT"
     assert absent["s3"]["reason_code"] == "SCOPE_NOT_RECORDED"
-    assert all("disabled" not in row["explanation"].lower() for row in document["unrecorded_services"])
+    assert all(
+        "disabled" not in row["explanation"].lower() for row in document["unrecorded_services"]
+    )
 
 
 def test_agentcore_denied_reads_remain_incomplete_without_no_endpoint_claim():
-    value = snapshot(service="iam", issues=[
-        CollectionIssue(None, "ListAgentRuntimeEndpoints", "AccessDenied"),
-        CollectionIssue(None, "GetAgentRuntime", "AWS request throttled"),
-    ])
+    value = snapshot(
+        service="iam",
+        issues=[
+            CollectionIssue(None, "ListAgentRuntimeEndpoints", "AccessDenied"),
+            CollectionIssue(None, "GetAgentRuntime", "AWS request throttled"),
+        ],
+    )
     document = diagnostics(value)
     assert [item["reason_code"] for item in limitations(document)] == ["THROTTLED", "ACCESS_DENIED"]
     assert "no endpoint" not in json.dumps(document).lower()
@@ -269,7 +296,9 @@ def test_duplicate_reordered_issues_have_identical_json_and_keep_multiplicity():
         CollectionIssue(None, "ListAgentRuntimeEndpoints", "AccessDenied"),
     ]
     first = module().render_coverage_json(diagnostics(snapshot(service="iam", issues=issues)))
-    second = module().render_coverage_json(diagnostics(snapshot(service="iam", issues=reversed(issues))))
+    second = module().render_coverage_json(
+        diagnostics(snapshot(service="iam", issues=reversed(issues)))
+    )
     assert first == second
     assert first.count('"reason_code": "ACCESS_DENIED"') == 2
 
@@ -289,7 +318,9 @@ def test_report_must_match_snapshot_scan_account_and_region():
 def test_cli_help_json_console_exit_and_offline_zero_client(monkeypatch, tmp_path):
     runner = CliRunner()
     path = write(snapshot(), tmp_path / "facts.json")
-    monkeypatch.setattr("boto3.session.Session.client", Mock(side_effect=AssertionError("AWS client")))
+    monkeypatch.setattr(
+        "boto3.session.Session.client", Mock(side_effect=AssertionError("AWS client"))
+    )
     help_result = runner.invoke(app, ["coverage", "--help"])
     assert help_result.exit_code == 0 and "offline" in help_result.stdout.lower()
     json_result = runner.invoke(app, ["coverage", str(path), "--output", "json"])
@@ -318,11 +349,15 @@ def test_cli_invalid_snapshot_path_collision_and_exclusive_create(tmp_path):
     malformed.write_text("{bad", encoding="utf-8")
     assert runner.invoke(app, ["coverage", str(malformed)]).exit_code == 1
     path = write(snapshot(), tmp_path / "facts.json")
-    collision = runner.invoke(app, ["coverage", str(path), "--output", "json", "--report-file", str(path)])
+    collision = runner.invoke(
+        app, ["coverage", str(path), "--output", "json", "--report-file", str(path)]
+    )
     assert collision.exit_code == 1
     destination = tmp_path / "coverage.json"
     destination.write_text("KEEP", encoding="utf-8")
-    exists = runner.invoke(app, ["coverage", str(path), "--output", "json", "--report-file", str(destination)])
+    exists = runner.invoke(
+        app, ["coverage", str(path), "--output", "json", "--report-file", str(destination)]
+    )
     assert exists.exit_code == 1 and destination.read_text(encoding="utf-8") == "KEEP"
     assert runner.invoke(app, ["coverage", str(path), "--output", "html"]).exit_code == 2
 
@@ -332,9 +367,13 @@ def test_cli_incomplete_evidence_writes_diagnostics_and_exits_one(tmp_path):
     value = snapshot(issues=[CollectionIssue(None, "ListBuckets", "AccessDenied")])
     path = write(value, tmp_path / "facts.json")
     destination = tmp_path / "coverage.json"
-    result = runner.invoke(app, ["coverage", str(path), "--output", "json", "--report-file", str(destination)])
+    result = runner.invoke(
+        app, ["coverage", str(path), "--output", "json", "--report-file", str(destination)]
+    )
     assert result.exit_code == 1 and destination.exists()
-    assert json.loads(destination.read_text(encoding="utf-8"))["summary"]["incomplete_services"] == 1
+    assert (
+        json.loads(destination.read_text(encoding="utf-8"))["summary"]["incomplete_services"] == 1
+    )
 
 
 def test_console_sanitizes_untrusted_snapshot_metadata():
@@ -349,7 +388,9 @@ def test_serial_parallel_reports_produce_same_diagnostics():
     value = snapshot(issues=[CollectionIssue(None, "ListBuckets", "AccessDenied")])
     parallel = deepcopy(value)
     parallel.services = dict(reversed(list(parallel.services.items())))
-    assert module().render_coverage_json(diagnostics(value)) == module().render_coverage_json(diagnostics(parallel))
+    assert module().render_coverage_json(diagnostics(value)) == module().render_coverage_json(
+        diagnostics(parallel)
+    )
 
 
 def test_diagnostics_do_not_change_lead_delta_or_evidence_pack_inputs():
@@ -366,11 +407,14 @@ def test_builder_uses_supplied_evaluation_without_second_evaluation(monkeypatch)
         "awsherlock.evaluation.evaluate_snapshot",
         Mock(side_effect=AssertionError("second evaluation")),
     )
-    assert module().build_coverage_diagnostics(value, report)["services"][0]["coverage_status"] == "COMPLETE"
+    assert (
+        module().build_coverage_diagnostics(value, report)["services"][0]["coverage_status"]
+        == "COMPLETE"
+    )
 
 
 def test_json_bytes_match_across_hash_seeds():
-    script = r'''
+    script = r"""
 from datetime import datetime,timezone
 from awsherlock.collectors.common import CollectionIssue,CollectionResult
 from awsherlock.coverage_intelligence import build_coverage_diagnostics,render_coverage_json
@@ -381,8 +425,16 @@ metadata=ScanMetadata(scan_id="fixed",started_at=datetime(2026,1,1,tzinfo=timezo
 issues=[CollectionIssue(None,"ListAgentRuntimeEndpoints","AccessDenied"),CollectionIssue(None,"GetAgentRuntime","AWS request throttled")]
 value=Snapshot(metadata,{"iam":CollectionResult([],list(reversed(issues)))},(),2)
 print(render_coverage_json(build_coverage_diagnostics(value,evaluate_snapshot(value))),end="")
-'''
+"""
     env = dict(os.environ, PYTHONPATH=str(Path("src").resolve()), PYTHONDONTWRITEBYTECODE="1")
-    outputs = [subprocess.run([sys.executable, "-c", script], env={**env, "PYTHONHASHSEED": seed},
-                              capture_output=True, text=True, check=True).stdout for seed in ("1", "777")]
+    outputs = [
+        subprocess.run(
+            [sys.executable, "-c", script],
+            env={**env, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for seed in ("1", "777")
+    ]
     assert outputs[0] == outputs[1]

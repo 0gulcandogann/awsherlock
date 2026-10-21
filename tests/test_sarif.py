@@ -12,7 +12,6 @@ from awsherlock.evaluation import evaluate_snapshot
 from awsherlock.models import Severity
 from awsherlock.sarif import SCHEMA_URI, render_sarif
 from awsherlock.snapshot import write_snapshot
-from test_snapshot import snapshot
 
 
 def test_sarif_findings_rules_and_full_coverage(snapshot):
@@ -34,10 +33,16 @@ def test_sarif_findings_rules_and_full_coverage(snapshot):
     assert "AccessDenied" in render_sarif(report)
 
 
-@pytest.mark.parametrize("severity,level", [
-    (Severity.CRITICAL, "error"), (Severity.HIGH, "error"),
-    (Severity.MEDIUM, "warning"), (Severity.LOW, "note"), (Severity.INFO, "note"),
-])
+@pytest.mark.parametrize(
+    "severity,level",
+    [
+        (Severity.CRITICAL, "error"),
+        (Severity.HIGH, "error"),
+        (Severity.MEDIUM, "warning"),
+        (Severity.LOW, "note"),
+        (Severity.INFO, "note"),
+    ],
+)
 def test_sarif_severity_mapping(snapshot, severity, level):
     report = evaluate_snapshot(snapshot)
     report.findings = [replace(report.findings[0], severity=severity)]
@@ -49,12 +54,20 @@ def test_sarif_severity_mapping(snapshot, severity, level):
 def test_sarif_logical_location_disambiguates_accounts_without_evidence(snapshot):
     report = evaluate_snapshot(snapshot)
     original = report.findings[0]
-    report.findings = [replace(original, evidence={"secret-marker": "never export"}),
-                       replace(original, account_id="999999999999", resource_arn=None,
-                               evidence={"secret-marker": "never export"})]
+    report.findings = [
+        replace(original, evidence={"secret-marker": "never export"}),
+        replace(
+            original,
+            account_id="999999999999",
+            resource_arn=None,
+            evidence={"secret-marker": "never export"},
+        ),
+    ]
     rendered = render_sarif(report)
     results = json.loads(rendered)["runs"][0]["results"]
-    names = [result["locations"][0]["logicalLocations"][0]["fullyQualifiedName"] for result in results]
+    names = [
+        result["locations"][0]["logicalLocations"][0]["fullyQualifiedName"] for result in results
+    ]
     assert names[0] != names[1]
     assert names[0].startswith(original.account_id + "/")
     assert names[1].startswith("999999999999/")

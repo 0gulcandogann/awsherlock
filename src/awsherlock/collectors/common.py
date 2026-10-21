@@ -4,8 +4,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections.abc import Callable
 
-from botocore.exceptions import (BotoCoreError, ClientError, ConnectTimeoutError,
-                                ReadTimeoutError, EndpointConnectionError)
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    ConnectTimeoutError,
+    ReadTimeoutError,
+    EndpointConnectionError,
+)
 
 from awsherlock.models import JSONValue, Resource, Relationship
 
@@ -36,16 +41,33 @@ def error_message(error: Exception) -> str:
         code = error.response.get("Error", {}).get("Code")
         if code in {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}:
             return "AccessDenied"
-        if code in {"Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded"}:
+        if code in {
+            "Throttling",
+            "ThrottlingException",
+            "TooManyRequestsException",
+            "RequestLimitExceeded",
+            "SlowDown",
+            "RequestThrottled",
+            "RequestThrottledException",
+        }:
             return "AWS request throttled"
-        if code in {"ExpiredToken", "ExpiredTokenException", "InvalidClientTokenId", "SignatureDoesNotMatch"}:
+        if code in {"RequestTimeout", "RequestTimeoutException"}:
+            return "AWS request timed out"
+        if code in {
+            "ExpiredToken",
+            "ExpiredTokenException",
+            "InvalidClientTokenId",
+            "SignatureDoesNotMatch",
+        }:
             return "AWS credentials expired or invalid"
         return "AWS request failed"
     if isinstance(error, (ConnectTimeoutError, ReadTimeoutError)):
         return "AWS request timed out"
     if isinstance(error, EndpointConnectionError):
         return "AWS endpoint connection failed"
-    return "Invalid AWS response" if isinstance(error, InvalidResponse) else "AWS SDK request failed"
+    return (
+        "Invalid AWS response" if isinstance(error, InvalidResponse) else "AWS SDK request failed"
+    )
 
 
 AWS_ERRORS = (BotoCoreError, ClientError, InvalidResponse)
@@ -58,7 +80,11 @@ def items(response: object, key: str) -> list:
 
 
 def text_field(value: object) -> str:
-    if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 or ord(c) == 127 for c in value):
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or any(ord(c) < 32 or ord(c) == 127 for c in value)
+    ):
         raise InvalidResponse()
     return value
 
@@ -69,8 +95,13 @@ def age_days(value: object, now: datetime) -> int:
     return (now - value).days
 
 
-def collect_fact(result: CollectionResult, resource: Resource, key: str, operation: str,
-                 read: Callable[[], JSONValue]) -> None:
+def collect_fact(
+    result: CollectionResult,
+    resource: Resource,
+    key: str,
+    operation: str,
+    read: Callable[[], JSONValue],
+) -> None:
     try:
         resource.data[key] = read()
     except AWS_ERRORS as error:

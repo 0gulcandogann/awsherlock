@@ -15,11 +15,22 @@ from awsherlock.snapshot import Snapshot, write_snapshot
 
 
 def sample(encrypted: bool | None, *, issue=False, region="eu-west-1", account="123456789012"):
-    metadata = ScanMetadata(scan_id="sample", started_at=datetime(2026, 9, 23, tzinfo=timezone.utc),
-                            account_id=account, region=region, version="test")
-    resource = Resource(service="ec2", resource_type="volume", account_id=account, region=region,
-                        resource_id="vol-123", resource_arn=None,
-                        data={} if encrypted is None else {"encrypted": encrypted})
+    metadata = ScanMetadata(
+        scan_id="sample",
+        started_at=datetime(2026, 9, 23, tzinfo=timezone.utc),
+        account_id=account,
+        region=region,
+        version="test",
+    )
+    resource = Resource(
+        service="ec2",
+        resource_type="volume",
+        account_id=account,
+        region=region,
+        resource_id="vol-123",
+        resource_arn=None,
+        data={} if encrypted is None else {"encrypted": encrypted},
+    )
     issues = [CollectionIssue("vol-123", "describe_volumes", "AccessDenied")] if issue else []
     return Snapshot(metadata, {"ec2": CollectionResult([resource], issues)})
 
@@ -29,7 +40,9 @@ def test_new_resolved_unchanged_and_deterministic():
     assert compare_snapshots(safe, unsafe)["summary"]["NEW"] == 1
     assert compare_snapshots(unsafe, safe)["summary"]["RESOLVED"] == 1
     assert compare_snapshots(unsafe, unsafe)["summary"]["UNCHANGED"] == 1
-    assert render_diff_json(compare_snapshots(unsafe, safe)) == render_diff_json(compare_snapshots(unsafe, safe))
+    assert render_diff_json(compare_snapshots(unsafe, safe)) == render_diff_json(
+        compare_snapshots(unsafe, safe)
+    )
 
 
 def test_denied_or_missing_fact_cannot_resolve():

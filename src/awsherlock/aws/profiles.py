@@ -23,6 +23,10 @@ def list_profiles() -> list[ProfileMetadata]:
     try:
         profiles = Session().full_config.get("profiles", {})
     except (BotoCoreError, OSError):
-        raise SessionError("Could not read AWS profile configuration. Check your AWS config files.") from None
-    return [ProfileMetadata(name, values.get("region") or None)
-            for name, values in sorted(profiles.items())]
+        raise SessionError(
+            "Could not read AWS profile configuration. Check your AWS config files."
+        ) from None
+    return [
+        ProfileMetadata(name, values.get("region") or None)
+        for name, values in sorted(profiles.items())
+    ]
