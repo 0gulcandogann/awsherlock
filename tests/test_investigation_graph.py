@@ -255,6 +255,47 @@ def test_offline_graph_selection_and_filtering_in_real_browser(tmp_path):
 
 
 @pytest.mark.browser
+@pytest.mark.parametrize("width", [375, 1440])
+def test_contextual_standalone_viewport_contains_long_graph_labels(tmp_path, width):
+    import json
+
+    from awsherlock.investigation_engine import build_investigations
+    from awsherlock.reporting import render_contextual_html
+    from test_report_browser import run_browser
+
+    result = build_investigations(pair(LAMBDA))
+    item = replace(result.investigations[0], title="Review " + "workload " * 80)
+    html = render_contextual_html(replace(result, investigations=(item,)))
+    embedded = json.dumps(html).replace("<", "\\u003c")
+    script = (
+        """
+    const frame = document.createElement('iframe');
+    frame.style.width = '"""
+        + str(width)
+        + """px';
+    frame.style.height = '1000px';
+    frame.onload = () => {
+      const doc = frame.contentDocument;
+      const fits = () => doc.documentElement.scrollWidth <= doc.documentElement.clientWidth;
+      const select = doc.getElementById('investigation-select');
+      const bounded = () => select.getBoundingClientRect().right <= doc.documentElement.clientWidth;
+      const collapsedFits = fits() && bounded();
+      doc.getElementById('graph-evidence-link').click();
+      const expandedFits = fits() && bounded() && doc.querySelector('.contextual-record').open;
+      const graph = doc.querySelector('.graph-scroll');
+      const contained = graph.getBoundingClientRect().right <= doc.documentElement.clientWidth;
+      const ok = collapsedFits && expandedFits && contained &&
+        doc.querySelectorAll('#investigation-svg g[data-node]').length > 0;
+      document.body.insertAdjacentHTML('beforeend', '<p id="viewport-result">' + (ok ? 'PASS' : 'FAIL') + '</p>');
+    };
+    frame.srcdoc = """
+        + embedded
+        + ";document.body.append(frame);"
+    )
+    assert '<p id="viewport-result">PASS</p>' in run_browser(html, script, tmp_path)
+
+
+@pytest.mark.browser
 def test_contextual_standalone_print_restore_and_untrusted_title(tmp_path):
     from awsherlock.investigation_engine import build_investigations
     from awsherlock.reporting import render_contextual_html

@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.5.1 — Unreleased
+## v0.5.1 — 2026-10-21
 
 **Substantial feature release under a patch version number.** The package
 version changed by maintainer direction; the complete investigation scope is
@@ -36,10 +36,12 @@ shared configuration without changing runtime dependencies. The exact
 recorded in the [readiness report](releases/v0.5.1-readiness.md). All Ruff findings
 are resolved and Black formatting passes across 162 Python files. Shared pytest
 fixture registration preserves the same providers and scopes for all 1773 tests.
-The user reported all six Chrome browser tests passing in a normal Omarchy
-terminal; Codex-local browser execution remains blocked. The
-[final publication gate](releases/v0.5.1-final-release-gate.md) records candidate
-checksums, packaging evidence and remaining Twine/remote availability blockers.
+After access was enabled, an independent full suite passed **1779 tests**,
+including eight Chrome browser cases. Visual review found and fixed standalone
+graph-control overflow; 375px/1440px regressions cover long investigation titles.
+Strict Twine verification passed. The
+[final publication gate](releases/v0.5.1-final-release-gate.md) records the local
+checks, clean-commit publishing process and historical candidate provenance.
 
 ## v0.5.0
 

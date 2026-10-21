@@ -2,14 +2,13 @@
 
 # AWSherlock
 
-**Source release preparation: v0.5.1 — Contextual Investigation Engine.**
-The published-version badges below remain v0.5.0 until an authorized release.
+**AWSherlock v0.5.1 — Contextual Investigation Engine.**
 Despite its patch version number, **v0.5.1 contains substantial feature
 additions**: the complete investigation engine, contextual priority and offline
 graph are official v0.5.1 features. This numbering does not reduce their scope.
 
-[![Release v0.5.0](https://img.shields.io/badge/release-v0.5.0-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.5.0)
-[![PyPI v0.5.0](https://img.shields.io/badge/PyPI-v0.5.0-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.5.0/)
+[![Release v0.5.1](https://img.shields.io/badge/release-v0.5.1-FF9900?style=flat-square)](https://github.com/0gulcandogann/awsherlock/releases/tag/v0.5.1)
+[![PyPI v0.5.1](https://img.shields.io/badge/PyPI-v0.5.1-FF9900?style=flat-square)](https://pypi.org/project/awsherlock/0.5.1/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 [![42 security checks](https://img.shields.io/badge/security_checks-42-7C3AED?style=flat-square)](#checks)
 [![11 supported AWS services](https://img.shields.io/badge/AWS_services-11_supported-FF9900?style=flat-square)](#checks)
@@ -17,7 +16,7 @@ graph are official v0.5.1 features. This numbering does not reduce their scope.
 
 AWSherlock is a command-line scanner for AWS security configuration. It has 42 registered checks across 11 supported services: 29 default configuration checks across seven services, six opt-in IAM identity governance checks, three opt-in RDS checks, one opt-in GuardDuty check, one opt-in DynamoDB check and two opt-in Amazon Bedrock checks. Reports appear in your terminal, as JSON, or as a standalone investigation-oriented HTML file. Snapshot schema v2 records positive workload relationships, and five conservative Lead patterns connect exact supporting findings and relationships without claiming effective access or an attack path.
 
-The v0.5.1 source adds evidence-aware contextual investigations over those same
+Version 0.5.1 adds evidence-aware contextual investigations over those same
 five patterns: separate observed, inferred and unknown conditions, explained
 review priority, visible coverage limitations and an offline Investigation Graph.
 No Finding severity, Lead identity or snapshot schema changes are required.
@@ -26,8 +25,7 @@ See [contextual investigations](docs/contextual-investigations.md),
 The [changelog](docs/changelog.md) records this release strategy and the
 additional graph, coverage, AWS error-handling and validation improvements.
 The [final readiness report](docs/releases/v0.5.1-readiness.md) distinguishes
-passed local checks, user-reported Chrome validation, Codex IPC restrictions and
-untested live AWS.
+the complete local Chrome regression, historical sandbox restrictions and untested live AWS.
 
 > [!TIP]
 > **Install from PyPI.** You can also install AWSherlock directly from [PyPI](https://pypi.org/project/awsherlock/) with `pipx install awsherlock`. See [PyPI installation](#pypi-installation) for pip and upgrade commands.
@@ -1507,8 +1505,7 @@ Findings are configuration indicators for review. Complete coverage applies only
 
 ## Release notes
 
-Version [0.5.1](docs/releases/v0.5.1.md) is prepared in source, pending authorized
-publication. It derives contextual investigations from all existing Leads,
+Version [0.5.1](docs/releases/v0.5.1.md) derives contextual investigations from all existing Leads,
 separates observations/inferences/unknowns, explains bounded priority and adds an
 offline SVG graph to scoped HTML reports. Existing scan JSON, Evidence Packs,
 Lead Delta, five Lead rules and snapshot v1/v2 compatibility remain intact.
