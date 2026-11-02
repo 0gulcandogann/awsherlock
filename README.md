@@ -1499,7 +1499,9 @@ Keep sessions in the authentication layer, AWS reads in collectors, evaluation i
 
 ## Security reporting
 
-For a suspected vulnerability in AWSherlock, use the repository's private security reporting option when available, or contact the maintainer through their GitHub profile to arrange a private channel. Do not post credentials, private account data or exploitable sensitive details in a public issue. Include the affected version, a synthetic reproduction and expected versus actual behavior. No response-time or support-period guarantee is currently offered.
+AWSherlock's security contact is its maintainer, **Oğulcan Doğan ([@0gulcandogann](https://github.com/0gulcandogann))**, who triages vulnerability reports, coordinates fixes and publishes GitHub Security Advisories for the project.
+
+To report a suspected vulnerability in AWSherlock, use [private vulnerability reporting](https://github.com/0gulcandogann/awsherlock/security/advisories/new) under the repository's Security tab. Do not post credentials, private account data or exploitable sensitive details in a public issue. Include the affected version, a synthetic reproduction and expected versus actual behavior. See [SECURITY.md](SECURITY.md) for the full policy, supported versions and disclosure process.
 
 Findings are configuration indicators for review. Complete coverage applies only to supported checks and known resources. Treat all reports and snapshots as sensitive audit data.
 
