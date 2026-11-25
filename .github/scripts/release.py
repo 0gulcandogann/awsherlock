@@ -156,8 +156,12 @@ def verify_index(dist: Path, index: str, destination: Path) -> None:
 class OfflineAssets(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
+        # The only <link> a report may carry is its inline data: favicon; nothing may load remotely.
+        inline_icon = attributes.get("rel") == "icon" and str(attributes.get("href", "")).startswith(
+            "data:image/svg+xml,"
+        )
         if (tag in {"script", "img", "iframe"} and "src" in attributes) or (
-            tag == "link" and "href" in attributes
+            tag == "link" and "href" in attributes and not inline_icon
         ):
             raise ValueError("Report depends on an external asset")
 
