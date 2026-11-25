@@ -33,7 +33,11 @@ def test_html_self_contained_and_escaped(snapshot):
     assert "hero-stamp" in html and "severity-track" in html
     parsed = Elements()
     parsed.feed(html)
-    assert not any(tag in {"img", "iframe", "link"} for tag, attrs in parsed.tags)
+    assert not any(tag in {"img", "iframe"} for tag, attrs in parsed.tags)
+    # The only permitted <link> is the inline data: favicon; nothing may load a remote resource.
+    for tag, attrs in parsed.tags:
+        if tag == "link":
+            assert attrs.get("rel") == "icon" and attrs["href"].startswith("data:image/svg+xml,")
     assert not any("src" in attrs for tag, attrs in parsed.tags)
 
 

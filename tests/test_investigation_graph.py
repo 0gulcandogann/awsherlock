@@ -237,7 +237,7 @@ def test_offline_graph_selection_and_filtering_in_real_browser(tmp_path):
     check(document.querySelector(document.getElementById('graph-evidence-link').getAttribute('href')).open);
     const toggle = document.getElementById('graph-inferred');
     toggle.checked = false; toggle.dispatchEvent(new Event('change'));
-    check(!svg.querySelector('line[data-semantics="INFERRED"]'));
+    check(!svg.querySelector('[data-semantics="INFERRED"]'));
     const search = document.getElementById('graph-search');
     const firstNode = svg.querySelector('g[data-node]');
     search.value = 'no-such-node'; search.dispatchEvent(new Event('input'));

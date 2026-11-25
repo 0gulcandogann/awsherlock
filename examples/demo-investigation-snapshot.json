@@ -1,0 +1,260 @@
+{
+  "schema_version": 2,
+  "metadata": {
+    "scan_id": "synthetic-investigation-demo",
+    "started_at": "2026-10-07T00:00:00+00:00",
+    "account_id": "000000000000",
+    "region": "eu-central-1",
+    "version": "0.5.1"
+  },
+  "services": {
+    "lambda": {
+      "resources": [
+        {
+          "service": "lambda",
+          "resource_type": "function",
+          "account_id": "000000000000",
+          "region": "eu-central-1",
+          "resource_id": "example-webhook-handler",
+          "resource_arn": "arn:aws:lambda:eu-central-1:000000000000:function:example-webhook-handler",
+          "data": {
+            "urls": [
+              {
+                "arn": "arn:aws:lambda:eu-central-1:000000000000:function:example-webhook-handler",
+                "auth": "NONE"
+              }
+            ],
+            "role_policies": [
+              "arn:aws:iam::aws:policy/AdministratorAccess"
+            ],
+            "runtime": {
+              "name": "python3.13",
+              "deprecated": false,
+              "catalog_date": "2026-09-15",
+              "evaluated_on": "2026-10-07"
+            }
+          }
+        }
+      ],
+      "issues": []
+    },
+    "ec2": {
+      "resources": [
+        {
+          "service": "ec2",
+          "resource_type": "instance",
+          "account_id": "000000000000",
+          "region": "eu-central-1",
+          "resource_id": "i-00000000000000001",
+          "resource_arn": "arn:aws:ec2:eu-central-1:000000000000:instance/i-00000000000000001",
+          "data": {
+            "metadata": {
+              "endpoint": "enabled",
+              "tokens": "optional"
+            },
+            "addresses": [
+              "203.0.113.25"
+            ]
+          }
+        }
+      ],
+      "issues": []
+    },
+    "iam": {
+      "resources": [
+        {
+          "service": "iam",
+          "resource_type": "role",
+          "account_id": "000000000000",
+          "region": null,
+          "resource_id": "example-webhook-role",
+          "resource_arn": "arn:aws:iam::000000000000:role/example-webhook-role",
+          "data": {
+            "attached": [
+              "arn:aws:iam::aws:policy/AdministratorAccess"
+            ],
+            "statements": [],
+            "identity_requested": true,
+            "identity_profile": {
+              "owner": true,
+              "purpose": true,
+              "declared_kind": "workload",
+              "boundary": null,
+              "service_linked": false
+            },
+            "identity_approval": {
+              "status": "registered",
+              "declared_kind": "workload",
+              "owner": true,
+              "purpose": true,
+              "allowed_principals": [
+                "lambda.amazonaws.com"
+              ],
+              "shared": false,
+              "external_id_required": false,
+              "source_identity_required": false
+            },
+            "identity_policy_context": {
+              "complete": true,
+              "managed_sources": []
+            },
+            "identity_usage": {
+              "created_days": 200,
+              "last_used_days": 2,
+              "status": "recorded"
+            },
+            "identity_trust": {
+              "principals": [
+                {
+                  "kind": "Service",
+                  "value": "lambda.amazonaws.com"
+                }
+              ],
+              "mechanisms": [
+                "aws_service"
+              ],
+              "broad": false,
+              "status": "supported",
+              "external_id_condition": false,
+              "source_identity_condition": false
+            }
+          }
+        },
+        {
+          "service": "iam",
+          "resource_type": "role",
+          "account_id": "000000000000",
+          "region": null,
+          "resource_id": "example-batch-role",
+          "resource_arn": "arn:aws:iam::000000000000:role/example-batch-role",
+          "data": {
+            "attached": [
+              "arn:aws:iam::aws:policy/AdministratorAccess"
+            ],
+            "statements": [],
+            "identity_requested": true,
+            "identity_profile": {
+              "owner": true,
+              "purpose": true,
+              "declared_kind": "workload",
+              "boundary": null,
+              "service_linked": false
+            },
+            "identity_approval": {
+              "status": "registered",
+              "declared_kind": "workload",
+              "owner": true,
+              "purpose": true,
+              "allowed_principals": [
+                "ec2.amazonaws.com"
+              ],
+              "shared": false,
+              "external_id_required": false,
+              "source_identity_required": false
+            },
+            "identity_policy_context": {
+              "complete": true,
+              "managed_sources": []
+            },
+            "identity_usage": {
+              "created_days": 200,
+              "last_used_days": 2,
+              "status": "recorded"
+            },
+            "identity_trust": {
+              "principals": [
+                {
+                  "kind": "Service",
+                  "value": "ec2.amazonaws.com"
+                }
+              ],
+              "mechanisms": [
+                "aws_service"
+              ],
+              "broad": false,
+              "status": "supported",
+              "external_id_condition": false,
+              "source_identity_condition": false
+            }
+          }
+        }
+      ],
+      "issues": []
+    },
+    "s3": {
+      "resources": [
+        {
+          "service": "s3",
+          "resource_type": "bucket",
+          "account_id": "000000000000",
+          "region": "eu-central-1",
+          "resource_id": "example-demo-bucket",
+          "resource_arn": "arn:aws:s3:::example-demo-bucket",
+          "data": {
+            "public_access_block": null,
+            "encryption": [
+              "AES256"
+            ],
+            "versioning": null,
+            "policy_public": false
+          }
+        }
+      ],
+      "issues": []
+    }
+  },
+  "relationships": [
+    {
+      "source": {
+        "service": "ec2",
+        "resource_type": "instance",
+        "account_id": "000000000000",
+        "region": "eu-central-1",
+        "resource_id": "i-00000000000000001",
+        "resource_arn": "arn:aws:ec2:eu-central-1:000000000000:instance/i-00000000000000001"
+      },
+      "type": "RUNS_AS",
+      "target": {
+        "service": "iam",
+        "resource_type": "role",
+        "account_id": "000000000000",
+        "region": null,
+        "resource_id": "example-batch-role",
+        "resource_arn": "arn:aws:iam::000000000000:role/example-batch-role"
+      },
+      "evidence": [
+        {
+          "service": "iam",
+          "fact": "identity_bindings",
+          "operation": null
+        }
+      ]
+    },
+    {
+      "source": {
+        "service": "lambda",
+        "resource_type": "function",
+        "account_id": "000000000000",
+        "region": "eu-central-1",
+        "resource_id": "example-webhook-handler",
+        "resource_arn": "arn:aws:lambda:eu-central-1:000000000000:function:example-webhook-handler"
+      },
+      "type": "RUNS_AS",
+      "target": {
+        "service": "iam",
+        "resource_type": "role",
+        "account_id": "000000000000",
+        "region": null,
+        "resource_id": "example-webhook-role",
+        "resource_arn": "arn:aws:iam::000000000000:role/example-webhook-role"
+      },
+      "evidence": [
+        {
+          "service": "iam",
+          "fact": "identity_bindings",
+          "operation": null
+        }
+      ]
+    }
+  ]
+}

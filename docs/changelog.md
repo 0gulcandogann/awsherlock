@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased — visual report
+
+Presentation only. Scan JSON, Lead v2, Evidence Pack v1, snapshot, diff and Lead
+Delta contracts are unchanged. The report stays one offline file with inline
+CSS, JS and SVG, no external fonts, libraries or images.
+
+- Investigation Graph is split into two tabs. **Architecture** shows the
+  resources and configuration relationships that investigations refer to, in
+  lanes (compute, identity, data, AI, monitoring). **Review paths** shows the
+  evidence behind one investigation in columns. Neither view claims an attack
+  path; the legend and every detail panel say so.
+- Edge styles separate observed (solid), inferred (dashed) and coverage
+  limitation (dotted). Selecting a node opens a detail panel with connections.
+  Arrow keys move between nodes and tabs follow the ARIA tabs pattern.
+- Review paths is a tree: the investigation on top, resources below it, each
+  resource's findings nested under it, joined by orthogonal rails so no line
+  crosses a card or another line. Resource-to-resource relationships are drawn as
+  brackets on the right. Architecture orders cards inside each lane by their
+  neighbours to keep connections short.
+- Architecture fans connection points out along each card side and replaces a
+  pile of identical inline labels with one summary line when there are more than
+  three edges. The stat counters finish even when the page opens in a background
+  tab or is printed right away.
+- Tables no longer split headers or status badges inside a word when the page is
+  zoomed or narrow ("Resour/ces", "COMPLE/TE"). Only long identifiers and ARNs
+  still wrap anywhere; the table scrolls sideways when it must.
+- Responsive sweep at 320–1600 px: Architecture sizes itself to its container and
+  redraws on resize, Review paths drops its fixed minimum width, narrow screens
+  get a "scroll sideways" hint, the hero stacks below 900 px, service tiles go
+  two per row on phones with scaling icons, and long condition codes break after
+  underscores instead of mid-word.
+- Inline cloud-and-magnifier favicon (a `data:` URI, no external file).
+- Own inline SVG glyphs for 11 services plus a generic fallback, with AWS-style
+  category colors. Color is never the only signal; labels name each service.
+- Motion: one hero scan sweep, counting stat tiles, filling severity bars, and a
+  staged reveal of graph nodes and edges. All motion is opt-in through
+  `prefers-reduced-motion: no-preference` and is removed in print.
+- Layout fixes inside the existing visual identity (mono type, purple frames,
+  orange offset shadows): the Investigation Graph now sits right after the Leads,
+  the nav gains a "Graph" link, the footer moves to the end of the page, findings
+  show their service icon, and a severity distribution bar sits above the counts.
+  Screenshots are in `docs/assets/`.
+- New synthetic `examples/demo-investigation-snapshot.json` (two Leads) built by
+  `scripts/build_investigation_demo.py`. `examples/demo-report.html` was
+  regenerated because the report now carries the inline glyph sprite.
+
 ## v0.5.1 — 2026-10-21
 
 **Substantial feature release under a patch version number.** The package

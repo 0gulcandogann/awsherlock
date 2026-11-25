@@ -15,3 +15,18 @@ awsherlock scan examples/demo-snapshot.json --output html --report-file demo.htm
 
 `demo-report.json` and `demo-report.html` are generated examples. Open the HTML
 locally to try search, filters, sorting and coverage details without internet.
+
+## Investigation demo
+
+`demo-investigation-snapshot.json` is a second synthetic snapshot with a Lambda
+Function URL and a public EC2 instance, each running as a broad IAM role. It
+produces two Leads and a populated Investigation Graph. Leads are review hints,
+not verified attack paths.
+
+```bash
+awsherlock leads examples/demo-investigation-snapshot.json
+awsherlock scan examples/demo-investigation-snapshot.json --output html --report-file demo.html
+```
+
+`demo-investigation-report.html` is the generated example. Rebuild the snapshot
+with `python scripts/build_investigation_demo.py examples/demo-investigation-snapshot.json`.

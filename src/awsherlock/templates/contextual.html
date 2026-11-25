@@ -1,30 +1,67 @@
-<section class="panel" id="contextual-investigations" aria-labelledby="contextual-title">
-<h2 id="contextual-title">Contextual investigations</h2>
-<p>Priority describes configuration review urgency, not impact or confidence. PROVISIONAL means effective access, reachability or business criticality remains unknown. Missing evidence does not establish safety.</p>
-{% if not investigation.contextual %}<p>No contextual investigation data. Review findings and coverage; no absence or safety conclusion follows.</p>{% endif %}
-{% for item in investigation.contextual %}
-<details class="contextual-record" id="context-{{ item.id | replace(':', '-') }}">
-<summary><strong>{{ item.priority }} · {{ item.priority_status }}</strong> — {{ item.title }}</summary>
-<p>{{ item.id }}<br>Account {{ item.account_id }} · {{ item.region or 'Global' }}</p>
-<p>{{ item.explanation }}</p><p>{{ item.priority_explanation }}</p>
-<ul>{% for factor in item.priority_factors %}<li><strong>{{ factor.code }} +{{ factor.points }}</strong>: {{ factor.explanation }}<br>Evidence: {% for ref in factor.evidence %}<code>{{ ref.id }}</code> {% endfor %}</li>{% endfor %}</ul>
-<div class="statement-grid">{% for field in ['observed', 'inferred', 'unknown'] %}<div class="statement"><h3>{{ field | capitalize }}</h3><ul>{% for condition in item[field] %}<li><strong>{{ condition.code }}</strong>: {{ condition.text }}{% if condition.assumptions %}<p>Assumptions: {{ condition.assumptions | join(' ') }}</p>{% endif %}{% if condition.evidence %}<p>Evidence: {% for ref in condition.evidence %}<code>{{ ref.id }}</code> {% endfor %}</p>{% endif %}</li>{% endfor %}</ul></div>{% endfor %}</div>
-<h3>Resources</h3><ul>{% for ref in item.resources %}<li>{{ ref.account_id }} / {{ ref.region or 'Global' }} / {{ ref.service }} / {{ ref.resource_type }} / {{ ref.resource_id }}{% if ref.resource_arn %}<br>{{ ref.resource_arn }}{% endif %}</li>{% endfor %}</ul>
-<h3>Supporting evidence references</h3><ul>{% for finding in item.supporting_findings %}<li><code>{{ finding.id }}</code>: {{ finding.reference.check_id }} / {{ finding.reference.service }} / {{ finding.reference.resource_id }}</li>{% endfor %}{% for edge in item.supporting_relationships %}<li><code>{{ edge.id }}</code>: {{ edge.reference.source.resource_id }} → {{ edge.reference.type }} → {{ edge.reference.target.resource_id }}</li>{% endfor %}</ul>
-<h3>Coverage limitations</h3><ul>{% for gap in item.coverage_gaps %}<li><code>{{ gap.id }}</code>: {{ gap.code }} / {{ gap.service or 'Supporting evidence' }} / {{ gap.status }}{% if gap.reason_code %} / {{ gap.reason_code }}{% endif %}{% if gap.operation %} / {{ gap.operation }}{% endif %}</li>{% else %}<li>No supporting coverage gap detected. Effective access and exhaustive inventory remain unverified.</li>{% endfor %}</ul>
-<h3>Recommended investigation actions</h3><ol>{% for action in item.recommended_actions %}<li>{{ action.text }}</li>{% endfor %}</ol>
-</details>
-{% endfor %}
-</section>
+<svg class="icon-sprite" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="ic-lambda" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#ed7100" d="M0 0h64v64H0z"/><path fill="#fff" d="M22.68 52h-9.106l10.264-21.59 4.562 9.451zm2.047-24.333a.99.99 0 0 0-.896-.564h-.003a.99.99 0 0 0-.896.569L11.097 52.569c-.147.31-.126.674.057.965.181.29.5.466.842.466H23.31a1 1 0 0 0 .9-.572l6.194-13.144a1 1 0 0 0-.005-.864zM51.008 52h-9.022L26.955 19.578a1 1 0 0 0-.903-.578h-5.924l.007-7h11.68l14.96 32.42c.163.354.516.58.904.58h3.33zm.996-9h-3.69l-14.96-32.42a1 1 0 0 0-.903-.58H19.14a1 1 0 0 0-.996.999l-.008 9A.993.993 0 0 0 19.131 21h6.286l15.03 32.422a1 1 0 0 0 .903.578h10.654c.55 0 .996-.448.996-1v-9c0-.552-.445-1-.996-1"/></g></symbol>
+<symbol id="ic-ec2" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#ed7100" d="M0 0h64v64H0z"/><path fill="#fff" d="M22 41h19V23H22zm21-18h3v2h-3v2h3v2h-3v2h3v2h-3v3h3v2h-3v2h3v2h-3.137c-.255.587-.84 1-1.519 1H41v3h-2v-3h-2v3h-2v-3h-2v3h-2v-3h-2v3h-2v-3h-3v3h-2v-3h-.344a1.66 1.66 0 0 1-1.519-1H18v-2h2v-2h-2v-2h2v-3h-2v-2h2v-2h-2v-2h2v-2h-2v-2h2v-.344c0-.913.743-1.656 1.656-1.656H22v-3h2v3h3v-3h2v3h2v-3h2v3h2v-3h2v3h2v-3h2v3h.344c.913 0 1.656.743 1.656 1.656zM32 52H12V32h4v-2h-4.157A1.845 1.845 0 0 0 10 31.843v20.314c0 1.016.826 1.843 1.843 1.843h20.314A1.845 1.845 0 0 0 34 52.157V48h-2zm22-40.157v20.314A1.845 1.845 0 0 1 52.157 34H48v-2h4V12H32v4h-2v-4.157c0-1.016.826-1.843 1.843-1.843h20.314c1.017 0 1.843.827 1.843 1.843"/></g></symbol>
+<symbol id="ic-s3" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#7aa116" d="M0 0h64v64H0z"/><path fill="#fff" d="m47.759 33.948.234-1.817c2.173 1.254 2.849 1.99 3.044 2.293-.324.061-1.205.085-3.278-.476M30.499 21c-10.374 0-17.117-2.512-17.5-4.304v-.185c.35-1.119 6.14-4.51 17.5-4.51 11.34 0 17.133 3.38 17.5 4.504v.111C47.725 18.446 40.962 21 30.5 21m15.319 12.362c-4.765-1.565-10.906-4.383-13.224-5.474a2.09 2.09 0 0 0-2.082-1.982A2.097 2.097 0 0 0 28.418 28c0 1.154.94 2.094 2.094 2.094.457 0 .877-.152 1.22-.4 2.4 1.128 8.887 4.104 13.826 5.686l-1.721 13.344C43.583 50.352 38.919 52 30.497 52c-8.425 0-13.092-1.648-13.342-3.249l-3.72-28.937C16.945 21.915 23.749 23 30.5 23c6.75 0 13.554-1.085 17.065-3.185zM50 16.5c0-3.069-8.34-6.5-19.5-6.5S11 13.431 11 16.5v.543l4.174 31.99C15.874 53.516 26.123 54 30.497 54c4.372 0 14.616-.484 15.32-4.993l1.684-13.06c1.277.332 2.31.51 3.115.508.99 0 1.657-.252 2.08-.758.35-.416.489-.94.389-1.476-.228-1.22-1.682-2.509-4.715-4.177l-.1-.055L50 17.044z"/></g></symbol>
+<symbol id="ic-iam" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#dd344c" d="M0 0h64v64H0z"/><path fill="#fff" d="M12 47h40V18H12zm42-30v31a1 1 0 0 1-1 1H11a1 1 0 0 1-1-1V17a1 1 0 0 1 1-1h42a1 1 0 0 1 1 1M35 39h12v-2H35zm10-4h4v-2h-4zm-10 0h6v-2h-6zm-12.5 2.5a.5.5 0 1 0 1.002-.002.5.5 0 0 0-1.002.002m3 0a2.5 2.5 0 0 1-1.5 2.288V42h-2v-2.212a2.5 2.5 0 0 1-1.5-2.288c0-1.378 1.121-2.5 2.5-2.5s2.5 1.122 2.5 2.5M16 42.995 29.995 43l.001-2H27v-2h2.997l.001-2H27v-2h2.999L30 33.005 16.005 33zm2-11.994 10.001.003.001-5.004c0-1.024-.802-1.727-1.28-2.055-.875-.6-2.548-.945-3.72-.945H23c-2.127 0-4.997 1.232-4.998 3zm-3.707 13.7a1 1 0 0 1-.293-.707L14.005 32a1 1 0 0 1 1-1H16l.002-5c.001-3.089 3.874-5 6.998-5h.002c1.565 0 3.651.473 4.852 1.295 1.385.951 2.149 2.267 2.148 3.705l-.001 5.005.999.001a1 1 0 0 1 1 1L31.995 44a1 1 0 0 1-1 1L15 44.994a1 1 0 0 1-.707-.293M47 30h2v-2h-2zm-12 0h9v-2h-9z"/></g></symbol>
+<symbol id="ic-secretsmanager" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#dd344c" d="M0 0h64v64H0z"/><path fill="#fff" d="M31.24 34.64a.76.76 0 0 0 1.52 0 .76.76 0 0 0-1.52 0m-2 0A2.763 2.763 0 0 1 32 31.88a2.764 2.764 0 0 1 2.76 2.76A2.76 2.76 0 0 1 33 37.205V40h-2v-2.795a2.76 2.76 0 0 1-1.76-2.565M39 31H25v10h14v-2h-2v-2h2v-2h-2v-2h2zm-12-2h9.999L37 25c0-.865-.576-1.859-1.543-2.659-1.014-.84-2.305-1.341-3.454-1.341h-.002c-2.383 0-5 2.093-5.001 4zm12-4-.001 4H40a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H24a1 1 0 0 1-1-1V30a1 1 0 0 1 1-1h1v-4c.001-3.029 3.469-6 7.001-6h.002c1.625 0 3.348.657 4.729 1.801C38.174 21.994 39.001 23.525 39 25M15.489 43.95l1.621-1.173A18.2 18.2 0 0 1 13.676 33H16v-2h-2.322a18.2 18.2 0 0 1 3.432-9.719l-1.621-1.173A20.18 20.18 0 0 0 11.678 31H10v2h1.676c.185 3.962 1.484 7.731 3.813 10.95m27.258 2.968A18.2 18.2 0 0 1 33 50.35V48h-2v2.35a18.2 18.2 0 0 1-9.75-3.432l-1.172 1.62A20.17 20.17 0 0 0 31 52.35V54h2v-1.65c3.951-.19 7.709-1.488 10.919-3.812zM21.25 17.14A18.2 18.2 0 0 1 31 13.707V16h2v-2.293a18.2 18.2 0 0 1 9.747 3.433l1.172-1.62A20.16 20.16 0 0 0 33 11.707V10h-2v1.707a20.17 20.17 0 0 0-10.922 3.813zM52.319 31a20.17 20.17 0 0 0-3.81-10.892l-1.622 1.173A18.16 18.16 0 0 1 50.319 31H48v2h2.322a18.2 18.2 0 0 1-3.435 9.777l1.622 1.173c2.329-3.219 3.627-6.988 3.813-10.95H54v-2zm-7.293-10.584 6.159-6.16-1.414-1.414-6.159 6.16zM18.971 43.642l-6.16 6.16 1.414 1.414 6.161-6.16zm4.275-21.809-11.66-11.66-1.414 1.414 11.66 11.66zM43.303 41.89l10.523 10.523-1.414 1.414-10.524-10.523z"/></g></symbol>
+<symbol id="ic-kms" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#dd344c" d="M0 0h64v64H0z"/><path fill="#fff" d="M42.84 41.997h6v-2h-6zm-8 0h6v-2h-6zm-8 0h6v-2h-6zm10-6.5a1.501 1.501 0 1 1 1.5 1.5c-.826 0-1.5-.673-1.5-1.5m5 0c0-1.93-1.57-3.5-3.5-3.5-1.928 0-3.5 1.57-3.5 3.5s1.572 3.5 3.5 3.5c1.93 0 3.5-1.57 3.5-3.5m-11.5 1.5c-.826 0-1.5-.673-1.5-1.5s.674-1.5 1.5-1.5a1.501 1.501 0 0 1 0 3m0-5c-1.928 0-3.5 1.57-3.5 3.5s1.572 3.5 3.5 3.5c1.93 0 3.5-1.57 3.5-3.5s-1.57-3.5-3.5-3.5m23.5-6v20a1 1 0 0 1-1 1h-26v-2h25v-18h-19v-2h20a1 1 0 0 1 1 1m-32.936-2.105a1.98 1.98 0 0 1-1.98-1.98c0-1.09.889-1.978 1.98-1.978a1.98 1.98 0 0 1 1.978 1.979 1.98 1.98 0 0 1-1.978 1.979m0-5.958a3.984 3.984 0 0 0-3.98 3.979 3.984 3.984 0 0 0 3.98 3.979 3.983 3.983 0 0 0 3.978-3.98 3.983 3.983 0 0 0-3.978-3.978m2.63 12.112a1 1 0 0 0-.693.95v18.58l-1.94 1.9-2.06-2.807v-2.63a1 1 0 0 0-.351-.761l-2.106-1.792 2.106-1.791c.223-.19.35-.47.35-.762V39.23c0-.293-.127-.572-.35-.762l-2.106-1.791 2.106-1.792c.223-.19.35-.47.35-.762v-3.127a1 1 0 0 0-.697-.953c-4.38-1.388-6.886-5.653-5.958-10.142.67-3.246 3.166-5.848 6.359-6.631 2.718-.668 5.509-.085 7.652 1.596a8.74 8.74 0 0 1 3.369 6.917 8.67 8.67 0 0 1-6.031 8.262m8.03-8.262a10.73 10.73 0 0 0-4.134-8.491c-2.628-2.062-6.04-2.78-9.363-1.964-3.937.965-7.015 4.17-7.841 8.168a10.75 10.75 0 0 0 6.615 12.206v1.96l-2.648 2.253a1.002 1.002 0 0 0 0 1.523l2.648 2.254v.778l-2.648 2.254a1 1 0 0 0 0 1.523L16.84 46.5v2.496c0 .213.069.42.195.592l2.936 4a1 1 0 0 0 .806.408 1 1 0 0 0 .699-.286l3.064-3a1 1 0 0 0 .3-.714v-18.3a10.66 10.66 0 0 0 6.724-9.913"/></g></symbol>
+<symbol id="ic-rds" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#c925d1" d="M0 0h64v64H0z"/><path fill="#fff" d="M54 11v8h-2v-5.586l-6.293 6.293-1.414-1.414L50.586 12h-5.461v-2H53a1 1 0 0 1 1 1m-42 7.875h-2V11a1 1 0 0 1 1-1h8v2h-5.586l6.293 6.293-1.414 1.414L12 13.414zm7.707 26.832L13.414 52h5.461v2H11a1 1 0 0 1-1-1v-8h2v5.586l6.293-6.293zM51.5 31.781c0-2.429-2.866-4.849-7.667-6.474l.641-1.894c5.736 1.941 9.026 4.991 9.026 8.368s-3.29 6.427-9.026 8.369l-.641-1.895c4.801-1.624 7.667-4.045 7.667-6.474m-38.957 0c0 2.324 2.681 4.679 7.172 6.3l-.68 1.88c-5.396-1.947-8.492-4.928-8.492-8.18s3.096-6.233 8.492-8.18l.68 1.881c-4.491 1.621-7.172 3.976-7.172 6.299M52 45.125h2V53a1 1 0 0 1-1 1h-8v-2h5.586l-6.293-6.293 1.414-1.414L52 50.586zM32.022 31.402c-5.023 0-7.896-1.343-8.022-1.919v-3.226c2.159 1.009 5.609 1.336 8 1.336s5.841-.327 8-1.336v3.226c-.106.574-2.949 1.919-7.978 1.919m0 5.728c-5.023 0-7.896-1.344-8.022-1.92v-3.254c1.953.981 5.055 1.446 8.022 1.446 2.951 0 6.033-.464 7.978-1.442v3.25c-.106.575-2.948 1.92-7.978 1.92M32 42.268c-5.05 0-7.896-1.351-8-1.922v-2.663c1.953.982 5.055 1.447 8.022 1.447 2.951 0 6.033-.464 7.978-1.443v2.655c-.104.575-2.95 1.926-8 1.926m0-20.075c4.971 0 7.642 1.177 7.982 1.701-.34.523-3.011 1.699-7.982 1.699-5.091 0-7.767-1.232-8-1.644v-.019c.233-.504 2.909-1.737 8-1.737m0-2c-3.714 0-10 .78-10 3.701v16.452c0 2.695 5.184 3.922 10 3.922s10-1.227 10-3.922V23.894c0-2.921-6.286-3.701-10-3.701"/></g></symbol>
+<symbol id="ic-dynamodb" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#c925d1" d="M0 0h64v64H0z"/><path fill="#fff" d="M46.586 25.25H43a1 1 0 0 1-.822-.435 1.02 1.02 0 0 1-.114-.931l2.493-6.722h-8.913l-4.091 9.098H36c.32 0 .623.156.812.42.187.264.239.602.136.91l-3.66 11.101zm3.12-.297L31.709 43.15a.99.99 0 0 1-1.232.146 1.014 1.014 0 0 1-.423-1.18l4.56-13.833H30a1 1 0 0 1-.841-.463 1.02 1.02 0 0 1-.07-.966l5-11.12a1 1 0 0 1 .91-.593h11c.329 0 .636.163.823.435.187.273.23.62.115.931l-2.494 6.721H49a1 1 0 0 1 .924.624c.155.378.069.813-.217 1.102M41.002 44.22c-2.71 1.886-7.687 2.882-12.468 2.882-4.816 0-9.837-1.01-12.533-2.924l.001 3.816c0 1.664 4.768 3.984 12.532 3.984 7.495 0 12.468-2.702 12.468-4.49zm2.064-3.27c0 .187-.032.367-.064.546v5.993C43 51.079 36.51 54 28.533 54c-6.903 0-13.871-1.89-14.473-5.5h-.059L14 43.445V16.151h.001c0-3.996 7.487-6.151 14.532-6.151 3.94 0 7.73.64 10.397 1.756l-.766 1.868c-2.432-1.019-5.943-1.602-9.631-1.602-7.764 0-12.532 2.405-12.532 4.13 0 1.724 4.768 4.129 12.532 4.129.195 0 .399 0 .596-.007l.078 2.02c-.225.009-.45.009-.674.009-4.817 0-9.837-1.01-12.533-2.924v4.358h.001v.017c.005.53.489 1.143 1.364 1.72 1.982 1.288 5.55 2.168 9.539 2.351l-.091 2.02c-4.126-.19-7.75-1.069-10.086-2.416-.31.298-.726 1.056-.726 1.467 0 1.724 4.768 4.129 12.532 4.129.738 0 1.465-.025 2.162-.075l.14 2.017c-.743.054-1.518.08-2.302.08-4.817 0-9.837-1.009-12.533-2.924v3.67h.001c.005.547.489 1.16 1.364 1.737 2.268 1.474 6.549 2.393 11.168 2.393h.33v2.022h-.33c-4.778 0-9.86-1.008-12.532-2.543-.322.298 0 1.01 0 1.548 0 1.725 4.768 4.13 12.532 4.13s12.532-2.405 12.532-4.13c0-.61-.6-1.174-1.092-1.538-.41.247-.86.483-1.372.7l-.768-1.868c.53-.223.99-.463 1.364-.711 1.1-.734 1.804-1.779 1.804-2.175h2c0 .94-.621 1.947-1.417 2.775 1.192 1.04 1.48 2.078 1.48 2.817M17.142 48.39c.791.408 1.716.772 2.752 1.08l.564-1.94a14 14 0 0 1-2.406-.94zm2.752-11.05.564-1.94c-.916-.272-1.726-.589-2.406-.94l-.91 1.799c.791.41 1.716.772 2.752 1.08m-2.752-13.21.91-1.801c.68.352 1.49.668 2.406.94l-.564 1.94a16 16 0 0 1-2.752-1.08"/></g></symbol>
+<symbol id="ic-bedrock" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#01a88d" d="M0 0h64v64H0z"/><path fill="#fff" d="M51 31a1.001 1.001 0 0 1 0-2 1.001 1.001 0 0 1 0 2M26.977 51.848l-3.203-1.746 3.741-2.245-1.03-1.714-4.747 2.848L17 46.406v-5.84l4.515-2.71-1.03-1.713L16 38.833l-4-2.4v-3.815l5.447-2.723-.894-1.79L12 30.382v-2.764l4.956-2.478L21 27.566v2.816l-3.447 1.723.894 1.79 3.556-1.778 3.554 1.76.886-1.792L23 30.38v-2.814l4.515-2.71A1 1 0 0 0 28 24v-5h-2v4.434l-4 2.4-4-2.4v-6.846l3-1.666V21h2v-7.19l3.024-1.68 4.978 2.486-.001 21.834-10.538 6.706 1.074 1.688 9.464-6.022L31 49.434zM48 39a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m-8 10a1.001 1.001 0 0 1 0-2 1.001 1.001 0 0 1 0 2m2-33a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m9 11a3 3 0 0 0-2.816 2H33.001v-4H42a1 1 0 0 0 1-1v-4.184A3 3 0 0 0 45 17c0-1.654-1.346-3-3-3s-3 1.346-3 3c0 1.302.839 2.402 2 2.816V23h-7.999l.001-9.002a1 1 0 0 0-.553-.894l-6.002-3a1 1 0 0 0-.932.022l-9 5A1 1 0 0 0 16 16v7.382l-5.447 2.723c-.339.17-.553.516-.553.895v10a1 1 0 0 0 .485.857L15 40.566V47a1 1 0 0 0 .521.878l11 6a1 1 0 0 0 .994-.021l5-3A1 1 0 0 0 33 50v-7h6v2.184A3 3 0 0 0 37 48c0 1.654 1.346 3 3 3s3-1.346 3-3a3 3 0 0 0-2-2.816V42a1 1 0 0 0-1-1h-7l.001-4h10.585l1.715 1.715A2.95 2.95 0 0 0 45 40c0 1.654 1.346 3 3 3s3-1.346 3-3-1.346-3-3-3a2.95 2.95 0 0 0-1.285.3l-2.008-2.007A1 1 0 0 0 44 35H33.001v-4h15.183A3 3 0 0 0 51 33c1.654 0 3-1.346 3-3s-1.346-3-3-3"/></g></symbol>
+<symbol id="ic-cloudtrail" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M20 41.974h3V39.96h-3zm2-4.026h6v-2.013h-6zm24.96-7.884c-.226-2.335-1.404-4.05-3.248-4.672-1.474-.495-3.083-.193-4.361.744-.685-1.443-1.663-3.024-2.649-4.003-3.23-3.208-6.961-3.958-11.086-2.225-3.357 1.404-6.227 5.502-6.58 9.232-1.846.654-4.028 2.101-4.962 4.401l1.852.761c.727-1.79 2.694-3.013 4.321-3.431.443-.114.753-.516.753-.975 0-3.076 2.566-6.95 5.385-8.13 3.404-1.43 6.238-.857 8.913 1.8 1.061 1.053 2.237 3.195 2.762 4.658a1 1 0 0 0 .792.654.98.98 0 0 0 .947-.39c.817-1.094 2.13-1.57 3.279-1.186 1.222.41 1.922 1.723 1.922 3.6 0 .492.354.912.836.992 4.09.685 6.164 2.721 6.164 6.054 0 5.833-5.389 6.035-6 6.039H29V46h17c2.767 0 8-1.683 8-8.052 0-4.106-2.491-6.882-7.04-7.884M22 46h4v-2.013h-4zm3-4.026h11V39.96H25zm-14 0h7V39.96h-7zm2-4.026h6v-2.013h-6zM14 46h6v-2.013h-6zm-4 0h2v-2.013h-2z"/></g></symbol>
+<symbol id="ic-guardduty" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#dd344c" d="M0 0h64v64H0z"/><path fill="#fff" d="M36 34.35c-.033 1.882-.611 4.08-3 4.554V25.83l3 1.246zm-8-.01v-7.264l3-1.246v13.063c-2.758-.585-3-3.568-3-4.553m3.616-10.932-5 2.077a1 1 0 0 0-.616.923v7.932c0 3.073 1.571 6.66 6 6.66 3.685 0 5.927-2.472 6-6.631v-7.96a1 1 0 0 0-.616-.924l-5-2.077a1 1 0 0 0-.768 0M40 34.368c0 .353-.091 8.633-8 8.633-7.876 0-7.999-8.31-8-8.661v-9.934l8-3.323 8 3.323zm1.384-11.553-9-3.738a1 1 0 0 0-.768 0l-9 3.738a1 1 0 0 0-.616.923V34.34C22 38.028 24.09 45 32 45s10-6.954 10-10.631v-10.63a1 1 0 0 0-.616-.924M52 35.115l-2.428-.138a1.01 1.01 0 0 0-1.032.779 16.9 16.9 0 0 1-2.188 5.287 1 1 0 0 0 .179 1.28l1.814 1.617-4.406 4.406-1.612-1.808a1 1 0 0 0-1.28-.18 16.8 16.8 0 0 1-5.293 2.193 1 1 0 0 0-.777 1.033L35.115 52h-6.23l.138-2.42a1 1 0 0 0-.777-1.031 16.8 16.8 0 0 1-5.29-2.194.995.995 0 0 0-1.28.18l-1.615 1.81-4.406-4.405 1.81-1.613c.365-.326.441-.868.181-1.281a16.8 16.8 0 0 1-2.189-5.29 1.026 1.026 0 0 0-1.032-.78l-2.425.14v-6.23l2.432.137c.445.016.923-.3 1.032-.777a16.8 16.8 0 0 1 2.192-5.28 1 1 0 0 0-.179-1.28l-1.822-1.626 4.406-4.405 1.624 1.82a1 1 0 0 0 1.279.18 16.8 16.8 0 0 1 5.282-2.186 1 1 0 0 0 .777-1.033L28.885 12h6.23l-.138 2.438c-.029.49.3.925.777 1.033 1.874.424 3.65 1.16 5.279 2.188a1 1 0 0 0 1.279-.18l1.627-1.824 4.406 4.405-1.819 1.622a1 1 0 0 0-.179 1.28 16.8 16.8 0 0 1 2.191 5.284c.107.477.564.793 1.032.777l2.43-.138zm1.687-8.016a1 1 0 0 0-.744-.27l-2.66.15a18.8 18.8 0 0 0-1.806-4.356l1.99-1.775a1 1 0 0 0 .041-1.453l-5.903-5.902a.97.97 0 0 0-.735-.293 1 1 0 0 0-.718.334l-1.781 1.996a18.8 18.8 0 0 0-4.35-1.804l.151-2.669A1 1 0 0 0 36.174 10h-8.348a1 1 0 0 0-.726.313 1 1 0 0 0-.272.744l.151 2.667a18.8 18.8 0 0 0-4.353 1.802l-1.778-1.992a1 1 0 0 0-.718-.334.99.99 0 0 0-.735.293l-5.903 5.902a1 1 0 0 0 .041 1.453l1.994 1.778a18.8 18.8 0 0 0-1.807 4.353l-2.663-.15a1 1 0 0 0-1.057.997v8.348a1 1 0 0 0 1.057.999l2.655-.152a18.8 18.8 0 0 0 1.805 4.364l-1.983 1.767a1 1 0 0 0-.042 1.454l5.903 5.902a.95.95 0 0 0 .735.293c.275-.008.535-.13.718-.334l1.769-1.983a18.8 18.8 0 0 0 4.362 1.81l-.151 2.649A1 1 0 0 0 27.826 54h8.348a1 1 0 0 0 .998-1.057l-.151-2.647a18.8 18.8 0 0 0 4.365-1.81l1.766 1.98c.183.206.443.327.718.335a.94.94 0 0 0 .735-.293l5.903-5.902a1 1 0 0 0-.041-1.453L48.48 41.38a18.8 18.8 0 0 0 1.805-4.36l2.658.152A1 1 0 0 0 54 36.174v-8.348a1 1 0 0 0-.313-.727"/></g></symbol>
+<symbol id="ic-generic" viewBox="0 0 24 24"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></symbol>
+<symbol id="ic-finding" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.1"/></symbol>
+<symbol id="ic-gap" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.2 1-1.2 1.8M12 17v.1"/></symbol>
+<symbol id="ic-investigation" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/></symbol>
+</defs></svg>
 <section class="panel" id="investigation-graph" aria-labelledby="graph-title">
 <h2 id="graph-title">Investigation Graph</h2>
-<p>Solid blue lines: observed configuration relationships. Dashed gray lines: inferred review associations. Neither establishes verified access or an attack path. Findings and coverage gaps are evidence nodes.</p>
+<p>Two views of the same evidence. <strong>Architecture</strong> shows the resources and configuration relationships that investigations refer to. <strong>Review paths</strong> shows what supports one investigation. Neither view proves effective access or an attack path. Findings and coverage gaps are evidence nodes.</p>
 {% if investigation.graph.investigations %}
-<div class="filters"><label for="investigation-select">Select investigation<select id="investigation-select">{% for item in investigation.graph.investigations %}<option value="{{ item.investigation_id }}">{{ item.priority }} · {{ item.title }} · {{ loop.index }}</option>{% endfor %}</select></label><label for="graph-search">Highlight nodes<input id="graph-search" type="search" placeholder="Resource, finding, gap…"></label><label for="graph-inferred"><input id="graph-inferred" type="checkbox" checked> Show inferred associations</label></div>
+<div class="graph-interactive">
+<div class="filters graph-controls"><label for="graph-search">Highlight nodes<input id="graph-search" type="search" placeholder="Resource, finding, gap…"></label><label for="graph-inferred"><input id="graph-inferred" type="checkbox" checked> Show inferred associations</label></div>
+<div class="graph-tabs" role="tablist" aria-label="Investigation graph views">
+<button type="button" role="tab" id="tab-architecture" aria-selected="true" aria-controls="panel-architecture">Architecture</button>
+<button type="button" role="tab" id="tab-paths" aria-selected="false" aria-controls="panel-paths" tabindex="-1">Review paths</button>
+</div>
+<div class="graph-stage" id="graph-stage">
+<div class="graph-panel" role="tabpanel" id="panel-architecture" aria-labelledby="tab-architecture">
+<p class="graph-note">Only resources and configuration relationships referenced by investigations appear here. This is not a full inventory.</p>
+<p id="architecture-empty" hidden>No resources are referenced by the selected investigations. Missing resources do not establish safety.</p>
+<p id="architecture-edge-note" class="graph-note" hidden></p>
+<p class="graph-scroll-hint">Scroll sideways to see the whole diagram.</p>
+<div class="graph-scroll"><svg id="architecture-svg" class="graph-svg" role="group" aria-label="Architecture of resources referenced by investigations" xmlns="http://www.w3.org/2000/svg"></svg></div>
+</div>
+<div class="graph-panel" role="tabpanel" id="panel-paths" aria-labelledby="tab-paths" hidden>
+<div class="filters"><label for="investigation-select">Select investigation<select id="investigation-select">{% for item in investigation.graph.investigations %}<option value="{{ item.investigation_id }}">{{ item.priority }} · {{ item.title }} · {{ loop.index }}</option>{% endfor %}</select></label></div>
 <p><a id="graph-evidence-link" href="#context-{{ investigation.graph.investigations[0].investigation_id | replace(':', '-') }}">Inspect selected investigation evidence</a></p>
-<p id="graph-status" role="status" aria-live="polite"></p><p id="graph-node-detail" aria-live="polite">Select a node to read its full label.</p>
-<div class="graph-scroll"><svg id="investigation-svg" role="group" aria-label="Selected investigation configuration and evidence graph" xmlns="http://www.w3.org/2000/svg"></svg></div>
-<p>Legend: purple = investigation; blue = resource or IAM role; orange = supporting finding; red = coverage gap. Graph limits: {{ investigation.graph.limits.nodes_per_investigation }} nodes and {{ investigation.graph.limits.edges_per_investigation }} edges per selection. {{ investigation.graph.omitted_investigations }} additional investigations omitted from the graph; their text remains above.</p>
+<p id="graph-status" role="status" aria-live="polite"></p>
+<p class="graph-scroll-hint">Scroll sideways to see the whole diagram.</p>
+<div class="graph-scroll"><svg id="investigation-svg" class="graph-svg" role="group" aria-label="Selected investigation configuration and evidence graph" xmlns="http://www.w3.org/2000/svg"></svg></div>
+</div>
+<div id="graph-node-detail" class="graph-detail" aria-live="polite"><p>Select a node to read its full label and connections. Arrow keys move between nodes.</p></div>
+</div>
+<div class="graph-legend" aria-label="Graph legend">
+<ul class="legend-lines">
+<li><svg width="44" height="10" aria-hidden="true"><line x1="0" y1="5" x2="44" y2="5" class="edge edge-observed"/></svg> Solid: observed configuration relationship</li>
+<li><svg width="44" height="10" aria-hidden="true"><line x1="0" y1="5" x2="44" y2="5" class="edge edge-inferred"/></svg> Dashed: inferred review association, unverified</li>
+<li><svg width="44" height="10" aria-hidden="true"><line x1="0" y1="5" x2="44" y2="5" class="edge edge-gap"/></svg> Dotted: coverage limitation, evidence is missing or unknown</li>
+</ul>
+<ul class="legend-kinds">
+<li class="cat-compute"><svg width="18" height="18" aria-hidden="true"><use href="#ic-ec2" class="aws-ic" width="18" height="18"/></svg> Compute</li>
+<li class="cat-identity"><svg width="18" height="18" aria-hidden="true"><use href="#ic-iam" class="aws-ic" width="18" height="18"/></svg> Identity and keys</li>
+<li class="cat-data"><svg width="18" height="18" aria-hidden="true"><use href="#ic-s3" class="aws-ic" width="18" height="18"/></svg> Data</li>
+<li class="cat-ai"><svg width="18" height="18" aria-hidden="true"><use href="#ic-bedrock" class="aws-ic" width="18" height="18"/></svg> AI</li>
+<li class="cat-monitor"><svg width="18" height="18" aria-hidden="true"><use href="#ic-cloudtrail" class="aws-ic" width="18" height="18"/></svg> Monitoring</li>
+<li class="k-INVESTIGATION"><svg width="18" height="18" aria-hidden="true"><use href="#ic-investigation" class="ic" width="18" height="18"/></svg> Investigation</li>
+<li class="k-FINDING"><svg width="18" height="18" aria-hidden="true"><use href="#ic-finding" class="ic" width="18" height="18"/></svg> Supporting finding</li>
+<li class="k-COVERAGE"><svg width="18" height="18" aria-hidden="true"><use href="#ic-gap" class="ic" width="18" height="18"/></svg> Coverage gap</li>
+</ul>
+<p><strong>These lines are not attack paths.</strong> Observed and inferred lines are review associations; neither shows that access is effective. Color is never the only signal: every node names its service and kind. Graph limits: {{ investigation.graph.limits.nodes_per_investigation }} nodes and {{ investigation.graph.limits.edges_per_investigation }} edges per selection. {{ investigation.graph.omitted_investigations }} additional investigations omitted from the graph; their text remains above.</p>
+<p class="graph-note">AWS service icons are AWS Architecture Icons, © Amazon Web Services, used only to identify services. AWSherlock is not affiliated with or endorsed by AWS.</p>
+</div>
+</div>
 <noscript><p>The graph requires JavaScript. All investigation conditions, evidence references, coverage limitations and actions are available in the text above.</p></noscript>
 <script type="application/json" id="investigation-graph-data">{{ investigation.graph | tojson }}</script>
 <script>
@@ -35,63 +72,456 @@
   const search = document.getElementById('graph-search');
   const inferred = document.getElementById('graph-inferred');
   const svg = document.getElementById('investigation-svg');
-  const nodeLabels = new Map();
+  const archSvg = document.getElementById('architecture-svg');
+  const archEmpty = document.getElementById('architecture-empty');
+  const detail = document.getElementById('graph-node-detail');
   const ns = 'http://www.w3.org/2000/svg';
+  const CATEGORY = {lambda:'compute', ec2:'compute', iam:'identity', secretsmanager:'identity', kms:'identity', s3:'data', rds:'data', dynamodb:'data', bedrock:'ai', cloudtrail:'monitor', guardduty:'monitor'};
+  const LANES = [['compute','Compute'], ['identity','Identity and keys'], ['data','Data'], ['ai','AI'], ['monitor','Monitoring'], ['other','Other']];
+  const KIND_ICON = {INVESTIGATION:'investigation', FINDING:'finding', COVERAGE:'gap'};
+  const KIND_NAME = {INVESTIGATION:'Investigation', FINDING:'Supporting finding', COVERAGE:'Coverage gap', RESOURCE:'Resource'};
+  const NODE_W = 220, NODE_H = 58, MAX_ARCH_NODES = 60;
+  const pathGroups = new Map(), archGroups = new Map();
   function element(tag, attrs, text) {
     const item = document.createElementNS(ns, tag);
     for (const [name, value] of Object.entries(attrs)) item.setAttribute(name, String(value));
     if (text !== undefined) item.textContent = text;
     return item;
   }
-  function draw() {
+  function parseResource(label) {
+    const match = /^([^/]+)\/([^:]+): (.*)$/.exec(label);
+    return match ? {service: match[1], type: match[2], name: match[3]} : {service: 'other', type: '', name: label};
+  }
+  const categoryOf = service => CATEGORY[service] || 'other';
+  const iconOf = service => (service in CATEGORY ? service : 'generic');
+  const clip = (value, size) => value.length > size ? value.slice(0, size - 1) + '…' : value;
+  const AWS_ICONS = new Set(Object.keys(CATEGORY));
+  function icon(name, x, y, size) { return element('use', {href: '#ic-' + name, x, y, width: size, height: size, class: AWS_ICONS.has(name) ? 'aws-ic' : 'ic'}); }
+  function connections(graphs, id) {
+    const labels = new Map();
+    for (const graph of graphs) for (const node of graph.nodes) labels.set(node.id, node.label);
+    const rows = [];
+    for (const graph of graphs) for (const edge of graph.edges) {
+      if (edge.source !== id && edge.target !== id) continue;
+      const other = edge.source === id ? edge.target : edge.source;
+      rows.push({label: edge.label, semantics: edge.semantics, other: labels.get(other) || other, outgoing: edge.source === id});
+    }
+    return rows;
+  }
+  function showDetail(node, graphs, appearsIn) {
+    detail.replaceChildren();
+    const title = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.textContent = KIND_NAME[node.kind] + ': ' + node.label;
+    title.append(strong);
+    const id = document.createElement('p');
+    const code = document.createElement('code');
+    code.textContent = node.id;
+    id.append(code);
+    detail.append(title, id);
+    const rows = connections(graphs, node.id);
+    const heading = document.createElement('p');
+    heading.textContent = rows.length ? 'Connections' : 'No connections in the rendered graph.';
+    detail.append(heading);
+    if (rows.length) {
+      const list = document.createElement('ul');
+      for (const row of rows.slice(0, 12)) {
+        const item = document.createElement('li');
+        const kind = row.semantics === 'OBSERVED' ? 'observed configuration' : 'inferred, unverified';
+        item.textContent = (row.outgoing ? row.label + ' → ' : row.label + ' ← ') + row.other + ' (' + kind + ')';
+        list.append(item);
+      }
+      if (rows.length > 12) { const more = document.createElement('li'); more.textContent = (rows.length - 12) + ' more connections omitted.'; list.append(more); }
+      detail.append(list);
+    }
+    if (appearsIn && appearsIn.length) {
+      const label = document.createElement('p');
+      label.textContent = 'Referenced by ' + appearsIn.length + ' investigation' + (appearsIn.length === 1 ? '' : 's') + ':';
+      const list = document.createElement('ul');
+      for (const graph of appearsIn.slice(0, 8)) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.setAttribute('href', '#context-' + graph.investigation_id.replaceAll(':', '-'));
+        link.setAttribute('data-open-record', '1');
+        link.textContent = graph.priority + ' · ' + graph.title;
+        item.append(link);
+        list.append(item);
+      }
+      detail.append(label, list);
+    }
+    const note = document.createElement('p');
+    note.className = 'graph-note';
+    note.textContent = 'A connection is a review association, not verified access or an attack path.';
+    detail.append(note);
+  }
+  detail.addEventListener('click', event => {
+    const link = event.target.closest('a[data-open-record]');
+    if (!link) return;
+    const record = document.getElementById(link.getAttribute('href').slice(1));
+    if (record) record.open = true;
+  });
+  function neighbours(groups, links) {
+    const ids = Array.from(groups.keys());
+    for (const [id, group] of groups) {
+      const related = new Set([id]);
+      for (const link of links) { if (link.source === id) related.add(link.target); if (link.target === id) related.add(link.source); }
+      const on = () => {
+        for (const other of ids) groups.get(other).classList.toggle('is-dim', !related.has(other));
+        for (const link of links) link.el.classList.toggle('is-dim', link.source !== id && link.target !== id);
+      };
+      const off = () => {
+        for (const other of ids) groups.get(other).classList.remove('is-dim');
+        for (const link of links) link.el.classList.remove('is-dim');
+      };
+      group.addEventListener('pointerenter', on); group.addEventListener('pointerleave', off);
+      group.addEventListener('focus', on); group.addEventListener('blur', off);
+    }
+  }
+  function arrowNavigation(groups) {
+    const order = Array.from(groups.values());
+    order.forEach((group, index) => group.addEventListener('keydown', event => {
+      const step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[event.key];
+      if (!step) return;
+      event.preventDefault();
+      const next = order[(index + step + order.length) % order.length];
+      next.focus();
+    }));
+  }
+  function wireNode(group, node, groups, activate) {
+    group.addEventListener('click', activate);
+    group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); } });
+    groups.set(node.id, group);
+  }
+  function animateWhenVisible(target) {
+    if (target.classList.contains('graph-anim')) return;
+    if (!('IntersectionObserver' in window)) { target.classList.add('graph-anim'); return; }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { target.classList.add('graph-anim'); observer.disconnect(); }
+    }, {threshold: 0.2});
+    observer.observe(target);
+  }
+  function drawArchitecture() {
+    archSvg.replaceChildren(); archGroups.clear();
+    const nodes = new Map();
+    for (const graph of data.investigations) for (const node of graph.nodes) {
+      if (node.kind !== 'RESOURCE') continue;
+      if (!nodes.has(node.id)) nodes.set(node.id, Object.assign({appears: []}, node, parseResource(node.label)));
+      nodes.get(node.id).appears.push(graph);
+    }
+    archEmpty.hidden = nodes.size > 0;
+    if (!nodes.size) { archSvg.setAttribute('width', '0'); archSvg.setAttribute('height', '0'); return; }
+    const laneOrder = LANES.map(lane => lane[0]);
+    const sorted = Array.from(nodes.values()).sort((a, b) =>
+      laneOrder.indexOf(categoryOf(a.service)) - laneOrder.indexOf(categoryOf(b.service)) ||
+      a.service.localeCompare(b.service) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).slice(0, MAX_ARCH_NODES);
+    const omitted = nodes.size - sorted.length;
+    const shown = new Set(sorted.map(node => node.id));
+    const lanes = LANES.filter(lane => sorted.some(node => categoryOf(node.service) === lane[0]));
+    const available = Math.min(1080, (archSvg.parentElement.clientWidth || 1084) - 4);
+    const gap = lanes.length > 1 ? Math.max(80, (available - 60 - lanes.length * NODE_W) / (lanes.length - 1)) : 0;
+    const width = lanes.length > 1 ? Math.ceil(60 + lanes.length * NODE_W + (lanes.length - 1) * gap) : Math.max(available, NODE_W + 60);
+    // Order nodes inside each lane by the average row of their neighbours in earlier lanes,
+    // which keeps connections short and avoids lines crossing over other cards.
+    const adjacent = new Map();
+    for (const graph of data.investigations) for (const edge of graph.edges) {
+      if (!shown.has(edge.source) || !shown.has(edge.target)) continue;
+      for (const [a, b] of [[edge.source, edge.target], [edge.target, edge.source]]) {
+        if (!adjacent.has(a)) adjacent.set(a, new Set());
+        adjacent.get(a).add(b);
+      }
+    }
+    const place = new Map(), rowOf = new Map();
+    let tallest = 0;
+    lanes.forEach((lane, laneIndex) => {
+      let members = sorted.filter(node => categoryOf(node.service) === lane[0]);
+      if (laneIndex > 0) {
+        const score = node => {
+          const rows = Array.from(adjacent.get(node.id) || []).filter(other => rowOf.has(other)).map(other => rowOf.get(other));
+          return rows.length ? rows.reduce((sum, value) => sum + value, 0) / rows.length : Infinity;
+        };
+        members = members.slice().sort((a, b) => {
+          const sa = score(a), sb = score(b);
+          return sa === sb ? a.name.localeCompare(b.name) : sa - sb;
+        });
+      }
+      members.forEach((node, row) => {
+        rowOf.set(node.id, row);
+        const x = lanes.length > 1 ? 30 + laneIndex * (NODE_W + gap) : (width - NODE_W) / 2;
+        place.set(node.id, {x, y: 56 + row * (NODE_H + 22), lane: laneIndex});
+      });
+      tallest = Math.max(tallest, members.length);
+    });
+    const height = 56 + tallest * (NODE_H + 22) + 10 + (omitted ? 22 : 0);
+    archSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    archSvg.setAttribute('width', String(width)); archSvg.setAttribute('height', String(height));
+    archSvg.style.setProperty('--sweep-to', width + 'px');
+    const defs = element('defs', {});
+    const gradient = element('linearGradient', {id: 'arch-sweep-gradient', x1: 0, x2: 1, y1: 0, y2: 0});
+    gradient.append(element('stop', {offset: '0', 'stop-color': '#e98c52', 'stop-opacity': '0'}), element('stop', {offset: '0.8', 'stop-color': '#e98c52', 'stop-opacity': '0.35'}), element('stop', {offset: '1', 'stop-color': '#7b0ad1', 'stop-opacity': '0.55'}));
+    defs.append(gradient); archSvg.append(defs);
+    lanes.forEach((lane, index) => {
+      const x = lanes.length > 1 ? 30 + index * (NODE_W + gap) : (width - NODE_W) / 2;
+      const title = element('text', {x, y: 30, class: 'lane-title cat-' + lane[0]}, lane[1]);
+      archSvg.append(title, element('line', {x1: x, x2: x + NODE_W, y1: 40, y2: 40, class: 'lane-rule cat-' + lane[0]}));
+    });
+    const links = [];
+    const seen = new Set();
+    const drawn = [];
+    for (const graph of data.investigations) for (const edge of graph.edges) {
+      if (seen.has(edge.id) || !shown.has(edge.source) || !shown.has(edge.target)) continue;
+      if (!nodes.has(edge.source) || !nodes.has(edge.target)) continue;
+      if (!inferred.checked && edge.semantics === 'INFERRED') continue;
+      seen.add(edge.id);
+      const a = place.get(edge.source), b = place.get(edge.target);
+      const sides = a.x < b.x ? ['r', 'l'] : a.x > b.x ? ['l', 'r'] : ['r', 'r'];
+      drawn.push({edge, a, b, sides, offsets: [0, 0]});
+    }
+    // Fan the connection points out along each card side so several edges never pile onto one spot.
+    const groups = new Map();
+    drawn.forEach((item, index) => {
+      for (const end of [0, 1]) {
+        const id = end === 0 ? item.edge.source : item.edge.target;
+        const key = id + item.sides[end];
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({index, end, otherY: (end === 0 ? item.b : item.a).y});
+      }
+    });
+    for (const members of groups.values()) {
+      members.sort((x, y) => x.otherY - y.otherY || x.index - y.index);
+      const step = members.length > 1 ? Math.min(10, 40 / (members.length - 1)) : 0;
+      members.forEach((member, position) => { drawn[member.index].offsets[member.end] = (position - (members.length - 1) / 2) * step; });
+    }
+    const labelInline = drawn.length <= 3;
+    const labelCounts = new Map();
+    drawn.forEach((item, order) => {
+      const {edge, a, b, sides, offsets} = item;
+      const y1 = a.y + NODE_H / 2 + offsets[0], y2 = b.y + NODE_H / 2 + offsets[1];
+      const x1 = sides[0] === 'r' ? a.x + NODE_W : a.x, x2 = sides[1] === 'r' ? b.x + NODE_W : b.x;
+      let d, labelX;
+      if (sides[0] === sides[1]) { d = `M${x1} ${y1} C${x1 + 70} ${y1} ${x2 + 70} ${y2} ${x2} ${y2}`; labelX = x1 + 48; }
+      else { const dx = (x2 - x1) / 2; d = `M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`; labelX = (x1 + x2) / 2; }
+      const observed = edge.semantics === 'OBSERVED';
+      const path = element('path', {d, pathLength: 1, class: 'edge ' + (observed ? 'edge-observed' : 'edge-inferred'), 'data-semantics': edge.semantics, style: '--d:' + (500 + order * 140)});
+      path.append(element('title', {}, edge.label));
+      archSvg.append(path);
+      if (labelInline) archSvg.append(element('text', {x: labelX, y: (y1 + y2) / 2 - 7, 'text-anchor': 'middle', class: 'edge-label'}, edge.label));
+      labelCounts.set(edge.label, (labelCounts.get(edge.label) || 0) + 1);
+      links.push({el: path, source: edge.source, target: edge.target});
+    });
+    const note = document.getElementById('architecture-edge-note');
+    note.hidden = labelInline || !drawn.length;
+    note.textContent = 'Lines: ' + Array.from(labelCounts, ([label, count]) => label + ' × ' + count).join(', ') + '. Hover a line or select a card for details.';
+    sorted.forEach((node, index) => {
+      const p = place.get(node.id);
+      const group = element('g', {class: 'node arch-node cat-' + categoryOf(node.service), 'data-node': node.id, tabindex: 0, role: 'button', 'aria-label': node.service + ' ' + node.type + ': ' + node.name, style: '--i:' + index});
+      group.append(element('rect', {x: p.x, y: p.y, width: NODE_W, height: NODE_H, rx: 6, class: 'card'}));
+      group.append(element('rect', {x: p.x, y: p.y, width: 5, height: NODE_H, class: 'accent'}));
+      group.append(icon(iconOf(node.service), p.x + 14, p.y + 14, 30));
+      group.append(element('text', {x: p.x + 50, y: p.y + 23, class: 'kind-text'}, node.service + ' / ' + node.type));
+      group.append(element('text', {x: p.x + 50, y: p.y + 43, class: 'name-text'}, clip(node.name, 24)));
+      group.append(element('title', {}, node.label));
+      wireNode(group, node, archGroups, () => showDetail(node, data.investigations, node.appears));
+      archSvg.append(group);
+    });
+    if (omitted) archSvg.append(element('text', {x: 30, y: height - 8, class: 'graph-omitted'}, omitted + ' more resources omitted from this view. The Resources section lists all identities.'));
+    archSvg.append(element('rect', {x: -160, y: 0, width: 160, height, class: 'sweep', fill: 'url(#arch-sweep-gradient)'}));
+    neighbours(archGroups, links); arrowNavigation(archGroups);
+    animateWhenVisible(archSvg);
+    highlight();
+  }
+  function drawPaths() {
     const graph = data.investigations.find(item => item.investigation_id === select.value);
     if (!graph) return;
-    svg.replaceChildren();
-    nodeLabels.clear();
-    document.getElementById('graph-node-detail').textContent = 'Select a node to read its full label.';
-    const height = Math.max(180, Math.ceil(graph.nodes.length / 3) * 90 + 30);
-    svg.setAttribute('viewBox', `0 0 1080 ${height}`);
-    svg.setAttribute('width', '1080'); svg.setAttribute('height', String(height));
-    const positions = new Map(graph.nodes.map((node, index) => [node.id, {x: 10 + index % 3 * 360, y: 20 + Math.floor(index / 3) * 90}]));
+    svg.replaceChildren(); pathGroups.clear();
+    detail.replaceChildren();
+    const intro = document.createElement('p');
+    intro.textContent = 'Select a node to read its full label and connections. Arrow keys move between nodes.';
+    detail.append(intro);
+    // Tree layout: investigation on top, resources below it, each resource's findings nested under it.
+    // Connectors are orthogonal rails in the left gutter, so no line crosses a card or another line.
+    const byId = new Map(graph.nodes.map(node => [node.id, node]));
+    const root = graph.nodes.find(node => node.kind === 'INVESTIGATION');
+    const findingParent = new Map();
     for (const edge of graph.edges) {
-      if (!inferred.checked && edge.semantics === 'INFERRED') continue;
-      const a = positions.get(edge.source), b = positions.get(edge.target);
-      const line = element('line', {x1:a.x+160, y1:a.y+25, x2:b.x+160, y2:b.y+25, stroke:edge.semantics === 'OBSERVED' ? '#2563eb' : '#94a3b8', 'stroke-width':2, 'data-semantics':edge.semantics});
-      if (edge.semantics === 'INFERRED') line.setAttribute('stroke-dasharray', '6 5');
-      line.append(element('title', {}, edge.label)); svg.append(line);
-      if (edge.semantics === 'OBSERVED') svg.append(element('text', {x:(a.x+b.x)/2+160, y:(a.y+b.y)/2+18, fill:'#1d4ed8', 'font-size':10}, edge.label));
+      const source = byId.get(edge.source), target = byId.get(edge.target);
+      if (source && target && source.kind === 'FINDING' && target.kind === 'RESOURCE') findingParent.set(source.id, {edge, parent: target.id});
     }
-    const colors = {INVESTIGATION:'#6d28d9', RESOURCE:'#1d4ed8', FINDING:'#b45309', COVERAGE:'#b91c1c'};
-    for (const node of graph.nodes) {
-      const p = positions.get(node.id);
-      const group = element('g', {'data-node':node.id, tabindex:0, role:'button', 'aria-label':node.kind+': '+node.label});
-      group.append(element('rect', {x:p.x, y:p.y, width:330, height:54, rx:5, fill:'#fff', stroke:colors[node.kind]}));
-      group.append(element('text', {x:p.x+8, y:p.y+18, fill:colors[node.kind], 'font-size':10}, node.kind));
-      group.append(element('text', {x:p.x+8, y:p.y+38, fill:'#111827', 'font-size':11}, node.label.length > 43 ? node.label.slice(0, 40)+'…' : node.label));
-      group.append(element('title', {}, node.label));
-      const inspect = () => { document.getElementById('graph-node-detail').textContent = node.kind+': '+node.label+' — '+node.id; };
-      group.addEventListener('click', inspect); group.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inspect(); } });
-      nodeLabels.set(group, node.label.toLowerCase());
+    const rootEdge = new Map();
+    for (const edge of graph.edges) if (edge.source === root.id && !findingParent.has(edge.target)) rootEdge.set(edge.target, edge);
+    const ORDER = {RESOURCE: 0, FINDING: 1, COVERAGE: 2};
+    const top = graph.nodes.filter(node => node !== root && !findingParent.has(node.id))
+      .sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
+    const rows = [{node: root, level: 0}];
+    for (const node of top) {
+      rows.push({node, level: 1, edge: rootEdge.get(node.id), parent: root.id});
+      if (node.kind !== 'RESOURCE') continue;
+      for (const [findingId, info] of findingParent) if (info.parent === node.id) rows.push({node: byId.get(findingId), level: 2, edge: info.edge, parent: node.id});
+    }
+    const PH = 54, STEP = 68, X = [16, 64, 112], W = [368, 320, 272], RIGHT = 384, TOP = 24;
+    const rowOf = new Map(rows.map((row, index) => [row.node.id, index]));
+    const yOf = id => TOP + rowOf.get(id) * STEP;
+    const rail = id => X[rows[rowOf.get(id)].level] + 24;
+    const brackets = graph.edges.filter(edge => { const s = byId.get(edge.source), t = byId.get(edge.target); return s && t && s.kind === 'RESOURCE' && t.kind === 'RESOURCE'; });
+    const bracketRoom = brackets.length ? brackets.length * 18 + 190 : 0;
+    const width = RIGHT + 28 + bracketRoom + 16;
+    const height = TOP + rows.length * STEP + 6;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', String(width)); svg.setAttribute('height', String(height));
+    const links = [];
+    let order = 0;
+    function connector(edge, parts) {
+      const gapEdge = edge.label === 'coverage limitation';
+      const kind = edge.semantics === 'OBSERVED' ? 'edge-observed' : gapEdge ? 'edge-gap' : 'edge-inferred';
+      const group = element('g', {class: 'edge-group'});
+      const delay = '--d:' + (400 + order * 90);
+      for (const part of parts) {
+        const shape = part.d
+          ? element('path', {d: part.d, pathLength: 1, class: 'edge ' + kind, 'data-semantics': edge.semantics, style: delay})
+          : element('line', {x1: part.x1, y1: part.y1, x2: part.x2, y2: part.y2, pathLength: 1, class: 'edge ' + kind, 'data-semantics': edge.semantics, style: delay});
+        group.append(shape);
+      }
+      group.append(element('title', {}, edge.label + (edge.semantics === 'OBSERVED' ? ' (observed configuration)' : ' (inferred, unverified)')));
       svg.append(group);
+      links.push({el: group, source: edge.source, target: edge.target});
+      order += 1;
+      return group;
     }
-    document.getElementById('graph-evidence-link').setAttribute('href', '#context-'+graph.investigation_id.replaceAll(':','-'));
+    for (const row of rows) {
+      if (!row.edge || (!inferred.checked && row.edge.semantics === 'INFERRED')) continue;
+      const cy = yOf(row.node.id) + PH / 2, x = rail(row.parent);
+      connector(row.edge, [
+        {x1: x, y1: yOf(row.parent) + PH, x2: x, y2: cy},
+        {x1: x, y1: cy, x2: X[row.level], y2: cy},
+      ]);
+    }
+    brackets.forEach((edge, index) => {
+      if (!inferred.checked && edge.semantics === 'INFERRED') return;
+      const y1 = yOf(edge.source) + PH / 2, y2 = yOf(edge.target) + PH / 2, xr = RIGHT + 28 + index * 18;
+      connector(edge, [{d: `M${RIGHT} ${y1} H${xr} V${y2} H${RIGHT}`}]);
+      svg.append(element('text', {x: xr + 8, y: (y1 + y2) / 2 + 4, class: 'edge-label'}, edge.label));
+    });
+    rows.forEach((row, index) => {
+      const node = row.node, x = X[row.level], y = yOf(node.id), w = W[row.level];
+      const resource = node.kind === 'RESOURCE' ? parseResource(node.label) : null;
+      const classes = 'node k-' + node.kind + (resource ? ' cat-' + categoryOf(resource.service) : '');
+      const group = element('g', {class: classes, 'data-node': node.id, 'data-kind': node.kind, tabindex: 0, role: 'button', 'aria-label': node.kind + ': ' + node.label, style: '--i:' + index});
+      if (node.kind === 'INVESTIGATION' && graph.priority === 'HIGH') group.append(element('rect', {x: x - 3, y: y - 3, width: w + 6, height: PH + 6, rx: 8, class: 'pulse'}));
+      group.append(element('rect', {x, y, width: w, height: PH, rx: 6, class: 'card'}));
+      group.append(element('rect', {x, y, width: 5, height: PH, class: 'accent'}));
+      group.append(resource ? icon(iconOf(resource.service), x + 14, y + 12, 30) : icon(KIND_ICON[node.kind], x + 16, y + 15, 24));
+      group.append(element('text', {x: x + 50, y: y + 21, class: 'kind-text'}, resource ? resource.service + ' / ' + resource.type : KIND_NAME[node.kind]));
+      group.append(element('text', {x: x + 50, y: y + 40, class: 'name-text'}, clip(resource ? resource.name : node.label, [44, 36, 30][row.level])));
+      group.append(element('title', {}, node.label));
+      wireNode(group, node, pathGroups, () => showDetail(node, [graph], null));
+      svg.append(group);
+    });
+    document.getElementById('graph-evidence-link').setAttribute('href', '#context-' + graph.investigation_id.replaceAll(':', '-'));
     document.getElementById('graph-status').textContent = `${graph.priority} / ${graph.priority_status}. ${graph.nodes.length} nodes; ${graph.omitted_nodes} nodes and ${graph.omitted_edges} edges omitted. Text evidence remains available.`;
+    neighbours(pathGroups, links); arrowNavigation(pathGroups);
+    svg.classList.add('graph-anim');
     highlight();
   }
   function highlight() {
     const query = search.value.trim().toLowerCase();
-    for (const [group, label] of nodeLabels) group.setAttribute('opacity', !query || label.includes(query) ? '1' : '0.2');
+    for (const [groups, root] of [[pathGroups, svg], [archGroups, archSvg]]) {
+      for (const [id, group] of groups) {
+        const label = (group.querySelector('title') || {textContent: ''}).textContent.toLowerCase();
+        group.setAttribute('opacity', !query || label.includes(query) ? '1' : '0.2');
+      }
+    }
   }
+  const tabs = Array.from(document.querySelectorAll('#investigation-graph [role="tab"]'));
+  function activate(tab, focus) {
+    for (const item of tabs) {
+      const on = item === tab;
+      item.setAttribute('aria-selected', String(on));
+      item.tabIndex = on ? 0 : -1;
+      document.getElementById(item.getAttribute('aria-controls')).hidden = !on;
+    }
+    document.getElementById('graph-stage').classList.toggle('is-side', tab.id === 'tab-paths');
+    if (tab.id === 'tab-architecture') drawArchitecture();
+    if (focus) tab.focus();
+  }
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activate(tab, false));
+    tab.addEventListener('keydown', event => {
+      const move = {ArrowRight: 1, ArrowLeft: -1}[event.key];
+      if (move) { event.preventDefault(); activate(tabs[(index + move + tabs.length) % tabs.length], true); }
+      else if (event.key === 'Home') { event.preventDefault(); activate(tabs[0], true); }
+      else if (event.key === 'End') { event.preventDefault(); activate(tabs[tabs.length - 1], true); }
+    });
+  });
   const evidenceLink = document.getElementById('graph-evidence-link');
   evidenceLink.addEventListener('click', () => {
     const record = document.getElementById(evidenceLink.getAttribute('href').slice(1));
     if (record) record.open = true;
   });
-  select.addEventListener('change', draw); search.addEventListener('input', highlight); inferred.addEventListener('change', draw); draw();
+  select.addEventListener('change', drawPaths);
+  search.addEventListener('input', highlight);
+  inferred.addEventListener('change', () => { drawArchitecture(); drawPaths(); });
+  drawArchitecture(); drawPaths();
+  let resizeTimer = 0, lastWidth = archSvg.parentElement.clientWidth;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const width = archSvg.parentElement.clientWidth;
+      if (width && width !== lastWidth) { lastWidth = width; drawArchitecture(); }
+    }, 150);
+  });
 })();
 </script>
 {% else %}<p>No graph data. Missing graph nodes do not establish safety or absent relationships.</p>{% endif %}
 </section>
+<section class="panel" id="contextual-investigations" aria-labelledby="contextual-title">
+<h2 id="contextual-title">Contextual investigations</h2>
+<p>Priority describes configuration review urgency, not impact or confidence. PROVISIONAL means effective access, reachability or business criticality remains unknown. Missing evidence does not establish safety.</p>
+{% if not investigation.contextual %}<p>No contextual investigation data. Review findings and coverage; no absence or safety conclusion follows.</p>{% endif %}
+{% for item in investigation.contextual %}
+<details class="contextual-record" id="context-{{ item.id | replace(':', '-') }}">
+<summary><strong>{{ item.priority }} · {{ item.priority_status }}</strong> — {{ item.title }}</summary>
+<p><code class="rec-id">{{ item.id }}</code><br>Account {{ item.account_id }} · {{ item.region or 'Global' }}</p>
+<p>{{ item.explanation }}</p><p>{{ item.priority_explanation }}</p>
+<ul>{% for factor in item.priority_factors %}<li><strong>{{ factor.code | e | replace('_', '_<wbr>'|safe) }} +{{ factor.points }}</strong>: {{ factor.explanation }}<br>Evidence: {% for ref in factor.evidence %}<code>{{ ref.id }}</code> {% endfor %}</li>{% endfor %}</ul>
+<div class="statement-grid">{% for field in ['observed', 'inferred', 'unknown'] %}<div class="statement"><h3>{{ field | capitalize }}</h3><ul>{% for condition in item[field] %}<li><strong>{{ condition.code | e | replace('_', '_<wbr>'|safe) }}</strong>: {{ condition.text }}{% if condition.assumptions %}<p>Assumptions: {{ condition.assumptions | join(' ') }}</p>{% endif %}{% if condition.evidence %}<p>Evidence: {% for ref in condition.evidence %}<code>{{ ref.id }}</code> {% endfor %}</p>{% endif %}</li>{% endfor %}</ul></div>{% endfor %}</div>
+<h3>Resources</h3><ul>{% for ref in item.resources %}<li>{{ ref.account_id }} / {{ ref.region or 'Global' }} / {{ ref.service }} / {{ ref.resource_type }} / {{ ref.resource_id }}{% if ref.resource_arn %}<br>{{ ref.resource_arn }}{% endif %}</li>{% endfor %}</ul>
+<h3>Supporting evidence references</h3><ul>{% for finding in item.supporting_findings %}<li><code>{{ finding.id }}</code>: {{ finding.reference.check_id }} / {{ finding.reference.service }} / {{ finding.reference.resource_id }}</li>{% endfor %}{% for edge in item.supporting_relationships %}<li><code>{{ edge.id }}</code>: {{ edge.reference.source.resource_id }} → {{ edge.reference.type }} → {{ edge.reference.target.resource_id }}</li>{% endfor %}</ul>
+<h3>Coverage limitations</h3><ul>{% for gap in item.coverage_gaps %}<li><code>{{ gap.id }}</code>: {{ gap.code }} / {{ gap.service or 'Supporting evidence' }} / {{ gap.status }}{% if gap.reason_code %} / {{ gap.reason_code }}{% endif %}{% if gap.operation %} / {{ gap.operation }}{% endif %}</li>{% else %}<li>No supporting coverage gap detected. Effective access and exhaustive inventory remain unverified.</li>{% endfor %}</ul>
+<h3>Recommended investigation actions</h3><ol>{% for action in item.recommended_actions %}<li>{{ action.text }}</li>{% endfor %}</ol>
+</details>
+{% endfor %}
+</section>
 <style>
-.contextual-record{margin:14px 0;border:1px solid #cbd5e1;padding:12px;overflow-wrap:anywhere}.contextual-record>summary{cursor:pointer}.contextual-record code{overflow-wrap:anywhere}.graph-scroll{max-height:650px;overflow:auto;max-width:100%;border:1px solid #cbd5e1}.graph-scroll svg{display:block}#investigation-graph .filters label{min-width:0;max-width:100%}#investigation-select{display:block;box-sizing:border-box;max-width:100%}#graph-inferred{width:auto}#graph-node-detail{overflow-wrap:anywhere}@media print{.graph-scroll{display:none}#investigation-graph .filters{display:none}}
+.contextual-record{margin:14px 0;border:1px solid #cbd5e1;padding:12px;overflow-wrap:anywhere}.rec-id{font-size:11px;color:var(--muted,#64748b)}.graph-svg text{font-family:var(--mono,ui-monospace,Consolas,monospace)}.contextual-record>summary{cursor:pointer}.contextual-record code{overflow-wrap:anywhere}
+#investigation-graph{--g-purple:var(--purple,#6d28d9);--g-orange:var(--orange,#e98c52);--g-line:var(--line,#cbd5e1);--g-muted:var(--muted,#475569);--g-paper:var(--paper,#f8fafc)}
+.cat-compute{--cat:#c2571a}.cat-identity{--cat:#a21746}.cat-data{--cat:#1f7a4d}.cat-ai{--cat:#0f766e}.cat-monitor{--cat:#5b3fb3}.cat-other{--cat:#5d5170}.k-INVESTIGATION{--cat:#6d28d9}.k-FINDING{--cat:#b45309}.k-COVERAGE{--cat:#b91c1c}
+.graph-scroll{max-height:650px;overflow:auto;max-width:100%;border:1px solid var(--g-line);background:var(--g-paper)}.graph-scroll svg{display:block}
+#investigation-graph .filters label{min-width:0;max-width:100%}#investigation-graph .graph-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 22px}#investigation-graph .graph-controls label[for="graph-search"]{flex:1 1 260px;max-width:420px}#investigation-graph .graph-controls label[for="graph-inferred"]{display:flex;align-items:center;gap:8px;padding-bottom:9px;font-size:12px}#investigation-select{display:block;box-sizing:border-box;max-width:100%;width:100%}#panel-paths .filters{display:block}#graph-inferred{width:auto}
+.graph-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:16px 0 12px;border-bottom:2px solid var(--g-line)}
+.graph-tabs [role="tab"]{border:0;border-bottom:3px solid transparent;margin-bottom:-2px;background:transparent;color:var(--g-muted);font:inherit;font-weight:600;padding:9px 16px;cursor:pointer;border-radius:6px 6px 0 0}
+.graph-tabs [role="tab"][aria-selected="true"]{color:var(--g-purple);border-bottom-color:var(--g-orange)}
+.graph-tabs [role="tab"]:focus-visible{outline:3px solid var(--accent,#0f8573);outline-offset:-3px}
+.graph-panel[hidden]{display:none}
+.graph-note{color:var(--g-muted);font-size:12px}.graph-scroll-hint{display:none;color:var(--g-muted);font-size:12px}@media(max-width:640px){.graph-scroll-hint{display:block}}.graph-stage.is-side{display:grid;grid-template-columns:minmax(0,760px) minmax(260px,1fr);gap:20px;align-items:start}.graph-stage.is-side .graph-detail{margin:0;position:sticky;top:16px}@media(max-width:1000px){.graph-stage.is-side{display:block}.graph-stage.is-side .graph-detail{margin:14px 0;position:static}}
+.graph-detail{overflow-wrap:anywhere;margin:14px 0;padding:12px 14px;border:1px solid var(--g-line);border-left:5px solid var(--g-orange);background:#fff}.graph-detail ul{margin:6px 0;padding-left:18px}.graph-detail p{margin:4px 0}
+.graph-legend{margin-top:14px;font-size:12px}.graph-legend ul{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;margin:8px 0}.graph-legend li{display:inline-flex;align-items:center;gap:7px;color:var(--cat,inherit)}.legend-lines li{color:inherit}
+.ic{fill:none;stroke:var(--cat,currentColor);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.edge{fill:none;stroke-width:2}.edge-observed{stroke:var(--g-purple)}.edge-inferred{stroke:#6b7787;stroke-dasharray:6 5}.edge-gap{stroke:#b91c1c;stroke-dasharray:2 5;stroke-linecap:round}
+.edge-label{font-size:10px;fill:var(--g-purple);paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.node{cursor:pointer;outline:none}.node .card{fill:#fff;stroke:var(--cat);stroke-width:1.5}.node .accent{fill:var(--cat)}.node .kind-text{fill:var(--cat);font-size:10px}.node .name-text{fill:#111827;font-size:11px}.node:hover .card,.node:focus-visible .card{stroke-width:3}.node:focus-visible .card{stroke-dasharray:none;stroke:#111827}
+.lane-title{font-size:11px;font-weight:700;fill:var(--cat)}.lane-rule{stroke:var(--cat);stroke-width:2}.graph-omitted{font-size:11px;fill:var(--g-muted)}
+.is-dim{opacity:.22}.sweep,.pulse{display:none}
+@media screen and (prefers-reduced-motion:no-preference){
+.graph-svg .node,.graph-svg .lane-title,.graph-svg .lane-rule{transition:opacity .15s}
+.graph-anim .node{animation:node-in .5s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0)*70ms + 200ms)}
+.graph-anim .edge{animation:edge-fade .5s ease backwards;animation-delay:calc(var(--d,0)*1ms)}
+.graph-anim .edge-observed{stroke-dasharray:1;animation:edge-draw .9s ease backwards;animation-delay:calc(var(--d,0)*1ms)}
+.graph-anim .sweep{display:block;animation:sweep-run 1.4s ease-in 0.1s 1 both;pointer-events:none}
+.graph-anim .pulse{display:block;fill:none;stroke:var(--g-orange);stroke-width:3;animation:pulse-ring 2.6s ease-in-out 1.6s infinite;pointer-events:none}
+@keyframes node-in{from{opacity:0;transform:translateY(8px)}}
+@keyframes edge-draw{from{stroke-dashoffset:1}}
+@keyframes edge-fade{from{opacity:0}}
+@keyframes sweep-run{from{transform:translateX(0);opacity:1}to{transform:translateX(calc(var(--sweep-to,1080px) + 160px));opacity:0}}
+@keyframes pulse-ring{0%,100%{opacity:0}50%{opacity:.9}}
+}
+@media print{*{animation:none!important;transition:none!important}.graph-interactive{display:none}}
 </style>
